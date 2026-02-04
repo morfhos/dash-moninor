@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(set DJANGO_SETTINGS_MODULE=backend.settings:*)",
+      "Bash(DJANGO_SETTINGS_MODULE=backend.settings python manage.py:*)",
+      "Bash(powershell.exe -Command \"cd C:\\\\projetos\\\\monitor\\\\dashmonitor; python analyze_xlsx.py\")",
+      "Bash(cmd.exe /c \"cd /d C:\\\\projetos\\\\monitor\\\\dashmonitor && python analyze_xlsx.py\")",
+      "Bash(DJANGO_SETTINGS_MODULE=dashmonitor_django.settings python manage.py:*)"
+    ]
+  }
+}
