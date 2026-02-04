@@ -1,0 +1,211 @@
+{% extends "web/base.html" %}
+{% load static %}
+
+{% block content %}
+  <div class="topbar">
+    <h1>{{ page_title }}</h1>
+  </div>
+
+  <section class="main-panel">
+    <div class="campaigns-grid">
+      {% for item in campaigns_with_stats %}
+        <a href="{% url 'web:contract_done' item.campaign.id %}" class="campaign-card">
+          <div class="card-logo">
+            {% if item.cliente.logo %}
+              <img src="{{ item.cliente.logo.url }}" alt="{{ item.cliente.nome }}" />
+            {% else %}
+              <div class="logo-placeholder">
+                <span>{{ item.cliente.nome|slice:":2"|upper }}</span>
+              </div>
+            {% endif %}
+          </div>
+          <div class="card-info">
+            <h3 class="cliente-name">{{ item.cliente.nome }}</h3>
+            <p class="campaign-name">{{ item.campaign.name }}</p>
+          </div>
+          <div class="card-stats">
+            <div class="stat-row">
+              <span class="stat-label">Investimento</span>
+              <span class="stat-value">R$ {{ item.investment|floatformat:0|default:"0" }}</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Inserções</span>
+              <span class="stat-value">{{ item.insertions|default:"0" }}</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">ON / OFF</span>
+              <span class="stat-value">{{ item.on_count }} : {{ item.off_count }}</span>
+            </div>
+          </div>
+          <div class="card-footer">
+            <span class="status-badge {% if item.campaign.status == 'active' %}active{% elif item.campaign.status == 'paused' %}paused{% else %}draft{% endif %}">
+              {{ item.campaign.status|upper }}
+            </span>
+            <span class="card-period">
+              {% if item.start %}{{ item.start|date:"d/m/y" }}{% endif %}
+              {% if item.end %} - {{ item.end|date:"d/m/y" }}{% endif %}
+            </span>
+          </div>
+        </a>
+      {% empty %}
+        <div class="empty-state">
+          <p>Nenhuma campanha cadastrada.</p>
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+
+<style>
+  .campaigns-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 24px;
+  }
+
+  .campaign-card {
+    display: flex;
+    flex-direction: column;
+    background: white;
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+
+  .campaign-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.1);
+    border-color: var(--brand-primary);
+  }
+
+  .card-logo {
+    width: 100%;
+    height: 140px;
+    background: linear-gradient(135deg, #dbeafe 0%, #2563eb 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .card-logo img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+
+  .logo-placeholder {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, var(--brand-primary) 0%, #8b5cf6 100%);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: 800;
+    color: white;
+    text-transform: uppercase;
+  }
+
+  .card-info {
+    padding: 16px 20px 12px;
+    text-align: center;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .cliente-name {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin: 0 0 4px 0;
+  }
+
+  .campaign-name {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0;
+    font-weight: 600;
+  }
+
+  .card-stats {
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .stat-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  .stat-value {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .card-footer {
+    padding: 12px 20px;
+    background: #f8fafc;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .status-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .status-badge.active {
+    background: rgba(34, 197, 94, 0.15);
+    color: #15803d;
+  }
+
+  .status-badge.paused {
+    background: rgba(245, 158, 11, 0.15);
+    color: #b45309;
+  }
+
+  .status-badge.draft {
+    background: rgba(107, 114, 128, 0.15);
+    color: #4b5563;
+  }
+
+  .card-period {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  .empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-secondary);
+  }
+
+  @media (max-width: 640px) {
+    .campaigns-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}

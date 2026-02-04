@@ -172,6 +172,7 @@ class ParsedPlacementRow:
 def parse_media_plan_xlsx(uploaded_file: UploadedFile) -> dict[str, Any]:
     errors: list[str] = []
     parsed_rows: list[ParsedPlacementRow] = []
+    pieces: list[dict[str, Any]] = []
 
     temp_path = None
     source_path = getattr(uploaded_file, "path", None)
@@ -211,6 +212,7 @@ def parse_media_plan_xlsx(uploaded_file: UploadedFile) -> dict[str, Any]:
         sheets = data.get("sheets") or []
         total_rows = int(data.get("total_rows") or 0)
         rows = data.get("rows") or []
+        pieces = list(data.get("pieces") or [])
 
         for r in rows:
             start_dt = _try_parse_datetime(r.get("data", {}).get("start_date"))
@@ -248,6 +250,7 @@ def parse_media_plan_xlsx(uploaded_file: UploadedFile) -> dict[str, Any]:
             "total_rows": total_rows,
             "detected": detected,
             "parsed_rows": parsed_rows,
+            "pieces": pieces,
         }
     finally:
         if source_path is None and temp_path:
@@ -263,6 +266,7 @@ def import_media_plan_xlsx(*, campaign: Campaign, uploaded_file: UploadedFile, r
         return {"ok": False, "errors": parsed.get("errors", ["Falha ao ler planilha."])}
 
     parsed_rows: list[ParsedPlacementRow] = parsed.get("parsed_rows", [])
+    pieces_table: list[dict[str, Any]] = parsed.get("pieces", [])
 
     created_lines = 0
     created_days = 0
@@ -276,6 +280,35 @@ def import_media_plan_xlsx(*, campaign: Campaign, uploaded_file: UploadedFile, r
             PlacementLine.objects.filter(campaign=campaign).delete()
 
         pieces_by_code: dict[str, Piece] = {p.code.upper(): p for p in campaign.pieces.all()}
+
+        for item in pieces_table:
+            code = str(item.get("code") or "").strip().upper()
+            if not code:
+                continue
+            title = str(item.get("title") or "").strip()
+            dur = _parse_int(item.get("duration_sec"))
+            existing = pieces_by_code.get(code)
+            if existing is None:
+                existing = Piece.objects.create(
+                    campaign=campaign,
+                    code=code,
+                    title=title[:250] if title else f"Peça {code}",
+                    duration_sec=max(0, int(dur or 0)),
+                    type=Piece.Type.VIDEO,
+                    status=Piece.Status.PENDING,
+                )
+                pieces_by_code[code] = existing
+                created_pieces += 1
+            else:
+                update_fields = []
+                if title and (existing.title.startswith("Peça ") or existing.title.strip() == existing.code):
+                    existing.title = title[:250]
+                    update_fields.append("title")
+                if dur and not existing.duration_sec:
+                    existing.duration_sec = max(0, int(dur))
+                    update_fields.append("duration_sec")
+                if update_fields:
+                    existing.save(update_fields=update_fields)
 
         for row in parsed_rows:
             line = PlacementLine.objects.create(

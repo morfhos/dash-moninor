@@ -55,6 +55,10 @@ urlpatterns = [
         views.campaign_set_status,
         name="campaign_set_status",
     ),
+    path("api/campaigns/<int:campaign_id>/", views.api_campaign_detail, name="api_campaign_detail"),
+    path("api/login/", views.api_login, name="api_login"),
+    path("api/logout/", views.api_logout, name="api_logout"),
+    path("api/me/", views.api_me, name="api_me"),
     path("configuracoes/", views.configuracoes, name="configuracoes"),
     path("logs-auditoria/", views.logs_auditoria, name="logs_auditoria"),
 ]

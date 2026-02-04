@@ -8,28 +8,32 @@
       <div class="campaign-header">
         <div class="header-top">
         
-          <h1 class="campaign-title">SABESP • Campanha de Conscientização</h1>
+          <h1 class="campaign-title">{{ headerTitle }}</h1>
           <div class="campaign-meta">
-            <p>Praças: São Paulo, Litoral + Vale do Paraíba, RMSP + Baixada Santista</p>
-            <p>Período: 20/12/2025 a 28/02/2026 • Meio: TV Aberta + PayTV, Rádio, Jornal, Digital</p>
+            <p v-if="campaign && campaign.markets && campaign.markets.length">Praças: {{ campaign.markets.join(', ') }}</p>
+            <p v-if="campaign">
+              Período: {{ formatDateRange(campaign.period.start, campaign.period.end) }} • Meio: {{ (campaign.media && campaign.media.channels ? campaign.media.channels : []).join(', ') }}
+            </p>
+            <p v-if="loading">Carregando campanha...</p>
+            <p v-if="error" style="color:#b91c1c; font-weight: 700;">{{ error }}</p>
           </div>
           
-          <div class="campaign-stats">
+          <div class="campaign-stats" v-if="campaign">
             <div class="stat-item">
               <span class="stat-label">Orçamento</span>
-              <span class="stat-value">R$ 750.000</span>
+              <span class="stat-value">{{ formatCurrency(campaign.budget_total) }}</span>
             </div>
             <div class="stat-item">
               <span class="stat-label">Investido</span>
-              <span class="stat-value">R$ 412.500</span>
+              <span class="stat-value">{{ formatCurrency(campaign.metrics && campaign.metrics.cost) }}</span>
             </div>
             <div class="stat-item">
               <span class="stat-label">Peças</span>
-              <span class="stat-value">3 (2 ON / 1 OFF)</span>
+              <span class="stat-value">{{ piecesText }}</span>
             </div>
             <div class="stat-item">
               <span class="stat-label">Atualização</span>
-              <span class="stat-value">há 2 min</span>
+              <span class="stat-value">{{ updatedText }}</span>
             </div>
           </div>
         </div>
@@ -57,112 +61,42 @@
         </div>
 
         <div class="pieces-grid">
-          <!-- Card 1 -->
-          <div class="piece-card">
+          <div v-if="!loading && campaign && campaign.pieces && campaign.pieces.length" v-for="p in campaign.pieces" :key="p.id" class="piece-card">
             <div class="card-header">
               <div>
-                <h3 class="piece-title">CONSCIÊNCIA - BANHO</h3>
-                <p class="piece-subtitle">TV Aberta + PayTV + OOH</p>
+                <h3 class="piece-title">{{ p.title }}</h3>
+                <p class="piece-subtitle">{{ p.subtitle }}</p>
               </div>
-              <span class="status-badge on">ON</span>
+              <span class="status-badge" :class="badgeClass(p.badge)">{{ p.badge || '-' }}</span>
             </div>
             <div class="card-image">
-              <img src="../img/1.png" alt="Consciência Banho" />
+              <img :src="p.image_url || placeholderImage" :alt="p.title" />
             </div>
             <div class="card-footer">
               <div class="footer-row">
                 <div class="footer-item">
                   <span class="footer-label">Formato</span>
-                  <span class="footer-value">Estático + Vídeo 15s</span>
+                  <span class="footer-value">{{ formatPieceFormat(p) }}</span>
                 </div>
                 <div class="footer-item">
                   <span class="footer-label">Período</span>
-                  <span class="footer-value">20/12 a 02/01</span>
+                  <span class="footer-value">{{ formatDateRange(p.period && p.period.start, p.period && p.period.end) }}</span>
                 </div>
               </div>
               <div class="footer-row">
                 <div class="footer-item">
-                  <span class="footer-label">Inserções</span>
-                  <span class="footer-value">210</span>
+                  <span class="footer-label">{{ metricLabel(p) }}</span>
+                  <span class="footer-value">{{ metricValue(p) }}</span>
                 </div>
                 <div class="footer-item">
                   <span class="footer-label">Praças</span>
-                  <span class="footer-value">Litoral + Vale</span>
+                  <span class="footer-value">{{ (p.markets || []).join(', ') }}</span>
                 </div>
               </div>
             </div>
           </div>
-
-          <!-- Card 2 -->
-          <div class="piece-card">
-            <div class="card-header">
-              <div>
-                <h3 class="piece-title">CONSCIÊNCIA - QUALIDADE DA ÁGUA</h3>
-                <p class="piece-subtitle">TV + Jornal • Institucional</p>
-              </div>
-              <span class="status-badge on">ON</span>
-            </div>
-            <div class="card-image">
-              <img src="../img/2.png" alt="Qualidade da Água" />
-            </div>
-            <div class="card-footer">
-              <div class="footer-row">
-                <div class="footer-item">
-                  <span class="footer-label">Formato</span>
-                  <span class="footer-value">Estático + Vídeo 30s</span>
-                </div>
-                <div class="footer-item">
-                  <span class="footer-label">Período</span>
-                  <span class="footer-value">30/12 a 02/01</span>
-                </div>
-              </div>
-              <div class="footer-row">
-                <div class="footer-item">
-                  <span class="footer-label">Inserções</span>
-                  <span class="footer-value">180</span>
-                </div>
-                <div class="footer-item">
-                  <span class="footer-label">Praças</span>
-                  <span class="footer-value">São Paulo</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Card 3 -->
-          <div class="piece-card">
-            <div class="card-header">
-              <div>
-                <h3 class="piece-title">CONSCIÊNCIA - ÁGUA BAIXADA</h3>
-                <p class="piece-subtitle">Digital • Social + Display</p>
-              </div>
-              <span class="status-badge off">OFF</span>
-            </div>
-            <div class="card-image">
-              <img src="../img/3.png" alt="Água Baixada" />
-            </div>
-            <div class="card-footer">
-              <div class="footer-row">
-                <div class="footer-item">
-                  <span class="footer-label">Formato</span>
-                  <span class="footer-value">Display + Social</span>
-                </div>
-                <div class="footer-item">
-                  <span class="footer-label">Período</span>
-                  <span class="footer-value">06/01 a 31/01</span>
-                </div>
-              </div>
-              <div class="footer-row">
-                <div class="footer-item">
-                  <span class="footer-label">Impressões</span>
-                  <span class="footer-value">2,4M</span>
-                </div>
-                <div class="footer-item">
-                  <span class="footer-label">Praças</span>
-                  <span class="footer-value">RMSP + Baixada</span>
-                </div>
-              </div>
-            </div>
+          <div v-if="!loading && campaign && (!campaign.pieces || campaign.pieces.length === 0)" style="color:#6B7280; font-weight: 600;">
+            Nenhuma peça encontrada para esta campanha.
           </div>
         </div>
       </div>
@@ -173,10 +107,124 @@
 <script>
 import Sidebar from '../components/Sidebar.vue'
 import TopUserBar from '../components/TopUserBar.vue'
+import placeholderImage from '../img/1.png'
 
 export default {
   name: 'CampaignDetail',
-  components: { Sidebar, TopUserBar }
+  components: { Sidebar, TopUserBar },
+  data() {
+    return {
+      loading: true,
+      error: '',
+      campaign: null,
+      placeholderImage
+    }
+  },
+  computed: {
+    headerTitle() {
+      if (!this.campaign) return 'Campanha'
+      return `${this.campaign.cliente.nome} • ${this.campaign.name}`
+    },
+    piecesText() {
+      if (!this.campaign || !this.campaign.pieces_stats) return '-'
+      const t = this.campaign.pieces_stats.total
+      const on = this.campaign.pieces_stats.on
+      const off = this.campaign.pieces_stats.off
+      return `${t} (${on} ON / ${off} OFF)`
+    },
+    updatedText() {
+      if (!this.campaign || !this.campaign.updated_at) return '-'
+      return this.timeAgo(this.campaign.updated_at)
+    }
+  },
+  mounted() {
+    this.load()
+  },
+  watch: {
+    '$route.params.id': function () {
+      this.load()
+    }
+  },
+  methods: {
+    async load() {
+      this.loading = true
+      this.error = ''
+      this.campaign = null
+      const id = this.$route.params.id
+      try {
+        const resp = await fetch(`/api/campaigns/${id}/`, { credentials: 'include' })
+        if (resp.status === 401) {
+          this.$router.push({ name: 'login', query: { redirect: this.$route.fullPath } })
+          return
+        }
+        if (!resp.ok) {
+          throw new Error(`HTTP ${resp.status}`)
+        }
+        this.campaign = await resp.json()
+      } catch (e) {
+        this.error = 'Falha ao carregar os dados da campanha.'
+      } finally {
+        this.loading = false
+      }
+    },
+    badgeClass(badge) {
+      if (badge === 'ON') return 'on'
+      if (badge === 'OFF') return 'off'
+      return 'off'
+    },
+    formatDateRange(startIso, endIso) {
+      const start = this.parseDate(startIso)
+      const end = this.parseDate(endIso)
+      if (!start || !end) return '-'
+      const s = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(start)
+      const e = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(end)
+      return `${s} a ${e}`
+    },
+    parseDate(iso) {
+      if (!iso) return null
+      const d = new Date(iso)
+      if (isNaN(d.getTime())) return null
+      return d
+    },
+    formatCurrency(value) {
+      if (value === null || value === undefined || value === '') return '-'
+      const n = Number(value)
+      if (isNaN(n)) return '-'
+      return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
+    },
+    formatPieceFormat(p) {
+      if (!p) return '-'
+      const dur = p.duration_sec ? `${p.duration_sec}s` : ''
+      const t = (p.type || '').toUpperCase()
+      return [t, dur].filter(Boolean).join(' ')
+    },
+    metricLabel(p) {
+      if (p && p.metrics && p.metrics.impressions) return 'Impressões'
+      return 'Inserções'
+    },
+    metricValue(p) {
+      if (!p || !p.metrics) return '-'
+      if (p.metrics.impressions) return this.formatCompactNumber(p.metrics.impressions)
+      return String(p.metrics.insertions || 0)
+    },
+    formatCompactNumber(n) {
+      const num = Number(n)
+      if (isNaN(num)) return '-'
+      return new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 }).format(num)
+    },
+    timeAgo(iso) {
+      const d = this.parseDate(iso)
+      if (!d) return '-'
+      const diffMs = Date.now() - d.getTime()
+      const mins = Math.floor(diffMs / 60000)
+      if (mins < 1) return 'agora'
+      if (mins < 60) return `há ${mins} min`
+      const hours = Math.floor(mins / 60)
+      if (hours < 24) return `há ${hours} h`
+      const days = Math.floor(hours / 24)
+      return `há ${days} d`
+    }
+  }
 }
 </script>
 

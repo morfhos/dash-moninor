@@ -1,10 +1,21 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, time
 import json
 import re
 import sys
 from typing import Any
+
+
+class DateTimeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        if isinstance(obj, date):
+            return obj.isoformat()
+        if isinstance(obj, time):
+            return obj.isoformat()
+        return super().default(obj)
 
 
 _MONTHS: dict[str, int] = {
@@ -227,6 +238,55 @@ def _find_day_row(ws: Any, *, start_row: int) -> int | None:
     return best_row
 
 
+def _extract_piece_table(ws: Any) -> list[dict[str, Any]]:
+    header_row = None
+    code_col = None
+    title_col = None
+    sec_col = None
+
+    for r in range(1, min(ws.max_row, 120) + 1):
+        row_vals = [ws.cell(row=r, column=c).value for c in range(1, min(ws.max_column, 200) + 1)]
+        norm_vals = [_norm(str(v)) if v is not None else "" for v in row_vals]
+        if "pc" not in norm_vals:
+            continue
+        if "titulos" not in norm_vals and "titulos" not in " ".join(norm_vals):
+            continue
+        if "sec" not in norm_vals:
+            continue
+        header_row = r
+        for c, nv in enumerate(norm_vals, start=1):
+            if nv == "pc":
+                code_col = c
+            elif nv == "sec":
+                sec_col = c
+            elif "titulo" in nv:
+                title_col = c
+        if title_col is None:
+            for c, nv in enumerate(norm_vals, start=1):
+                if "titulo" in nv:
+                    title_col = c
+                    break
+        break
+
+    if header_row is None or code_col is None or title_col is None:
+        return []
+
+    pieces: list[dict[str, Any]] = []
+    for r in range(header_row + 1, min(ws.max_row, header_row + 80) + 1):
+        code = ws.cell(row=r, column=code_col).value
+        title = ws.cell(row=r, column=title_col).value
+        sec = ws.cell(row=r, column=sec_col).value if sec_col is not None else None
+        code_s = str(code).strip().upper() if code is not None else ""
+        title_s = str(title).strip() if title is not None else ""
+        if not code_s and not title_s:
+            break
+        if not code_s:
+            continue
+        dur = _parse_int(sec) if sec is not None else None
+        pieces.append({"code": code_s, "title": title_s, "duration_sec": dur})
+    return pieces
+
+
 def _split_piece_codes(v: Any) -> list[str]:
     if v is None:
         return []
@@ -254,8 +314,20 @@ def main() -> int:
     parsed_rows: list[dict[str, Any]] = []
     detected: dict[str, Any] = {"sheets": {}}
     total_rows = 0
+    pieces_map: dict[str, dict[str, Any]] = {}
 
     for ws in wb.worksheets:
+        for p in _extract_piece_table(ws):
+            code = str(p.get("code") or "").strip().upper()
+            if not code:
+                continue
+            if code not in pieces_map:
+                pieces_map[code] = p
+            else:
+                if p.get("title") and not pieces_map[code].get("title"):
+                    pieces_map[code]["title"] = p.get("title")
+                if p.get("duration_sec") and not pieces_map[code].get("duration_sec"):
+                    pieces_map[code]["duration_sec"] = p.get("duration_sec")
         media_type, media_channel = detect_media_from_sheet(ws.title)
         header_row_idx = _find_table_header_row(ws)
         if header_row_idx is None:
@@ -384,10 +456,22 @@ def main() -> int:
             days: list[list[Any]] = []
             for col_idx, d in date_cols:
                 v = row_values[col_idx - 1] if col_idx - 1 < len(row_values) else None
-                ins = _parse_int(v)
-                if ins is None or ins <= 0:
+                if v is None:
                     continue
-                days.append([d.isoformat(), ins])
+
+                # Verificar se é um código de peça (letra) ou número de inserções
+                v_str = str(v).strip().upper()
+                if v_str and len(v_str) <= 2 and v_str.isalpha():
+                    # É um código de peça (ex: A, C, D, E, F, G, H)
+                    if v_str not in piece_codes:
+                        piece_codes.append(v_str)
+                    days.append([d.isoformat(), 1])  # 1 inserção para esta peça/data
+                else:
+                    # É um número de inserções
+                    ins = _parse_int(v)
+                    if ins is None or ins <= 0:
+                        continue
+                    days.append([d.isoformat(), ins])
 
             if (
                 not str(data.get("market") or "").strip()
@@ -410,8 +494,14 @@ def main() -> int:
                 }
             )
 
-    out = {"sheets": [ws.title for ws in wb.worksheets], "total_rows": total_rows, "detected": detected, "rows": parsed_rows}
-    sys.stdout.write(json.dumps(out, ensure_ascii=False))
+    out = {
+        "sheets": [ws.title for ws in wb.worksheets],
+        "total_rows": total_rows,
+        "detected": detected,
+        "rows": parsed_rows,
+        "pieces": list(pieces_map.values()),
+    }
+    sys.stdout.write(json.dumps(out, ensure_ascii=False, cls=DateTimeEncoder))
     return 0
 
 

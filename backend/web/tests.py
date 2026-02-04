@@ -267,3 +267,13 @@ class CampaignUploadFlowTests(TestCase):
         resp2 = self.client.post(reverse("web:campaign_delete", args=[self.campaign.id]), follow=False)
         self.assertEqual(resp2.status_code, 302)
         self.assertEqual(resp2["Location"], reverse("web:dashboard"))
+
+    def test_api_campaign_detail_permissions(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get(reverse("web:api_campaign_detail", args=[self.campaign.id]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("pieces", resp.json())
+
+        self.client.force_login(self.user_cliente)
+        resp2 = self.client.get(reverse("web:api_campaign_detail", args=[self.campaign.id]))
+        self.assertEqual(resp2.status_code, 200)

@@ -28,7 +28,7 @@
       <tbody>
         {% for c in campaigns %}
           <tr>
-            <td style="font-weight: 900;">{{ c.name }}</td>
+            <td style="font-weight: 900;"><a href="{% url 'web:contract_done' c.id %}" style="color: var(--text-primary); text-decoration: none; border-bottom: 2px solid var(--brand-primary);">{{ c.name }}</a></td>
             <td style="color: var(--text-secondary); font-weight: 800;">{{ c.media_type|upper }}</td>
             <td style="color: var(--text-secondary); font-weight: 800;">{{ c.status }}</td>
             <td style="color: var(--text-secondary); font-weight: 800;">
