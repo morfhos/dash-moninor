@@ -1,0 +1,35 @@
+{% extends "web/base.html" %}
+
+{% block content %}
+  <div class="topbar">
+    <div>
+      <h1>Upload concluído</h1>
+      <div style="margin-top:6px; color: var(--text-secondary); font-weight: 800; font-size: 13px;">
+        Campanha: {{ campaign.name }}
+      </div>
+    </div>
+    <a class="btn" href="{% url 'web:contract_wizard_step1' cliente.id %}" style="text-decoration:none;">Novo upload</a>
+  </div>
+
+  <section class="main-panel">
+    <div style="display:grid; gap: 12px;">
+      <div style="font-weight: 900;">Dados cadastrados</div>
+      <div style="color: var(--text-secondary); font-weight: 700;">
+        Período: {{ campaign.start_date|date:"d/m/Y H:i" }} até {{ campaign.end_date|date:"d/m/Y H:i" }} • Timezone: {{ campaign.timezone }} • Meio: {{ campaign.media_type|upper }}
+      </div>
+
+      {% if last_upload %}
+        <div style="margin-top: 10px; display:flex; justify-content:space-between; gap: 12px; padding: 12px 14px; border: 1px solid var(--border-color); border-radius: 12px; background: #ffffff;">
+          <div style="font-weight: 900;">Arquivo</div>
+          <a class="btn-link" href="{{ last_upload.file.url }}" target="_blank" rel="noreferrer">Baixar</a>
+        </div>
+      {% endif %}
+
+      <div style="display:flex; gap: 10px; flex-wrap: wrap; margin-top: 6px;">
+        <a class="btn-outline" href="{% url 'web:campaign_media_plan_upload' campaign.id %}" style="text-decoration:none;">Upload plano de mídia</a>
+        <a class="btn-outline" href="{% url 'web:campaign_assets_upload' campaign.id %}" style="text-decoration:none;">Upload peças</a>
+        <a class="btn-outline" href="{% url 'web:campaign_link_matrix' campaign.id %}" style="text-decoration:none;">Vinculação</a>
+      </div>
+    </div>
+  </section>
+{% endblock %}

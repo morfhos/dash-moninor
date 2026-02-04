@@ -1,0 +1,57 @@
+{% extends "web/base.html" %}
+
+{% block content %}
+  <div class="topbar">
+    <div>
+      <h1>Upload de Peças</h1>
+      <div style="margin-top:6px; color: var(--text-secondary); font-weight: 800; font-size: 13px;">
+        Campanha: {{ campaign.name }} • Cliente: {{ cliente.nome }}
+      </div>
+    </div>
+    <div style="display:flex; gap: 10px; align-items:center;">
+      <a class="btn-outline" href="{% url 'web:clientes_detail' cliente.id %}" style="text-decoration:none;">Voltar</a>
+      <a class="btn-outline" href="{% url 'web:campaign_link_matrix' campaign.id %}" style="text-decoration:none;">Vinculação</a>
+    </div>
+  </div>
+
+  <section class="main-panel">
+    {% if form_errors %}
+      <div style="margin-bottom: 12px; font-size: 13px; color: #b91c1c; font-weight: 800;">
+        {{ form_errors }}
+      </div>
+    {% endif %}
+
+    {% if result %}
+      <div class="card" style="padding: 14px; border-radius: 16px; margin-bottom: 14px;">
+        <div style="font-weight: 900; margin-bottom: 8px;">Resultado</div>
+        <div style="display:flex; gap: 16px; flex-wrap: wrap;">
+          <div style="display:flex; justify-content:space-between; gap: 12px; width: 240px;">
+            <div style="color: var(--text-secondary); font-weight: 800;">Peças criadas</div>
+            <div style="font-weight: 900;">{{ result.created_pieces }}</div>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap: 12px; width: 240px;">
+            <div style="color: var(--text-secondary); font-weight: 800;">Assets anexados</div>
+            <div style="font-weight: 900;">{{ result.created_assets }}</div>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap: 12px; width: 240px;">
+            <div style="color: var(--text-secondary); font-weight: 800;">Duplicados ignorados</div>
+            <div style="font-weight: 900;">{{ result.skipped_duplicates }}</div>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="card" style="padding: 16px; border-radius: 16px;">
+      <div style="font-weight: 900; margin-bottom: 6px;">Drag & drop (múltiplos arquivos)</div>
+      <div style="color: var(--text-secondary); font-weight: 800; font-size: 13px; margin-bottom: 12px;">
+        Dica: se o nome do arquivo começar com A/B/C/D..., ele tenta anexar/criar a peça automaticamente.
+      </div>
+      <form method="post" enctype="multipart/form-data" style="display:grid; gap: 12px;">
+        {% csrf_token %}
+        <input class="input" type="file" name="files" multiple required />
+        <button class="btn" type="submit" style="width: fit-content;">Enviar</button>
+      </form>
+    </div>
+  </section>
+{% endblock %}
+

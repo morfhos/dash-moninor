@@ -1,0 +1,75 @@
+{% extends "web/base.html" %}
+
+{% block content %}
+  <div class="topbar">
+    <div>
+      <h1>Vinculação Linhas ↔ Peças</h1>
+      <div style="margin-top:6px; color: var(--text-secondary); font-weight: 800; font-size: 13px;">
+        Campanha: {{ campaign.name }}
+      </div>
+    </div>
+    <div style="display:flex; gap: 10px; align-items:center;">
+      <a class="btn-outline" href="{% url 'web:campaign_media_plan_upload' campaign.id %}" style="text-decoration:none;">Plano de mídia</a>
+      <a class="btn-outline" href="{% url 'web:campaign_assets_upload' campaign.id %}" style="text-decoration:none;">Upload peças</a>
+    </div>
+  </div>
+
+  <section class="main-panel">
+    {% if saved %}
+      <div class="card" style="padding: 12px 14px; border-radius: 14px; margin-bottom: 14px;">
+        <div style="font-weight: 900;">Vínculos salvos.</div>
+      </div>
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+      <div class="card" style="padding: 0; border-radius: 16px; overflow: auto;">
+        <table class="table" style="min-width: 900px;">
+          <thead>
+            <tr>
+              <th style="width: 360px;">Linha de mídia</th>
+              {% for p in pieces %}
+                <th style="width: 120px; text-align:center;">{{ p.code }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in matrix_rows %}
+              <tr>
+                <td>
+                  <div style="display:grid; gap: 4px;">
+                    <div style="font-weight: 900;">{{ r.line.market }}{% if r.line.channel %} • {{ r.line.channel }}{% endif %}</div>
+                    <div style="color: var(--text-secondary); font-weight: 700; font-size: 12px;">
+                      {{ r.line.media_type|upper }} • {{ r.line.media_channel }}{% if r.line.external_ref %} • {{ r.line.external_ref }}{% endif %}
+                    </div>
+                  </div>
+                </td>
+                {% for c in r.cells %}
+                  <td style="text-align:center;">
+                    <input type="checkbox" name="link_{{ r.line.id }}_{{ c.piece.id }}" {% if c.checked %}checked{% endif %} />
+                  </td>
+                {% endfor %}
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="{{ pieces|length|add:1 }}" style="color: var(--text-secondary); text-align:center; padding: 18px;">
+                  Nenhuma linha de mídia cadastrada. Importe o plano de mídia primeiro.
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top: 14px; display:flex; gap: 10px; flex-wrap: wrap; align-items:center;">
+        <button class="btn" type="submit" style="width: fit-content;">Salvar vínculos</button>
+      </div>
+    </form>
+
+    <form method="post" action="{% url 'web:campaign_set_status' campaign.id %}" style="margin-top: 10px;">
+      {% csrf_token %}
+      <input type="hidden" name="status" value="active" />
+      <button class="btn-outline" type="submit" style="width: fit-content;">Ativar campanha</button>
+    </form>
+  </section>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends "web/base.html" %}
+
+{% block content %}
+  <div class="topbar">
+    <h1>{{ page_title }}</h1>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <a class="btn-outline" href="{% url 'web:clientes' %}">Voltar</a>
+      {% if cliente %}
+        <a class="btn-outline" href="{% url 'web:clientes_detail' cliente.id %}">Detalhe</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <section class="main-panel">
+    <form method="post" enctype="multipart/form-data" style="display:grid; gap: 14px;">
+      {% csrf_token %}
+      <div class="form-grid">
+        <div class="full">
+          <div style="font-size: 12px; font-weight: 800; color: var(--text-secondary); margin-bottom: 6px;">Nome</div>
+          {{ form.nome }}
+          {% if form.nome.errors %}<div style="color:#b91c1c; font-size: 12px; margin-top: 6px;">{{ form.nome.errors|striptags }}</div>{% endif %}
+        </div>
+
+        <div>
+          <div style="font-size: 12px; font-weight: 800; color: var(--text-secondary); margin-bottom: 6px;">CNPJ</div>
+          {{ form.cnpj }}
+          {% if form.cnpj.errors %}<div style="color:#b91c1c; font-size: 12px; margin-top: 6px;">{{ form.cnpj.errors|striptags }}</div>{% endif %}
+        </div>
+
+        <div>
+          <div style="font-size: 12px; font-weight: 800; color: var(--text-secondary); margin-bottom: 6px;">Status</div>
+          <label style="display:flex; align-items:center; gap:10px; padding: 12px 14px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--surface-2); cursor:pointer;">
+            {{ form.ativo }}
+            <span style="font-weight: 800;">Ativo</span>
+          </label>
+          {% if form.ativo.errors %}<div style="color:#b91c1c; font-size: 12px; margin-top: 6px;">{{ form.ativo.errors|striptags }}</div>{% endif %}
+        </div>
+
+        <div class="full">
+          <div style="font-size: 12px; font-weight: 800; color: var(--text-secondary); margin-bottom: 6px;">Logo</div>
+          <input class="input" type="file" name="logo" accept="image/*" />
+          {% if form.logo.errors %}<div style="color:#b91c1c; font-size: 12px; margin-top: 6px;">{{ form.logo.errors|striptags }}</div>{% endif %}
+          {% if cliente and cliente.logo %}
+            <div style="margin-top: 10px; display:flex; align-items:center; gap: 12px;">
+              <div class="logo-thumb"><img src="{{ cliente.logo.url }}" alt="{{ cliente.nome }}" /></div>
+              <div style="color: var(--text-secondary); font-size: 12px; font-weight: 700;">Logo atual</div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <button class="btn" type="submit" style="width: fit-content;">Salvar</button>
+    </form>
+  </section>
+{% endblock %}

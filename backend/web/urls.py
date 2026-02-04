@@ -1,0 +1,60 @@
+from django.urls import path
+
+from . import views
+
+
+app_name = "web"
+
+
+urlpatterns = [
+    path("", views.root, name="root"),
+    path("login/", views.login_view, name="login"),
+    path("logout/", views.logout_view, name="logout"),
+    path("administracao/", views.administracao, name="administracao"),
+    path("dashboard/", views.dashboard, name="dashboard"),
+    path("timeline-campanhas/", views.timeline_campanhas, name="timeline_campanhas"),
+    path("campanhas/", views.campanhas, name="campanhas"),
+    path("pecas-criativos/", views.pecas_criativos, name="pecas_criativos"),
+    path("veiculacao/", views.veiculacao, name="veiculacao"),
+    path("relatorios/", views.relatorios, name="relatorios"),
+    path("analytics/", views.analytics, name="analytics"),
+    path("integracoes/", views.integracoes, name="integracoes"),
+    path("uploads-planilhas/", views.uploads_planilhas, name="uploads_planilhas"),
+    path("usuarios-permissoes/", views.usuarios_permissoes, name="usuarios_permissoes"),
+    path("clientes/", views.clientes_list, name="clientes"),
+    path("clientes/novo/", views.clientes_create, name="clientes_create"),
+    path("clientes/<int:cliente_id>/", views.clientes_detail, name="clientes_detail"),
+    path("clientes/<int:cliente_id>/campanhas/", views.cliente_campaigns, name="cliente_campaigns"),
+    path("clientes/<int:cliente_id>/editar/", views.clientes_edit, name="clientes_edit"),
+    path("clientes/<int:cliente_id>/entrar/", views.clientes_enter, name="clientes_enter"),
+    path("clientes/<int:cliente_id>/upload/", views.clientes_upload, name="clientes_upload"),
+    path("sair-visao-cliente/", views.sair_visao_cliente, name="sair_visao_cliente"),
+    path("contratos/upload/", views.contract_wizard_entry, name="contract_wizard_entry"),
+    path("clientes/<int:cliente_id>/contratos/upload/", views.contract_wizard_step1, name="contract_wizard_step1"),
+    path("contratos/upload/<int:campaign_id>/arquivo/", views.contract_wizard_step2, name="contract_wizard_step2"),
+    path("contratos/upload/<int:campaign_id>/concluido/", views.contract_done, name="contract_done"),
+    path(
+        "campanhas/<int:campaign_id>/plano-midia/upload/",
+        views.campaign_media_plan_upload,
+        name="campaign_media_plan_upload",
+    ),
+    path(
+        "campanhas/<int:campaign_id>/pecas/upload/",
+        views.campaign_assets_upload,
+        name="campaign_assets_upload",
+    ),
+    path(
+        "campanhas/<int:campaign_id>/vinculacao/",
+        views.campaign_link_matrix,
+        name="campaign_link_matrix",
+    ),
+    path("campanhas/<int:campaign_id>/editar/", views.campaign_edit, name="campaign_edit"),
+    path("campanhas/<int:campaign_id>/excluir/", views.campaign_delete, name="campaign_delete"),
+    path(
+        "campanhas/<int:campaign_id>/status/",
+        views.campaign_set_status,
+        name="campaign_set_status",
+    ),
+    path("configuracoes/", views.configuracoes, name="configuracoes"),
+    path("logs-auditoria/", views.logs_auditoria, name="logs_auditoria"),
+]

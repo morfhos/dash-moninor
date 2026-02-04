@@ -1,0 +1,78 @@
+{% extends "web/base.html" %}
+
+{% block content %}
+  <div class="topbar">
+    <div>
+      <h1>Editar campanha</h1>
+      <div style="margin-top:6px; color: var(--text-secondary); font-weight: 800; font-size: 13px;">
+        Cliente: {{ cliente.nome }} • Campanha: {{ campaign.name }}
+      </div>
+    </div>
+    <a class="btn-outline" href="{% url 'web:cliente_campaigns' cliente.id %}" style="text-decoration:none;">Voltar</a>
+  </div>
+
+  <section class="main-panel">
+    {% if form_errors %}
+      <div style="margin-bottom: 12px; font-size: 13px; color: #b91c1c; font-weight: 800;">
+        {{ form_errors }}
+      </div>
+    {% endif %}
+
+    <div class="card" style="padding: 16px; border-radius: 16px; max-width: 760px;">
+      <form method="post" style="display:grid; gap: 12px;">
+        {% csrf_token %}
+
+        <div>
+          <div style="font-size: 12px; font-weight: 900; color: var(--text-secondary); margin-bottom: 6px;">Nome</div>
+          {{ form.name }}
+          {% if form.name.errors %}<div style="color:#b91c1c; font-size: 12px; margin-top: 6px;">{{ form.name.errors|striptags }}</div>{% endif %}
+        </div>
+
+        <div class="form-grid">
+          <div>
+            <div style="font-size: 12px; font-weight: 900; color: var(--text-secondary); margin-bottom: 6px;">Início</div>
+            {{ form.start_date }}
+            {% if form.start_date.errors %}<div style="color:#b91c1c; font-size: 12px; margin-top: 6px;">{{ form.start_date.errors|striptags }}</div>{% endif %}
+          </div>
+          <div>
+            <div style="font-size: 12px; font-weight: 900; color: var(--text-secondary); margin-bottom: 6px;">Fim</div>
+            {{ form.end_date }}
+            {% if form.end_date.errors %}<div style="color:#b91c1c; font-size: 12px; margin-top: 6px;">{{ form.end_date.errors|striptags }}</div>{% endif %}
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div>
+            <div style="font-size: 12px; font-weight: 900; color: var(--text-secondary); margin-bottom: 6px;">Timezone</div>
+            {{ form.timezone }}
+            {% if form.timezone.errors %}<div style="color:#b91c1c; font-size: 12px; margin-top: 6px;">{{ form.timezone.errors|striptags }}</div>{% endif %}
+          </div>
+          <div>
+            <div style="font-size: 12px; font-weight: 900; color: var(--text-secondary); margin-bottom: 6px;">Meio (ON/OFF)</div>
+            {{ form.media_type }}
+            {% if form.media_type.errors %}<div style="color:#b91c1c; font-size: 12px; margin-top: 6px;">{{ form.media_type.errors|striptags }}</div>{% endif %}
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div>
+            <div style="font-size: 12px; font-weight: 900; color: var(--text-secondary); margin-bottom: 6px;">Orçamento total</div>
+            {{ form.total_budget }}
+            {% if form.total_budget.errors %}<div style="color:#b91c1c; font-size: 12px; margin-top: 6px;">{{ form.total_budget.errors|striptags }}</div>{% endif %}
+          </div>
+          <div>
+            <div style="font-size: 12px; font-weight: 900; color: var(--text-secondary); margin-bottom: 6px;">Status</div>
+            {{ form.status }}
+            {% if form.status.errors %}<div style="color:#b91c1c; font-size: 12px; margin-top: 6px;">{{ form.status.errors|striptags }}</div>{% endif %}
+          </div>
+        </div>
+
+        <div style="display:flex; gap: 10px; flex-wrap: wrap; align-items:center;">
+          <button class="btn" type="submit" style="width: fit-content;">Salvar</button>
+          <a class="btn-outline" href="{% url 'web:campaign_delete' campaign.id %}" style="text-decoration:none;">Excluir</a>
+        </div>
+      </form>
+    </div>
+  </section>
+{% endblock %}
+

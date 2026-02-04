@@ -1,0 +1,68 @@
+{% extends "web/base.html" %}
+
+{% block content %}
+  <div class="topbar">
+    <h1>{{ page_title }}</h1>
+    <a class="btn" href="{% url 'web:clientes_create' %}" style="text-decoration:none;">Novo cliente</a>
+  </div>
+
+  <section class="main-panel">
+    <table class="table">
+      <thead>
+        <tr>
+          <th style="width: 60px;">Logo</th>
+          <th>Nome</th>
+          <th style="width: 160px;">CNPJ</th>
+          <th style="width: 140px;">Status</th>
+          <th style="width: 170px;">Última atualização</th>
+          <th style="width: 160px; text-align:right;">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in clientes %}
+          <tr>
+            <td>
+              <div class="logo-thumb">
+                {% if c.logo %}
+                  <img src="{{ c.logo.url }}" alt="{{ c.nome }}" />
+                {% else %}
+                  <span style="font-weight:800; color:#64748b;">{{ c.nome|slice:":1"|upper }}</span>
+                {% endif %}
+              </div>
+            </td>
+            <td>
+              <a href="{% url 'web:clientes_detail' c.id %}" style="text-decoration:none; font-weight:800; color: var(--text-primary);">
+                {{ c.nome }}
+              </a>
+            </td>
+            <td style="color: var(--text-secondary); font-weight: 700;">{{ c.cnpj|default:"-" }}</td>
+            <td>
+              {% if c.ativo %}
+                <span class="status-pill active"><span class="dot"></span>Ativo</span>
+              {% else %}
+                <span class="status-pill inactive"><span class="dot"></span>Inativo</span>
+              {% endif %}
+            </td>
+            <td style="color: var(--text-secondary); font-weight: 700;">
+              {{ c.atualizado_em|date:"d/m/Y H:i" }}
+            </td>
+            <td style="text-align:right;">
+              <span class="actions">
+                <a class="btn-link" href="{% url 'web:clientes_upload' c.id %}">Upload</a>
+                <a class="btn-link" href="{% url 'web:cliente_campaigns' c.id %}">Campanhas</a>
+                <a class="btn-link" href="{% url 'web:clientes_edit' c.id %}">Editar</a>
+                <a class="btn-link" href="{% url 'web:clientes_enter' c.id %}">Entrar</a>
+              </span>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="6" style="color: var(--text-secondary); text-align:center; padding: 18px;">
+              Nenhum cliente cadastrado.
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+{% endblock %}

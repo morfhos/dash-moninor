@@ -1,0 +1,28 @@
+{% extends "web/base.html" %}
+
+{% block content %}
+  <div class="topbar">
+    <div>
+      <h1>Excluir campanha</h1>
+      <div style="margin-top:6px; color: var(--text-secondary); font-weight: 800; font-size: 13px;">
+        Cliente: {{ cliente.nome }} • Campanha: {{ campaign.name }}
+      </div>
+    </div>
+    <a class="btn-outline" href="{% url 'web:cliente_campaigns' cliente.id %}" style="text-decoration:none;">Voltar</a>
+  </div>
+
+  <section class="main-panel">
+    <div class="card" style="padding: 16px; border-radius: 16px; max-width: 760px;">
+      <div style="font-weight: 900; margin-bottom: 10px;">Confirmação</div>
+      <div style="color: var(--text-secondary); font-weight: 800; margin-bottom: 14px;">
+        Essa ação vai excluir a campanha e os dados vinculados (linhas, dias, vínculos e uploads).
+      </div>
+      <form method="post" style="display:flex; gap: 10px; flex-wrap: wrap; align-items:center;">
+        {% csrf_token %}
+        <button class="btn" type="submit" style="width: fit-content;">Excluir</button>
+        <a class="btn-outline" href="{% url 'web:campaign_edit' campaign.id %}" style="text-decoration:none;">Cancelar</a>
+      </form>
+    </div>
+  </section>
+{% endblock %}
+

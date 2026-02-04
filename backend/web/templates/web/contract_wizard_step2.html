@@ -1,0 +1,58 @@
+{% extends "web/base.html" %}
+
+{% block content %}
+  <div class="topbar">
+    <div>
+      <h1>Contrato de Upload</h1>
+      <div style="margin-top:6px; color: var(--text-secondary); font-weight: 800; font-size: 13px;">
+        Campanha: {{ campaign.name }}
+      </div>
+    </div>
+    <a class="btn-outline" href="{% url 'web:contract_wizard_step1' cliente.id %}" style="text-decoration:none;">Voltar</a>
+  </div>
+
+  <section class="main-panel">
+    <div style="display:flex; gap: 20px; flex-wrap: wrap; align-items:flex-start;">
+      <div style="flex: 1; min-width: 320px;">
+        {% if form_errors %}
+          <div style="margin-bottom: 12px; font-size: 13px; color: #b91c1c; font-weight: 800;">
+            {{ form_errors }}
+          </div>
+        {% endif %}
+
+        <form method="post" enctype="multipart/form-data" style="display:grid; gap: 12px;">
+          {% csrf_token %}
+          <div>
+            <div style="font-size: 12px; font-weight: 900; color: var(--text-secondary); margin-bottom: 6px;">Arquivo do contrato</div>
+            <input class="input" type="file" name="contract_file" required />
+          </div>
+          <button class="btn" type="submit" style="width: fit-content;">Enviar</button>
+        </form>
+      </div>
+
+      <div style="width: 360px; flex-shrink: 0;">
+        <div style="font-weight: 900; margin-bottom: 10px;">Resumo</div>
+        <div class="card" style="padding: 14px; border-radius: 16px;">
+          <div style="display:grid; gap: 10px;">
+            <div style="display:flex; justify-content:space-between; gap: 12px;">
+              <div style="color: var(--text-secondary); font-weight: 800;">Início</div>
+              <div style="font-weight: 900;">{{ campaign.start_date|date:"d/m/Y H:i" }}</div>
+            </div>
+            <div style="display:flex; justify-content:space-between; gap: 12px;">
+              <div style="color: var(--text-secondary); font-weight: 800;">Fim</div>
+              <div style="font-weight: 900;">{{ campaign.end_date|date:"d/m/Y H:i" }}</div>
+            </div>
+            <div style="display:flex; justify-content:space-between; gap: 12px;">
+              <div style="color: var(--text-secondary); font-weight: 800;">Timezone</div>
+              <div style="font-weight: 900;">{{ campaign.timezone }}</div>
+            </div>
+            <div style="display:flex; justify-content:space-between; gap: 12px;">
+              <div style="color: var(--text-secondary); font-weight: 800;">Meio</div>
+              <div style="font-weight: 900;">{{ campaign.media_type|upper }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+{% endblock %}

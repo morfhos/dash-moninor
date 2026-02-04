@@ -1,0 +1,123 @@
+{% extends "web/base.html" %}
+
+{% block content %}
+  <div class="topbar">
+    <div>
+      <h1>Upload Plano de Mídia</h1>
+      <div style="margin-top:6px; color: var(--text-secondary); font-weight: 800; font-size: 13px;">
+        Campanha: {{ campaign.name }} • Cliente: {{ cliente.nome }}
+      </div>
+    </div>
+    <a class="btn-outline" href="{% url 'web:clientes_detail' cliente.id %}" style="text-decoration:none;">Voltar</a>
+  </div>
+
+  <section class="main-panel">
+    {% if form_errors %}
+      <div style="margin-bottom: 12px; font-size: 13px; color: #b91c1c; font-weight: 800;">
+        {{ form_errors }}
+      </div>
+    {% endif %}
+
+    <div style="display:flex; gap: 16px; flex-wrap: wrap; align-items:flex-start;">
+      <div style="flex: 1; min-width: 360px;">
+        <div style="font-weight: 900; margin-bottom: 10px;">1) Enviar .xlsx</div>
+        <div class="card" style="padding: 16px; border-radius: 16px;">
+          <form method="post" enctype="multipart/form-data" style="display:grid; gap: 12px;">
+            {% csrf_token %}
+            <input type="hidden" name="_action" value="validate" />
+            <div>
+              <div style="font-size: 12px; font-weight: 900; color: var(--text-secondary); margin-bottom: 6px;">Arquivo (.xlsx)</div>
+              <input class="input" type="file" name="xlsx_file" accept=".xlsx" required />
+            </div>
+            <div style="display:flex; gap: 10px; align-items:center;">
+              <input type="checkbox" name="replace_existing" checked />
+              <div style="color: var(--text-secondary); font-weight: 800; font-size: 13px;">Substituir linhas existentes desta campanha</div>
+            </div>
+            <button class="btn" type="submit" style="width: fit-content;">Validar</button>
+          </form>
+        </div>
+      </div>
+
+      <div style="width: 420px; flex-shrink: 0;">
+        <div style="font-weight: 900; margin-bottom: 10px;">2) Validação</div>
+        <div class="card" style="padding: 16px; border-radius: 16px;">
+          {% if result %}
+            {% if result.created %}
+              <div style="display:grid; gap: 10px;">
+                <div style="font-weight: 900;">Importação concluída</div>
+                <div style="display:flex; justify-content:space-between; gap: 12px;">
+                  <div style="color: var(--text-secondary); font-weight: 800;">PlacementLine</div>
+                  <div style="font-weight: 900;">{{ result.created.placement_lines }}</div>
+                </div>
+                <div style="display:flex; justify-content:space-between; gap: 12px;">
+                  <div style="color: var(--text-secondary); font-weight: 800;">PlacementDay</div>
+                  <div style="font-weight: 900;">{{ result.created.placement_days }}</div>
+                </div>
+                <div style="display:flex; justify-content:space-between; gap: 12px;">
+                  <div style="color: var(--text-secondary); font-weight: 800;">Pieces criadas (auto)</div>
+                  <div style="font-weight: 900;">{{ result.created.pieces }}</div>
+                </div>
+                <div style="display:flex; justify-content:space-between; gap: 12px;">
+                  <div style="color: var(--text-secondary); font-weight: 800;">Vínculos PlacementCreative</div>
+                  <div style="font-weight: 900;">{{ result.created.placement_creatives }}</div>
+                </div>
+                <a class="btn" href="{% url 'web:campaign_link_matrix' campaign.id %}" style="text-decoration:none; width: fit-content;">Ir para vinculação</a>
+              </div>
+            {% else %}
+              <div style="display:grid; gap: 10px;">
+                <div style="display:flex; justify-content:space-between; gap: 12px;">
+                  <div style="color: var(--text-secondary); font-weight: 800;">Sheets detectadas</div>
+                  <div style="font-weight: 900;">{{ result.sheets|length }}</div>
+                </div>
+                <div style="display:flex; justify-content:space-between; gap: 12px;">
+                  <div style="color: var(--text-secondary); font-weight: 800;">Linhas lidas (bruto)</div>
+                  <div style="font-weight: 900;">{{ result.total_rows }}</div>
+                </div>
+                <div style="display:flex; justify-content:space-between; gap: 12px;">
+                  <div style="color: var(--text-secondary); font-weight: 800;">Linhas válidas detectadas</div>
+                  <div style="font-weight: 900;">{{ result.valid_rows|default:"0" }}</div>
+                </div>
+
+                {% if result.detected.sheets %}
+                  <div style="margin-top: 6px; font-weight: 900;">Mapeamento por aba</div>
+                  <div style="display:grid; gap: 8px;">
+                    {% for sheet_name, info in result.detected.sheets.items %}
+                      <div style="display:flex; justify-content:space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 12px; background: #ffffff;">
+                        <div style="font-weight: 900;">{{ sheet_name }}</div>
+                        <div style="color: var(--text-secondary); font-weight: 800;">
+                          {{ info.media_type|upper }} • {{ info.media_channel }}
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+
+                {% if result.errors and result.errors|length %}
+                  <div style="margin-top: 6px; color:#b91c1c; font-weight: 900;">Erros</div>
+                  <div style="display:grid; gap: 6px;">
+                    {% for e in result.errors %}
+                      <div style="color:#b91c1c; font-weight: 800; font-size: 13px;">{{ e }}</div>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <form method="post" style="margin-top: 8px; display:flex; gap: 10px; align-items:center; flex-wrap: wrap;">
+                    {% csrf_token %}
+                    <input type="hidden" name="_action" value="import" />
+                    <input type="hidden" name="upload_id" value="{{ result.upload_id }}" />
+                    <input type="checkbox" name="replace_existing" checked />
+                    <div style="color: var(--text-secondary); font-weight: 800; font-size: 13px;">Substituir linhas existentes</div>
+                    <button class="btn" type="submit" style="width: fit-content;">Importar</button>
+                  </form>
+                {% endif %}
+              </div>
+            {% endif %}
+          {% else %}
+            <div style="color: var(--text-secondary); font-weight: 800;">
+              Envie a planilha para visualizar colunas detectadas, erros e contagem.
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </section>
+{% endblock %}

@@ -1,0 +1,56 @@
+<div class="top-userbar">
+  <div class="top-userbar-left">
+    <div class="search">
+      <span class="search-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      </span>
+      <input class="search-input" type="text" placeholder="Pesquisar..." />
+    </div>
+  </div>
+
+  <div class="top-userbar-right">
+    <button class="icon-btn" type="button" aria-label="Notificações">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+    </button>
+    <button class="icon-btn" type="button" aria-label="Mensagens">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+    </button>
+    <button class="icon-btn" type="button" aria-label="Ações">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="1"></circle><line x1="12" y1="8" x2="12" y2="8"></line><line x1="12" y1="16" x2="12" y2="16"></line></svg>
+    </button>
+
+    <div class="divider-vertical"></div>
+
+    {% if impersonating_cliente %}
+      <div style="display:flex; align-items:center; gap:10px; padding: 8px 10px; border: 1px solid var(--border-color); background: #ffffff; border-radius: 12px;">
+        <div style="font-size: 11px; font-weight: 900; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.6px;">Visão cliente</div>
+        <div style="font-size: 13px; font-weight: 900; color: var(--text-primary);">{{ impersonating_cliente.nome }}</div>
+      </div>
+    {% endif %}
+
+    <div class="profile-wrap" data-profile-wrap>
+      <button class="profile-btn" type="button" data-profile-toggle>
+        <span class="avatar">
+          {% with name=request.user.get_full_name|default:request.user.username %}
+            <span class="avatar-fallback">{{ name|slice:":2"|upper }}</span>
+          {% endwith %}
+        </span>
+        <span class="profile-name">
+          {% if request.user.get_full_name %}{{ request.user.get_full_name }}{% else %}{{ request.user.username }}{% endif %}
+        </span>
+        <span class="profile-caret">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </span>
+      </button>
+
+      <div class="profile-menu" data-profile-menu hidden>
+        <button class="profile-menu-item" type="button" data-action="logout">
+          <span class="menu-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          </span>
+          Logout
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

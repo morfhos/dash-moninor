@@ -1,0 +1,137 @@
+{% extends "web/base.html" %}
+
+{% block content %}
+  <div class="topbar">
+    <div>
+      <h1>Contrato de Upload</h1>
+      <div style="margin-top:6px; color: var(--text-secondary); font-weight: 800; font-size: 13px;">
+        Cliente: {{ cliente.nome }}
+      </div>
+    </div>
+    <a class="btn-outline" href="{% url 'web:clientes_detail' cliente.id %}" style="text-decoration:none;">Voltar</a>
+  </div>
+
+  <section class="main-panel">
+    <div style="display:flex; gap: 20px; flex-wrap: wrap; align-items:flex-start;">
+      <div style="flex: 1; min-width: 320px;">
+        <form method="post" style="display:grid; gap: 12px;">
+          {% csrf_token %}
+
+          <div>
+            <div style="font-size: 12px; font-weight: 900; color: var(--text-secondary); margin-bottom: 6px;">Nome da Campanha</div>
+            {{ form.name }}
+            {% if form.name.errors %}<div style="color:#b91c1c; font-size: 12px; margin-top: 6px;">{{ form.name.errors|striptags }}</div>{% endif %}
+          </div>
+
+          <div class="form-grid">
+            <div>
+              <div style="font-size: 12px; font-weight: 900; color: var(--text-secondary); margin-bottom: 6px;">Calendário de Início</div>
+              {{ form.start_date }}
+              {% if form.start_date.errors %}<div style="color:#b91c1c; font-size: 12px; margin-top: 6px;">{{ form.start_date.errors|striptags }}</div>{% endif %}
+            </div>
+            <div>
+              <div style="font-size: 12px; font-weight: 900; color: var(--text-secondary); margin-bottom: 6px;">Calendário de Fim</div>
+              {{ form.end_date }}
+              {% if form.end_date.errors %}<div style="color:#b91c1c; font-size: 12px; margin-top: 6px;">{{ form.end_date.errors|striptags }}</div>{% endif %}
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div>
+              <div style="font-size: 12px; font-weight: 900; color: var(--text-secondary); margin-bottom: 6px;">Timezone</div>
+              {{ form.timezone }}
+              {% if form.timezone.errors %}<div style="color:#b91c1c; font-size: 12px; margin-top: 6px;">{{ form.timezone.errors|striptags }}</div>{% endif %}
+            </div>
+            <div>
+              <div style="font-size: 12px; font-weight: 900; color: var(--text-secondary); margin-bottom: 6px;">Data de hoje</div>
+              <div class="input" style="display:flex; align-items:center; height: 44px;">{{ today_text }}</div>
+            </div>
+          </div>
+
+          <div>
+            <div style="font-size: 12px; font-weight: 900; color: var(--text-secondary); margin-bottom: 6px;">Meio (ON/OFF)</div>
+            {{ form.media_type }}
+            {% if form.media_type.errors %}<div style="color:#b91c1c; font-size: 12px; margin-top: 6px;">{{ form.media_type.errors|striptags }}</div>{% endif %}
+          </div>
+
+          <div>
+            <div style="font-size: 12px; font-weight: 900; color: var(--text-secondary); margin-bottom: 6px;">Orçamento total (opcional)</div>
+            {{ form.total_budget }}
+            {% if form.total_budget.errors %}<div style="color:#b91c1c; font-size: 12px; margin-top: 6px;">{{ form.total_budget.errors|striptags }}</div>{% endif %}
+          </div>
+
+          <button class="btn" type="submit" style="width: fit-content;">Próximo</button>
+        </form>
+      </div>
+
+      <div style="width: 360px; flex-shrink: 0;">
+        <div style="font-weight: 900; margin-bottom: 10px;">Ano de referência por mês (auto)</div>
+        <div class="card" style="padding: 14px; border-radius: 16px;">
+          <div id="monthsHint" style="color: var(--text-secondary); font-weight: 700; font-size: 13px;">
+            Selecione o início e o fim para visualizar os meses.
+          </div>
+          <div id="monthsList" style="margin-top: 10px; display:grid; gap: 8px;"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    (function () {
+      var start = document.querySelector('input[name="start_date"]')
+      var end = document.querySelector('input[name="end_date"]')
+      var list = document.getElementById('monthsList')
+      var hint = document.getElementById('monthsHint')
+      if (!start || !end || !list || !hint) return
+
+      function fmtMonth(d) {
+        try {
+          return new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(d)
+        } catch (e) {
+          return d.toLocaleString()
+        }
+      }
+
+      function firstOfMonth(d) {
+        return new Date(d.getFullYear(), d.getMonth(), 1)
+      }
+
+      function addMonths(d, n) {
+        return new Date(d.getFullYear(), d.getMonth() + n, 1)
+      }
+
+      function render() {
+        list.innerHTML = ''
+        var s = start.value ? new Date(start.value) : null
+        var e = end.value ? new Date(end.value) : null
+        if (!s || !e || isNaN(s.getTime()) || isNaN(e.getTime()) || s > e) {
+          hint.textContent = 'Selecione um intervalo válido.'
+          return
+        }
+        hint.textContent = ''
+        var cur = firstOfMonth(s)
+        var last = firstOfMonth(e)
+        var i = 0
+        while (cur <= last && i < 36) {
+          var row = document.createElement('div')
+          row.style.display = 'flex'
+          row.style.justifyContent = 'space-between'
+          row.style.alignItems = 'center'
+          row.style.padding = '10px 12px'
+          row.style.border = '1px solid var(--border-color)'
+          row.style.borderRadius = '12px'
+          row.style.background = '#ffffff'
+          row.innerHTML = '<div style="font-weight:900; text-transform: capitalize;">' + fmtMonth(cur) + '</div>' +
+            '<div style="color: var(--text-secondary); font-weight: 800;">' + cur.getFullYear() + '</div>'
+          list.appendChild(row)
+          cur = addMonths(cur, 1)
+          i++
+        }
+      }
+
+      start.addEventListener('change', render)
+      end.addEventListener('change', render)
+      render()
+    })()
+  </script>
+{% endblock %}

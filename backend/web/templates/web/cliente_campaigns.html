@@ -1,0 +1,57 @@
+{% extends "web/base.html" %}
+
+{% block content %}
+  <div class="topbar">
+    <div>
+      <h1>Campanhas</h1>
+      <div style="margin-top:6px; color: var(--text-secondary); font-weight: 800; font-size: 13px;">
+        Cliente: {{ cliente.nome }}
+      </div>
+    </div>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <a class="btn-outline" href="{% url 'web:clientes_detail' cliente.id %}" style="text-decoration:none;">Voltar</a>
+      <a class="btn" href="{% url 'web:contract_wizard_step1' cliente.id %}" style="text-decoration:none;">Nova campanha</a>
+    </div>
+  </div>
+
+  <section class="main-panel">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th style="width: 120px;">Meio</th>
+          <th style="width: 140px;">Status</th>
+          <th style="width: 230px;">Período</th>
+          <th style="width: 320px; text-align:right;">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in campaigns %}
+          <tr>
+            <td style="font-weight: 900;">{{ c.name }}</td>
+            <td style="color: var(--text-secondary); font-weight: 800;">{{ c.media_type|upper }}</td>
+            <td style="color: var(--text-secondary); font-weight: 800;">{{ c.status }}</td>
+            <td style="color: var(--text-secondary); font-weight: 800;">
+              {{ c.start_date|date:"d/m/Y H:i" }} → {{ c.end_date|date:"d/m/Y H:i" }}
+            </td>
+            <td style="text-align:right;">
+              <span class="actions">
+                <a class="btn-link" href="{% url 'web:campaign_edit' c.id %}">Editar</a>
+                <a class="btn-link" href="{% url 'web:campaign_delete' c.id %}">Excluir</a>
+                <a class="btn-link" href="{% url 'web:campaign_media_plan_upload' c.id %}">Midia</a>
+                <a class="btn-link" href="{% url 'web:campaign_assets_upload' c.id %}">Peças</a>
+                <a class="btn-link" href="{% url 'web:campaign_link_matrix' c.id %}">Vinculação</a>
+              </span>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="5" style="color: var(--text-secondary); text-align:center; padding: 18px;">
+              Nenhuma campanha cadastrada para este cliente.
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+{% endblock %}

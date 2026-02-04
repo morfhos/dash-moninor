@@ -1,0 +1,102 @@
+{% extends "web/base.html" %}
+
+{% block content %}
+  <div class="topbar">
+    <div>
+      <h1>{{ cliente.nome }}</h1>
+      <div style="margin-top: 6px; color: var(--text-secondary); font-weight: 700; font-size: 13px;">
+        {{ cliente.cnpj|default:"-" }}
+      </div>
+    </div>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <a class="btn-outline" href="{% url 'web:clientes' %}">Voltar</a>
+      <a class="btn-outline" href="{% url 'web:clientes_edit' cliente.id %}">Editar</a>
+      <a class="btn-outline" href="{% url 'web:clientes_upload' cliente.id %}" style="text-decoration:none;">Upload</a>
+      <a class="btn-outline" href="{% url 'web:cliente_campaigns' cliente.id %}" style="text-decoration:none;">Campanhas</a>
+      <a class="btn" href="{% url 'web:clientes_enter' cliente.id %}" style="text-decoration:none;">Entrar</a>
+    </div>
+  </div>
+
+  <div class="grid" style="grid-template-columns: minmax(0, 1fr) 360px;">
+    <section class="main-panel">
+      <div class="panel-header" style="margin-bottom: 12px;">
+        <div style="font-weight: 800;">Resumo</div>
+      </div>
+      <div style="display:flex; gap: 18px; align-items:center; flex-wrap: wrap;">
+        <div style="display:flex; align-items:center; gap: 12px;">
+          <div class="logo-thumb">
+            {% if cliente.logo %}
+              <img src="{{ cliente.logo.url }}" alt="{{ cliente.nome }}" />
+            {% else %}
+              <span style="font-weight:800; color:#64748b;">{{ cliente.nome|slice:":1"|upper }}</span>
+            {% endif %}
+          </div>
+          <div>
+            <div style="font-weight: 900; font-size: 14px;">{{ cliente.nome }}</div>
+            <div style="color: var(--text-secondary); font-weight: 700; font-size: 12px;">Atualizado em {{ cliente.atualizado_em|date:"d/m/Y H:i" }}</div>
+          </div>
+        </div>
+        <div>
+          {% if cliente.ativo %}
+            <span class="status-pill active"><span class="dot"></span>Ativo</span>
+          {% else %}
+            <span class="status-pill inactive"><span class="dot"></span>Inativo</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div style="margin-top: 18px; font-weight: 800; margin-bottom: 10px;">Usuários</div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th style="width: 180px;">Login</th>
+            <th style="width: 240px;">E-mail</th>
+            <th style="width: 140px;">Função</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in usuarios %}
+            <tr>
+              <td style="font-weight: 800;">{{ u.get_full_name|default:u.username }}</td>
+              <td style="color: var(--text-secondary); font-weight: 700;">{{ u.username }}</td>
+              <td style="color: var(--text-secondary); font-weight: 700;">{{ u.email }}</td>
+              <td style="color: var(--text-secondary); font-weight: 800;">
+                {% if u.funcao %}{{ u.get_funcao_display }}{% else %}-{% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4" style="color: var(--text-secondary); text-align:center; padding: 18px;">
+                Nenhum usuário cadastrado.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <aside class="aside-panel">
+      <section class="chart-section" style="border-radius: 16px;">
+        <div style="font-weight: 800; margin-bottom: 10px;">Criar usuário</div>
+        {% if user_form_errors %}
+          <div style="margin-bottom: 12px; font-size: 13px; color: #b91c1c; font-weight: 700;">
+            {{ user_form_errors }}
+          </div>
+        {% endif %}
+        <form method="post" style="display:grid; gap:10px;">
+          {% csrf_token %}
+          <input type="hidden" name="_action" value="create_user" />
+          {{ user_form.nome }}
+          {{ user_form.login }}
+          {{ user_form.email }}
+          {{ user_form.senha }}
+          <div style="color: var(--text-secondary); font-size: 12px; font-weight: 700;">
+            Função: Apenas ver
+          </div>
+          <button class="btn" type="submit" style="width:100%;">Criar</button>
+        </form>
+      </section>
+    </aside>
+  </div>
+{% endblock %}
