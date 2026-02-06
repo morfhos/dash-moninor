@@ -26,8 +26,13 @@ def nav_context(request):
     nav_mode = "cliente" if role == "cliente" else "admin"
     impersonating_cliente = nav_cliente if is_admin(request.user) and request.session.get("impersonate_cliente_id") else None
 
+    # Verificar se o usuário é realmente admin (não colaborador)
+    user_role = getattr(request.user, "role", "") if request.user.is_authenticated else ""
+    is_true_admin = request.user.is_authenticated and (request.user.is_superuser or user_role == "admin")
+
     return {
         "nav_mode": nav_mode,
         "nav_cliente": nav_cliente,
         "impersonating_cliente": impersonating_cliente,
+        "is_true_admin": is_true_admin,
     }

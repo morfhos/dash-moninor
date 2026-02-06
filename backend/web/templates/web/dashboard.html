@@ -1,0 +1,303 @@
+{% extends "web/base.html" %}
+{% load static %}
+
+{% block content %}
+  <div class="topbar">
+    <h1>{{ page_title }}</h1>
+    {% if role == "cliente" and cliente %}
+      <span class="cliente-badge">{{ cliente.nome }}</span>
+    {% endif %}
+  </div>
+
+  <!-- Stats Cards -->
+  <div class="stats-cards">
+    <div class="stat-card purple">
+      <div class="stat-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+        </svg>
+      </div>
+      <div class="stat-content">
+        <div class="stat-value">R${{ stats.investment|floatformat:0|default:"0" }}</div>
+        <div class="stat-label">Investimento Total</div>
+      </div>
+    </div>
+
+    <div class="stat-card blue">
+      <div class="stat-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+      </div>
+      <div class="stat-content">
+        <div class="stat-value">{{ stats.on_count }} : {{ stats.off_count }}</div>
+        <div class="stat-label">Ativas / Inativas</div>
+      </div>
+    </div>
+
+    <div class="stat-card teal">
+      <div class="stat-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+        </svg>
+      </div>
+      <div class="stat-content">
+        <div class="stat-value">R${{ stats.cost|floatformat:0|default:"0" }}</div>
+        <div class="stat-label">Custo Total</div>
+      </div>
+    </div>
+
+    <div class="stat-card cyan">
+      <div class="stat-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 5L6 9H2V15H6L11 19V5Z"></path>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+        </svg>
+      </div>
+      <div class="stat-content">
+        <div class="stat-value">{{ stats.insertions|default:"0" }}</div>
+        <div class="stat-label">Inserções Total</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <section class="dashboard-content">
+    <div class="modules-grid">
+      <!-- Timeline Campanhas Box -->
+      <a href="{% url 'web:grupo_campanhas' %}" class="module-card timeline-card">
+        <div class="module-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+        </div>
+        <div class="module-info">
+          <h3>Timeline Campanhas</h3>
+          <p>Visualize a programação das campanhas</p>
+        </div>
+        <div class="module-stats">
+          <span class="badge">{{ stats.total_campaigns }} ativa{{ stats.total_campaigns|pluralize:"s" }}</span>
+        </div>
+        <div class="module-arrow">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </div>
+      </a>
+
+      <!-- Relatórios Box -->
+      <a href="{% url 'web:relatorios' %}" class="module-card">
+        <div class="module-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+        </div>
+        <div class="module-info">
+          <h3>Relatórios</h3>
+          <p>Análises e métricas detalhadas</p>
+        </div>
+        <div class="module-arrow">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </div>
+      </a>
+
+      <!-- Analytics Box -->
+      <a href="{% url 'web:analytics' %}" class="module-card">
+        <div class="module-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path>
+            <path d="M22 12A10 10 0 0 0 12 2v10z"></path>
+          </svg>
+        </div>
+        <div class="module-info">
+          <h3>Analytics</h3>
+          <p>Insights e performance</p>
+        </div>
+        <div class="module-arrow">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </div>
+      </a>
+    </div>
+  </section>
+
+<style>
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .topbar h1 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 800;
+  }
+
+  .cliente-badge {
+    background: var(--brand-primary);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .stats-cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .stat-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    border-radius: 12px;
+    color: white;
+  }
+
+  .stat-card.purple { background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); }
+  .stat-card.blue { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+  .stat-card.teal { background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); }
+  .stat-card.cyan { background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); }
+
+  .stat-icon {
+    width: 40px;
+    height: 40px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .stat-value {
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .stat-label {
+    font-size: 12px;
+    opacity: 0.9;
+  }
+
+  .dashboard-content {
+    margin-top: 24px;
+  }
+
+  .modules-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+  }
+
+  .module-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 24px;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+
+  .module-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    border-color: var(--brand-primary);
+  }
+
+  .module-card.timeline-card {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border-color: #bae6fd;
+  }
+
+  .module-card.timeline-card:hover {
+    background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+    border-color: var(--brand-primary);
+  }
+
+  .module-icon {
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg, var(--brand-primary) 0%, #8b5cf6 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    flex-shrink: 0;
+  }
+
+  .module-info {
+    flex: 1;
+  }
+
+  .module-info h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 4px 0;
+  }
+
+  .module-info p {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  .module-stats {
+    margin-right: 8px;
+  }
+
+  .module-stats .badge {
+    background: rgba(34, 197, 94, 0.15);
+    color: #15803d;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .module-arrow {
+    color: var(--text-secondary);
+  }
+
+  @media (max-width: 1024px) {
+    .stats-cards {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width: 640px) {
+    .stats-cards {
+      grid-template-columns: 1fr;
+    }
+
+    .modules-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}

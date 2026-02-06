@@ -1,0 +1,848 @@
+{% extends "web/base.html" %}
+{% load static %}
+
+{% block content %}
+  <!-- Dashboard Section -->
+  <section class="dashboard-section">
+    <div class="report-header">
+      <div class="header-info">
+        <h2 class="section-title">Relatório Consolidado</h2>
+        <p class="report-subtitle">
+          {% if cliente %}{{ cliente.nome }} - {% endif %}
+          {{ campaigns|length }} campanha{{ campaigns|length|pluralize:"s" }} selecionada{{ campaigns|length|pluralize:"s" }}
+        </p>
+      </div>
+      <div class="header-actions">
+        <button class="btn-print" id="btnPrint">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+            <rect x="6" y="14" width="12" height="8"></rect>
+          </svg>
+          Imprimir
+        </button>
+        <button class="btn-export" id="btnExportPDF">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="12" y1="18" x2="12" y2="12"></line>
+            <line x1="9" y1="15" x2="15" y2="15"></line>
+          </svg>
+          Exportar CSV
+        </button>
+      </div>
+    </div>
+
+    <!-- Campanhas incluídas -->
+    <div class="campaigns-included">
+      <span class="label">Campanhas:</span>
+      {% for c in campaigns %}
+        <span class="campaign-tag">{{ c.name }}</span>
+      {% endfor %}
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="stats-cards">
+      <div class="stat-card purple">
+        <div class="stat-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+        </div>
+        <div class="stat-content">
+          <div class="stat-value">R${{ totals.investment|floatformat:0|default:"0" }}</div>
+          <div class="stat-label">Investimento Total</div>
+        </div>
+      </div>
+
+      <div class="stat-card blue">
+        <div class="stat-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+        </div>
+        <div class="stat-content">
+          <div class="stat-value">{{ stats.on_count }} : {{ stats.off_count }}</div>
+          <div class="stat-label">Ativas / Inativas</div>
+        </div>
+      </div>
+
+      <div class="stat-card teal">
+        <div class="stat-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+        </div>
+        <div class="stat-content">
+          <div class="stat-value">{{ stats.total_campaigns }}</div>
+          <div class="stat-label">Campanhas</div>
+        </div>
+      </div>
+
+      <div class="stat-card cyan">
+        <div class="stat-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 5L6 9H2V15H6L11 19V5Z"></path>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          </svg>
+        </div>
+        <div class="stat-content">
+          <div class="stat-value">{{ totals.insertions|default:"0" }}</div>
+          <div class="stat-label">Inserções Total</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="dashboard-grid">
+      <!-- Timeline Panel -->
+      <div class="timeline-panel">
+        <div class="timeline-header">
+          <h3 class="panel-title">Timeline Consolidada</h3>
+          <div class="timeline-filters">
+            <select class="filter-select" id="filterChannel">
+              <option value="">Todos Canais</option>
+              {% for ch in channels_data %}
+                <option value="{{ ch.key }}">{{ ch.name }}</option>
+              {% endfor %}
+            </select>
+            <button class="month-btn" id="btnClearFilters">
+              Limpar Filtros
+            </button>
+          </div>
+        </div>
+
+        <!-- Timeline Calendar -->
+        <div class="timeline-calendar">
+          <div class="calendar-header">
+            <button class="month-btn active" data-month="all">Todos</button>
+            {% for m in months_list %}
+              <button class="month-btn" data-month="{{ m.key }}" data-year="{{ m.year }}">
+                {{ m.name }} {{ m.year }}
+              </button>
+            {% empty %}
+              <span>Período não definido</span>
+            {% endfor %}
+          </div>
+
+          <!-- Timeline Rows -->
+          <div class="timeline-body" id="timelineBody">
+            {% for group in timeline_data %}
+              <div class="timeline-row" data-channel="{{ group.media_channel }}">
+                <div class="row-label">
+                  <strong>{{ group.channel }}</strong>
+                  {% if group.media_channel %}
+                    <span class="row-sublabel">{{ group.media_channel }}</span>
+                  {% endif %}
+                </div>
+                <div class="row-bars">
+                  {% for item in group.items %}
+                    <div class="timeline-bar"
+                         style="background: {{ item.color }};"
+                         title="{{ item.title }} - {{ item.start_str }} a {{ item.end_str }}"
+                         data-start="{{ item.start|date:'Y-m' }}"
+                         data-end="{{ item.end|date:'Y-m' }}"
+                         data-piece="{{ item.title }}"
+                         data-market="{{ item.market }}">
+                      <span class="bar-title">{{ item.title|truncatechars:25 }}</span>
+                      <span class="bar-dates">{{ item.start_str }} a {{ item.end_str }}</span>
+                    </div>
+                  {% endfor %}
+                </div>
+              </div>
+            {% empty %}
+              <div class="timeline-empty">
+                <p>Nenhum dado de timeline disponível nas campanhas selecionadas.</p>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Side Panel -->
+      <div class="side-panel">
+        <!-- Distribuição por Canal -->
+        <div class="panel-card">
+          <h3 class="panel-title">Inserções por Canal</h3>
+          <div class="channels-list">
+            {% for ch in channels_data %}
+              <div class="channel-item">
+                <div class="channel-info">
+                  <span class="channel-name">{{ ch.name }}</span>
+                  <span class="channel-lines">{{ ch.lines }} linha{{ ch.lines|pluralize:"s" }}</span>
+                </div>
+                <div class="channel-stats">
+                  <span class="channel-insertions">{{ ch.insertions }}</span>
+                </div>
+              </div>
+            {% empty %}
+              <div class="channels-empty">Nenhum dado disponível</div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Investment by Region -->
+        <div class="panel-card">
+          <h3 class="panel-title">Distribuição por Praça</h3>
+          <div class="pie-chart-container">
+            {% if markets_data %}
+              <div class="pie-chart" id="pieChart">
+                <div class="pie-center">
+                  <span>{{ markets_data.0.name|default:"" }}</span>
+                </div>
+              </div>
+              <script>
+                (function() {
+                  var data = [{% for m in markets_data %}{pct: {{ m.pct }}, color: "{{ m.color }}"}{% if not forloop.last %},{% endif %}{% endfor %}];
+                  var gradient = [];
+                  var cumulative = 0;
+                  data.forEach(function(item) {
+                    var start = cumulative * 3.6;
+                    cumulative += item.pct;
+                    var end = cumulative * 3.6;
+                    gradient.push(item.color + " " + start + "deg " + end + "deg");
+                  });
+                  document.getElementById('pieChart').style.background = "conic-gradient(" + gradient.join(", ") + ")";
+                })();
+              </script>
+            {% else %}
+              <div class="pie-placeholder">
+                <span>Sem dados</span>
+              </div>
+            {% endif %}
+          </div>
+          <div class="legend">
+            {% for m in markets_data %}
+              <div class="legend-item">
+                <span class="legend-color" style="background: {{ m.color }};"></span>
+                <span class="legend-label">{{ m.name }}</span>
+                <span class="legend-value">{{ m.pct }}%</span>
+              </div>
+            {% empty %}
+              <div class="legend-empty">Nenhum dado disponível</div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+<style>
+  .report-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .header-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    transition: color 0.2s ease;
+  }
+
+  .back-link:hover {
+    color: var(--brand-primary);
+  }
+
+  .section-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+  }
+
+  .report-subtitle {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 12px;
+  }
+
+  .btn-print, .btn-export {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .btn-print {
+    background: white;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+  }
+
+  .btn-print:hover {
+    background: #f8fafc;
+    border-color: var(--brand-primary);
+  }
+
+  .btn-export {
+    background: linear-gradient(135deg, var(--brand-primary) 0%, #8b5cf6 100%);
+    border: none;
+    color: white;
+  }
+
+  .btn-export:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  }
+
+  .campaigns-included {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    padding: 12px 16px;
+    background: #f8fafc;
+    border-radius: 10px;
+    margin-bottom: 20px;
+  }
+
+  .campaigns-included .label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+
+  .campaign-tag {
+    padding: 4px 12px;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .stats-cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .stat-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    border-radius: 12px;
+    color: white;
+  }
+
+  .stat-card.purple { background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); }
+  .stat-card.blue { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+  .stat-card.teal { background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); }
+  .stat-card.cyan { background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); }
+
+  .stat-icon {
+    width: 40px;
+    height: 40px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .stat-value {
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .stat-label {
+    font-size: 12px;
+    opacity: 0.9;
+  }
+
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 24px;
+  }
+
+  .timeline-panel {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    padding: 20px;
+  }
+
+  .timeline-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .panel-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+  }
+
+  .timeline-filters {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .filter-select {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 13px;
+    background: white;
+  }
+
+  .month-btn {
+    padding: 8px 16px;
+    border: 1px solid var(--border-color);
+    background: white;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--text-secondary);
+  }
+
+  .month-btn:hover {
+    border-color: var(--brand-primary);
+    color: var(--brand-primary);
+  }
+
+  .month-btn.active {
+    background: var(--brand-primary);
+    border-color: var(--brand-primary);
+    color: white;
+  }
+
+  .calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 12px;
+    background: #f8fafc;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+
+  .timeline-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .timeline-row {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 12px;
+    align-items: start;
+  }
+
+  .row-label {
+    font-size: 13px;
+    color: var(--text-primary);
+    padding-top: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .row-label strong {
+    font-weight: 700;
+    font-size: 14px;
+  }
+
+  .row-sublabel {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+
+  .row-bars {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .timeline-bar {
+    padding: 2px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    min-width: 120px;
+    max-width: 180px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+
+  .bar-title {
+    font-weight: 700;
+    color: #1f2937;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 12px;
+  }
+
+  .bar-dates {
+    font-size: 10px;
+    color: #4b5563;
+    margin-top: 3px;
+    font-weight: 500;
+  }
+
+  .timeline-empty {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-secondary);
+  }
+
+  .side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .panel-card {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    padding: 20px;
+  }
+
+  .panel-card .panel-title {
+    margin-bottom: 16px;
+  }
+
+  .channels-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .channel-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: #f8fafc;
+    border-radius: 8px;
+  }
+
+  .channel-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .channel-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .channel-lines {
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  .channel-insertions {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--brand-primary);
+  }
+
+  .channels-empty {
+    color: var(--text-secondary);
+    font-size: 13px;
+    text-align: center;
+    padding: 20px;
+  }
+
+  .pie-chart-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+
+  .pie-chart {
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    position: relative;
+  }
+
+  .pie-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90px;
+    height: 90px;
+    background: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+    color: var(--text-primary);
+  }
+
+  .pie-placeholder {
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    background: #f3f4f6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+  }
+
+  .legend {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  .legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+  }
+
+  .legend-label {
+    flex: 1;
+    color: var(--text-primary);
+  }
+
+  .legend-value {
+    font-weight: 700;
+    color: var(--text-secondary);
+  }
+
+  .legend-empty {
+    color: var(--text-secondary);
+    font-size: 13px;
+    text-align: center;
+  }
+
+  .timeline-bar.hidden {
+    display: none;
+  }
+
+  .timeline-row.hidden {
+    display: none;
+  }
+
+  @media (max-width: 1024px) {
+    .stats-cards {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .dashboard-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .stats-cards {
+      grid-template-columns: 1fr;
+    }
+    .report-header {
+      flex-direction: column;
+    }
+  }
+
+  @media print {
+    .header-actions,
+    .timeline-filters,
+    .calendar-header {
+      display: none !important;
+    }
+    .dashboard-grid {
+      grid-template-columns: 1fr !important;
+    }
+    .timeline-panel {
+      border: none !important;
+    }
+    .campaigns-included {
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
+    .stat-card {
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
+  }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const monthButtons = document.querySelectorAll('.month-btn[data-month]');
+  const timelineBars = document.querySelectorAll('.timeline-bar');
+  const timelineRows = document.querySelectorAll('.timeline-row');
+  const filterChannel = document.getElementById('filterChannel');
+
+  let selectedMonth = 'all';
+  let selectedChannel = '';
+
+  function applyFilters() {
+    timelineBars.forEach(bar => {
+      const startMonth = bar.dataset.start;
+      const endMonth = bar.dataset.end;
+
+      let visible = true;
+
+      if (selectedMonth !== 'all') {
+        if (startMonth && endMonth) {
+          visible = selectedMonth >= startMonth && selectedMonth <= endMonth;
+        } else if (startMonth) {
+          visible = selectedMonth === startMonth;
+        } else {
+          visible = false;
+        }
+      }
+
+      bar.classList.toggle('hidden', !visible);
+    });
+
+    timelineRows.forEach(row => {
+      const channel = row.dataset.channel;
+      let rowVisible = true;
+
+      if (selectedChannel) {
+        rowVisible = channel === selectedChannel;
+      }
+
+      if (rowVisible) {
+        const visibleBars = row.querySelectorAll('.timeline-bar:not(.hidden)');
+        rowVisible = visibleBars.length > 0;
+      }
+
+      row.classList.toggle('hidden', !rowVisible);
+    });
+  }
+
+  monthButtons.forEach(btn => {
+    btn.addEventListener('click', function() {
+      monthButtons.forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      selectedMonth = this.dataset.month;
+      applyFilters();
+    });
+  });
+
+  if (filterChannel) {
+    filterChannel.addEventListener('change', function() {
+      selectedChannel = this.value;
+      applyFilters();
+    });
+  }
+
+  const btnClearFilters = document.getElementById('btnClearFilters');
+  if (btnClearFilters) {
+    btnClearFilters.addEventListener('click', function() {
+      selectedMonth = 'all';
+      selectedChannel = '';
+      if (filterChannel) filterChannel.value = '';
+      monthButtons.forEach(b => b.classList.remove('active'));
+      document.querySelector('.month-btn[data-month="all"]')?.classList.add('active');
+      applyFilters();
+    });
+  }
+
+  // Imprimir
+  document.getElementById('btnPrint')?.addEventListener('click', function() {
+    window.print();
+  });
+
+  // Exportar CSV
+  document.getElementById('btnExportPDF')?.addEventListener('click', function() {
+    const visibleBars = document.querySelectorAll('.timeline-bar:not(.hidden)');
+
+    if (visibleBars.length === 0) {
+      alert('Nenhum dado para exportar.');
+      return;
+    }
+
+    const headers = ['Canal', 'Peça', 'Praça', 'Data Início', 'Data Fim'];
+    const rows = [];
+
+    visibleBars.forEach(bar => {
+      const row = bar.closest('.timeline-row');
+      const channel = row?.querySelector('.row-label strong')?.textContent || '';
+      const piece = bar.dataset.piece || '';
+      const market = bar.dataset.market || '';
+      const dates = bar.querySelector('.bar-dates')?.textContent || '';
+      const dateParts = dates.split(' a ');
+
+      rows.push([channel, piece, market, dateParts[0] || '', dateParts[1] || '']);
+    });
+
+    const BOM = '\uFEFF';
+    let csvContent = BOM + headers.map(h => `"${h}"`).join(';') + '\n';
+    rows.forEach(row => {
+      csvContent += row.map(cell => `"${(cell || '').replace(/"/g, '""')}"`).join(';') + '\n';
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'relatorio_consolidado.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  });
+});
+</script>
+{% endblock %}

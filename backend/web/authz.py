@@ -8,6 +8,17 @@ from django.shortcuts import redirect
 
 
 def is_admin(user: AbstractBaseUser) -> bool:
+    """Verifica se o usuário é admin ou colaborador (acesso ao painel administrativo)."""
+    if not getattr(user, "is_authenticated", False):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    role = getattr(user, "role", "")
+    return role in ("admin", "colaborador")
+
+
+def is_true_admin(user: AbstractBaseUser) -> bool:
+    """Retorna True apenas para superuser ou role == 'admin'."""
     if not getattr(user, "is_authenticated", False):
         return False
     if getattr(user, "is_superuser", False):
@@ -43,6 +54,16 @@ T = TypeVar("T", bound=Callable[..., HttpResponse])
 def require_admin(view: T) -> T:
     def _wrapped(request: HttpRequest, *args, **kwargs):
         if not is_admin(request.user) or request.session.get("impersonate_cliente_id"):
+            return redirect("web:dashboard")
+        return view(request, *args, **kwargs)
+
+    return _wrapped  # type: ignore[return-value]
+
+
+def require_true_admin(view: T) -> T:
+    """Permite acesso apenas para admin real (exclui colaboradores)."""
+    def _wrapped(request: HttpRequest, *args, **kwargs):
+        if not is_true_admin(request.user) or request.session.get("impersonate_cliente_id"):
             return redirect("web:dashboard")
         return view(request, *args, **kwargs)
 

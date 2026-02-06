@@ -1,0 +1,268 @@
+{% extends "web/base.html" %}
+{% load static %}
+
+{% block content %}
+  <div class="topbar">
+    <a href="{% url 'web:uploads_midia_clientes' %}" class="back-link">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M19 12H5M12 19l-7-7 7-7"/>
+      </svg>
+      Voltar
+    </a>
+    <div class="title-row">
+      {% if cliente.logo %}
+        <img src="{{ cliente.logo.url }}" alt="{{ cliente.nome }}" class="cliente-logo-small" />
+      {% endif %}
+      <h1>{{ cliente.nome }}</h1>
+    </div>
+    <p class="subtitle">Selecione uma campanha para gerenciar as peças</p>
+  </div>
+
+  <section class="main-panel">
+    <div class="campaigns-grid">
+      {% for item in campaigns_with_stats %}
+        <a href="{% url 'web:uploads_midia_pecas' item.campaign.id %}" class="campaign-card {% if item.is_active %}active{% endif %}">
+          <div class="card-header">
+            <h3 class="campaign-name">{{ item.campaign.name }}</h3>
+            <span class="status-badge {% if item.is_active %}active{% else %}inactive{% endif %}">
+              {% if item.is_active %}ATIVA{% else %}{{ item.campaign.status|upper }}{% endif %}
+            </span>
+          </div>
+          <div class="card-stats">
+            <div class="stat">
+              <span class="stat-value">{{ item.pieces_count }}</span>
+              <span class="stat-label">Peças</span>
+            </div>
+            <div class="stat">
+              <span class="stat-value">{{ item.pieces_with_assets }}</span>
+              <span class="stat-label">Com Mídia</span>
+            </div>
+            <div class="stat progress">
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: {% widthratio item.pieces_with_assets item.pieces_count 100 %}%;"></div>
+              </div>
+              <span class="stat-label">{% widthratio item.pieces_with_assets item.pieces_count 100 %}%</span>
+            </div>
+          </div>
+          <div class="card-footer">
+            <span class="period">
+              {% if item.start %}{{ item.start|date:"d/m/y" }}{% endif %}
+              {% if item.end %} - {{ item.end|date:"d/m/y" }}{% endif %}
+            </span>
+            <span class="arrow">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </span>
+          </div>
+        </a>
+      {% empty %}
+        <div class="empty-state">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <p>Nenhuma campanha cadastrada para este cliente.</p>
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+
+<style>
+  .topbar {
+    margin-bottom: 24px;
+  }
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    transition: color 0.2s ease;
+  }
+
+  .back-link:hover {
+    color: var(--brand-primary);
+  }
+
+  .title-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+
+  .title-row h1 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 800;
+  }
+
+  .cliente-logo-small {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+    border-radius: 8px;
+  }
+
+  .subtitle {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 14px;
+  }
+
+  .campaigns-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+  }
+
+  .campaign-card {
+    display: flex;
+    flex-direction: column;
+    background: white;
+    border-radius: 16px;
+    border: 2px solid var(--border-color);
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+
+  .campaign-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    border-color: var(--brand-primary);
+  }
+
+  .campaign-card.active {
+    border-color: #22c55e;
+  }
+
+  .card-header {
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .campaign-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+  }
+
+  .status-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+
+  .status-badge.active {
+    background: rgba(34, 197, 94, 0.15);
+    color: #15803d;
+  }
+
+  .status-badge.inactive {
+    background: rgba(107, 114, 128, 0.15);
+    color: #4b5563;
+  }
+
+  .card-stats {
+    padding: 20px;
+    display: flex;
+    gap: 24px;
+    align-items: center;
+  }
+
+  .stat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .stat-value {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--text-primary);
+  }
+
+  .stat-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+  }
+
+  .stat.progress {
+    flex: 1;
+    align-items: flex-end;
+  }
+
+  .progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #e5e7eb;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--brand-primary) 0%, #8b5cf6 100%);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+  }
+
+  .card-footer {
+    padding: 16px 20px;
+    background: #f8fafc;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .period {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  .arrow {
+    color: var(--text-secondary);
+  }
+
+  .empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-secondary);
+  }
+
+  .empty-state svg {
+    margin-bottom: 16px;
+    opacity: 0.5;
+  }
+
+  @media (max-width: 640px) {
+    .campaigns-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}

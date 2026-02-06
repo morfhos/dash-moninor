@@ -1,0 +1,694 @@
+{% extends "web/base.html" %}
+{% load static %}
+
+{% block content %}
+  <!-- Header da Campanha -->
+  <div class="campaign-header">
+    <h1>{{ cliente.nome }} &bull; {{ campaign.name }}</h1>
+    <p class="campaign-meta">
+      <span>Praças: {{ campaign_markets }}</span>
+      <span class="separator">&bull;</span>
+      <span>Período: {{ campaign.start_date|date:"d/m/Y" }} a {{ campaign.end_date|date:"d/m/Y" }}</span>
+      <span class="separator">&bull;</span>
+      <span>Meio: {{ campaign_channels }}</span>
+    </p>
+  </div>
+
+  <!-- Conteúdo -->
+  <section class="main-panel">
+    <div class="section-header">
+      <a onclick="history.back()" class="btn-back" style="cursor: pointer;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        Voltar
+      </a>
+      <h2>Peças da Campanha</h2>
+    </div>
+
+    <div class="pieces-grid">
+      {% for item in pieces_data %}
+        <div class="piece-card" data-piece-id="{{ item.piece.id }}">
+          <div class="piece-header">
+            <div class="piece-info">
+              <h3 class="piece-title">{{ item.piece.title }}</h3>
+              <p class="piece-channels">{{ item.channels_text }}</p>
+            </div>
+            <div class="piece-actions">
+              <span class="status-badge {% if item.is_on %}on{% else %}off{% endif %}">
+                {% if item.is_on %}ON{% else %}OFF{% endif %}
+              </span>
+              <button type="button" class="btn-edit" onclick="openEditModal({{ item.piece.id }}, '{{ item.piece.title|escapejs }}', '{{ item.piece.code|escapejs }}', {{ item.piece.duration_sec }}, '{{ item.piece.type }}', '{{ item.piece.status }}', '{{ item.piece.notes|escapejs }}')" title="Editar peça">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="piece-thumbnail" onclick="window.location='{% url 'web:peca_detalhe' item.piece.id %}'">
+            {% if item.has_asset and item.thumb_url %}
+              {% if item.media_type == 'video' %}
+                <video src="{{ item.thumb_url }}" class="thumb-media"></video>
+                <div class="play-overlay">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="white">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                  </svg>
+                </div>
+              {% elif item.media_type == 'audio' %}
+                <div class="audio-placeholder">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M11 5L6 9H2V15H6L11 19V5Z"></path>
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                  </svg>
+                </div>
+              {% else %}
+                <img src="{{ item.thumb_url }}" alt="{{ item.piece.title }}" class="thumb-media" />
+              {% endif %}
+            {% else %}
+              <div class="no-media">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                  <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                  <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+                <span>Sem mídia</span>
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="piece-details">
+            <div class="detail-row">
+              <div class="detail-item">
+                <span class="detail-label">Código</span>
+                <span class="detail-value piece-code">{{ item.piece.code }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Formato</span>
+                <span class="detail-value piece-format">{{ item.format_text }}</span>
+              </div>
+            </div>
+            <div class="detail-row">
+              <div class="detail-item">
+                <span class="detail-label">Período</span>
+                <span class="detail-value">
+                  {% if item.start_date %}{{ item.start_date|date:"d/m" }}{% endif %}
+                  {% if item.end_date %} a {{ item.end_date|date:"d/m" }}{% endif %}
+                  {% if not item.start_date and not item.end_date %}N/A{% endif %}
+                </span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Inserções</span>
+                <span class="detail-value">{{ item.insertions|default:"0" }}</span>
+              </div>
+            </div>
+            <div class="detail-row">
+              <div class="detail-item full">
+                <span class="detail-label">Praças</span>
+                <span class="detail-value">{{ item.markets_text }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      {% empty %}
+        <div class="empty-state">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+            <polyline points="21 15 16 10 5 21"></polyline>
+          </svg>
+          <p>Nenhuma peça cadastrada para esta campanha.</p>
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- Modal de Edição -->
+  <div id="editModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Editar Peça</h3>
+        <button type="button" class="modal-close" onclick="closeEditModal()">&times;</button>
+      </div>
+      <form id="editPieceForm" onsubmit="savePiece(event)">
+        <input type="hidden" id="editPieceId" name="piece_id" />
+
+        <div class="form-group">
+          <label for="editTitle">Título</label>
+          <input type="text" id="editTitle" name="title" class="form-input" required />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="editCode">Código</label>
+            <input type="text" id="editCode" name="code" class="form-input" required />
+          </div>
+          <div class="form-group">
+            <label for="editDuration">Duração (seg)</label>
+            <input type="number" id="editDuration" name="duration_sec" class="form-input" min="0" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="editType">Tipo</label>
+            <select id="editType" name="type" class="form-input">
+              <option value="video">Vídeo</option>
+              <option value="audio">Áudio</option>
+              <option value="image">Imagem</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="editStatus">Status</label>
+            <select id="editStatus" name="status" class="form-input">
+              <option value="pending">Pendente</option>
+              <option value="approved">Aprovado</option>
+              <option value="archived">Arquivado</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="editNotes">Observações</label>
+          <textarea id="editNotes" name="notes" class="form-input" rows="3"></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-cancel" onclick="closeEditModal()">Cancelar</button>
+          <button type="submit" class="btn-save">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<style>
+  .campaign-header {
+    margin-bottom: 24px;
+  }
+
+  .campaign-header h1 {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin: 0 0 8px 0;
+  }
+
+  .campaign-meta {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  .campaign-meta .separator {
+    margin: 0 8px;
+    opacity: 0.5;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .btn-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: var(--brand-primary);
+    color: white;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border: none;
+    cursor: pointer;
+  }
+
+  .btn-back:hover {
+    background: #4f46e5;
+    transform: translateY(-1px);
+  }
+
+  .section-header h2 {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0;
+    color: var(--text-primary);
+  }
+
+  .pieces-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 24px;
+  }
+
+  .piece-card {
+    display: block;
+    background: white;
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    transition: all 0.2s ease;
+  }
+
+  .piece-card:hover {
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    border-color: var(--brand-primary);
+  }
+
+  .piece-header {
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .piece-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-edit {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: white;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+
+  .btn-edit:hover {
+    background: var(--brand-primary);
+    border-color: var(--brand-primary);
+    color: white;
+  }
+
+  .piece-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 4px 0;
+    text-transform: uppercase;
+  }
+
+  .piece-channels {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  .status-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+
+  .status-badge.on {
+    background: rgba(34, 197, 94, 0.15);
+    color: #15803d;
+  }
+
+  .status-badge.off {
+    background: rgba(107, 114, 128, 0.15);
+    color: #4b5563;
+  }
+
+  .piece-thumbnail {
+    width: 100%;
+    height: 180px;
+    background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+  }
+
+  .piece-thumbnail:hover .play-overlay {
+    opacity: 1;
+  }
+
+  .thumb-media {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .play-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  .audio-placeholder {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #d97706;
+  }
+
+  .no-media {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: #94a3b8;
+    font-size: 12px;
+  }
+
+  .piece-details {
+    padding: 16px 20px;
+  }
+
+  .detail-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+
+  .detail-row:last-child {
+    margin-bottom: 0;
+  }
+
+  .detail-item {
+    flex: 1;
+  }
+
+  .detail-item.full {
+    flex: 100%;
+  }
+
+  .detail-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+
+  .detail-value {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-secondary);
+  }
+
+  .empty-state svg {
+    margin-bottom: 16px;
+    opacity: 0.5;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+  }
+
+  .modal-content {
+    background: white;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .modal-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: none;
+    background: #f1f5f9;
+    color: var(--text-secondary);
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+
+  .modal-close:hover {
+    background: #e2e8f0;
+    color: var(--text-primary);
+  }
+
+  #editPieceForm {
+    padding: 24px;
+  }
+
+  .form-group {
+    margin-bottom: 16px;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+  }
+
+  .form-input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+  }
+
+  .form-input:focus {
+    outline: none;
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  }
+
+  .form-row {
+    display: flex;
+    gap: 16px;
+  }
+
+  .form-row .form-group {
+    flex: 1;
+  }
+
+  textarea.form-input {
+    resize: vertical;
+    min-height: 80px;
+  }
+
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
+    margin-top: 8px;
+  }
+
+  .btn-cancel {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: white;
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .btn-cancel:hover {
+    background: #f1f5f9;
+    color: var(--text-primary);
+  }
+
+  .btn-save {
+    padding: 10px 24px;
+    border-radius: 8px;
+    border: none;
+    background: var(--brand-primary);
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .btn-save:hover {
+    background: #4f46e5;
+  }
+
+  .btn-save:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  @media (max-width: 768px) {
+    .pieces-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .form-row {
+      flex-direction: column;
+      gap: 0;
+    }
+  }
+</style>
+
+<script>
+function openEditModal(pieceId, title, code, duration, type, status, notes) {
+  document.getElementById('editPieceId').value = pieceId;
+  document.getElementById('editTitle').value = title;
+  document.getElementById('editCode').value = code;
+  document.getElementById('editDuration').value = duration || 0;
+  document.getElementById('editType').value = type || 'video';
+  document.getElementById('editStatus').value = status || 'pending';
+  document.getElementById('editNotes').value = notes || '';
+  document.getElementById('editModal').style.display = 'flex';
+}
+
+function closeEditModal() {
+  document.getElementById('editModal').style.display = 'none';
+}
+
+async function savePiece(event) {
+  event.preventDefault();
+
+  const pieceId = document.getElementById('editPieceId').value;
+  const data = {
+    title: document.getElementById('editTitle').value,
+    code: document.getElementById('editCode').value,
+    duration_sec: parseInt(document.getElementById('editDuration').value) || 0,
+    type: document.getElementById('editType').value,
+    status: document.getElementById('editStatus').value,
+    notes: document.getElementById('editNotes').value,
+  };
+
+  const saveBtn = document.querySelector('.btn-save');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Salvando...';
+
+  try {
+    const response = await fetch(`/api/pieces/${pieceId}/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+
+    if (result.ok) {
+      // Atualizar o card na página
+      const card = document.querySelector(`.piece-card[data-piece-id="${pieceId}"]`);
+      if (card) {
+        card.querySelector('.piece-title').textContent = data.title;
+        card.querySelector('.piece-code').textContent = data.code;
+
+        // Atualizar formato baseado no tipo e duração
+        let formatText = '';
+        if (data.type === 'video') {
+          formatText = data.duration_sec ? `Vídeo ${data.duration_sec}s` : 'Vídeo';
+        } else if (data.type === 'audio') {
+          formatText = data.duration_sec ? `Áudio ${data.duration_sec}s` : 'Áudio';
+        } else if (data.type === 'image') {
+          formatText = 'Imagem';
+        } else {
+          formatText = data.duration_sec ? `${data.duration_sec}s` : 'N/A';
+        }
+        card.querySelector('.piece-format').textContent = formatText;
+
+        // Atualizar botão de edição com novos valores
+        const editBtn = card.querySelector('.btn-edit');
+        editBtn.setAttribute('onclick',
+          `openEditModal(${pieceId}, '${data.title.replace(/'/g, "\\'")}', '${data.code.replace(/'/g, "\\'")}', ${data.duration_sec}, '${data.type}', '${data.status}', '${data.notes.replace(/'/g, "\\'").replace(/\n/g, "\\n")}')`
+        );
+      }
+
+      closeEditModal();
+    } else {
+      alert('Erro ao salvar: ' + (result.error || 'Erro desconhecido'));
+    }
+  } catch (error) {
+    alert('Erro ao salvar: ' + error.message);
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Salvar';
+  }
+}
+
+// Fechar modal ao clicar fora
+document.getElementById('editModal').addEventListener('click', function(e) {
+  if (e.target === this) {
+    closeEditModal();
+  }
+});
+
+// Fechar modal com ESC
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    closeEditModal();
+  }
+});
+</script>
+{% endblock %}

@@ -310,6 +310,43 @@ def import_media_plan_xlsx(*, campaign: Campaign, uploaded_file: UploadedFile, r
                 if update_fields:
                     existing.save(update_fields=update_fields)
 
+        # Verificar se há linhas sem piece_codes - se sim, criar peças genéricas por canal
+        lines_without_pieces = [r for r in parsed_rows if not r.piece_codes and r.days]
+        if lines_without_pieces and not pieces_table:
+            # Agrupar por media_channel para criar uma peça genérica por canal
+            channels_seen: set[str] = set()
+            for row in lines_without_pieces:
+                channel_key = row.media_channel or "other"
+                if channel_key not in channels_seen:
+                    channels_seen.add(channel_key)
+                    code = f"GEN_{channel_key.upper()}"
+                    if code not in pieces_by_code:
+                        channel_names = {
+                            "radio": "Rádio",
+                            "tv_aberta": "TV Aberta",
+                            "paytv": "PayTV",
+                            "jornal": "Jornal",
+                            "ooh": "OOH",
+                            "meta": "Meta",
+                            "google": "Google",
+                            "youtube": "YouTube",
+                            "display": "Display",
+                            "search": "Search",
+                            "social": "Social",
+                            "other": "Outros",
+                        }
+                        title = channel_names.get(channel_key, channel_key.title())
+                        p = Piece.objects.create(
+                            campaign=campaign,
+                            code=code,
+                            title=f"Veiculação {title}",
+                            duration_sec=0,
+                            type=Piece.Type.VIDEO,
+                            status=Piece.Status.PENDING,
+                        )
+                        pieces_by_code[code] = p
+                        created_pieces += 1
+
         for row in parsed_rows:
             line = PlacementLine.objects.create(
                 campaign=campaign,
@@ -331,21 +368,31 @@ def import_media_plan_xlsx(*, campaign: Campaign, uploaded_file: UploadedFile, r
                 PlacementDay.objects.create(placement_line=line, date=d, insertions=ins)
                 created_days += 1
 
-            for code in row.piece_codes:
-                p = pieces_by_code.get(code)
-                if p is None:
-                    p = Piece.objects.create(
-                        campaign=campaign,
-                        code=code,
-                        title=f"Peça {code}",
-                        duration_sec=max(0, int(row.data.get("duration_sec") or 0)),
-                        type=Piece.Type.VIDEO,
-                        status=Piece.Status.PENDING,
-                    )
-                    pieces_by_code[code] = p
-                    created_pieces += 1
-                PlacementCreative.objects.get_or_create(placement_line=line, piece=p)
-                created_links += 1
+            # Se a linha tem piece_codes, vincular às peças correspondentes
+            if row.piece_codes:
+                for code in row.piece_codes:
+                    p = pieces_by_code.get(code)
+                    if p is None:
+                        p = Piece.objects.create(
+                            campaign=campaign,
+                            code=code,
+                            title=f"Peça {code}",
+                            duration_sec=max(0, int(row.data.get("duration_sec") or 0)),
+                            type=Piece.Type.VIDEO,
+                            status=Piece.Status.PENDING,
+                        )
+                        pieces_by_code[code] = p
+                        created_pieces += 1
+                    PlacementCreative.objects.get_or_create(placement_line=line, piece=p)
+                    created_links += 1
+            elif row.days:
+                # Se não tem piece_codes mas tem dias, vincular à peça genérica do canal
+                channel_key = row.media_channel or "other"
+                gen_code = f"GEN_{channel_key.upper()}"
+                p = pieces_by_code.get(gen_code)
+                if p is not None:
+                    PlacementCreative.objects.get_or_create(placement_line=line, piece=p)
+                    created_links += 1
 
     return {
         "ok": True,

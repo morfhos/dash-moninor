@@ -67,6 +67,26 @@ class Campaign(models.Model):
         return self.RuntimeState.LIVE_NOW
 
 
+class RegionInvestment(models.Model):
+    """Armazena a porcentagem de investimento por região para uma campanha."""
+    campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name="region_investments")
+    region_name = models.CharField(max_length=200)
+    percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    order = models.PositiveIntegerField(default=0)
+    color = models.CharField(max_length=20, default="#6366f1")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Investimento por Região"
+        verbose_name_plural = "Investimentos por Região"
+        unique_together = ("campaign", "region_name")
+        ordering = ["order", "region_name"]
+
+    def __str__(self) -> str:
+        return f"{self.campaign_id} - {self.region_name}: {self.percentage}%"
+
+
 class Piece(models.Model):
     class Type(models.TextChoices):
         VIDEO = "video", "Video"

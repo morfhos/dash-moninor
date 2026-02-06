@@ -393,13 +393,38 @@ def main() -> int:
                 if month is not None:
                     month_by_col[col_idx] = month
 
+            # Ajustar anos para transições (ex: Dez 2025 -> Jan 2026)
+            # Se year_hint=2026 e temos dezembro antes de janeiro, dezembro é 2025
+            year_by_month: dict[int, int] = {}
+            sorted_cols = sorted(month_by_col.keys())
+            if sorted_cols:
+                # Detectar se há transição de ano (mês decresce na sequência)
+                months_in_order = [month_by_col[c] for c in sorted_cols]
+                unique_months = []
+                for m in months_in_order:
+                    if not unique_months or unique_months[-1] != m:
+                        unique_months.append(m)
+
+                # Se sequência é tipo [12, 1, 2], dezembro é ano anterior
+                # Se sequência é tipo [1, 2, 3], todos são mesmo ano
+                current_year = year_hint
+                for i, m in enumerate(unique_months):
+                    if i > 0 and m < unique_months[i - 1]:
+                        # Virada de ano detectada, meses anteriores são ano anterior
+                        for prev_m in unique_months[:i]:
+                            year_by_month[prev_m] = year_hint - 1
+                        current_year = year_hint
+                    if m not in year_by_month:
+                        year_by_month[m] = current_year
+
             for col_idx, v in enumerate(day_values, start=1):
                 n = _parse_int(v)
                 if n is None or not (1 <= n <= 31):
                     continue
                 month = month_by_col.get(col_idx) or datetime.now().month
+                year = year_by_month.get(month, year_hint)
                 try:
-                    date_cols.append((col_idx, date(year_hint, month, n)))
+                    date_cols.append((col_idx, date(year, month, n)))
                 except Exception:
                     pass
 
@@ -429,6 +454,17 @@ def main() -> int:
                 (row_values[col_by_key["property_text"] - 1] if "property_text" in col_by_key else "") or ""
             )
             data["format_text"] = (row_values[col_by_key["format_text"] - 1] if "format_text" in col_by_key else "") or ""
+
+            # Verificar se a linha é um cabeçalho de seção (ex: "TT PAY TV", "OPEN TV")
+            # Esses valores não devem ser tratados como market/cidade
+            market_val = str(data.get("market") or "").strip()
+            market_norm = _norm(market_val)
+            is_section_header = any(
+                pattern in market_norm
+                for pattern in ("pay tv", "paytv", "open tv", "tv aberta", "radio", "jornal", "ooh", "digital", "meta", "google", "youtube")
+            )
+            if is_section_header:
+                data["market"] = ""  # Não usar como market
 
             for k in ("market", "channel", "program", "property_text", "format_text"):
                 v = str(data.get(k) or "").strip()
@@ -473,6 +509,7 @@ def main() -> int:
                         continue
                     days.append([d.isoformat(), ins])
 
+            # Pular linhas sem dados úteis
             if (
                 not str(data.get("market") or "").strip()
                 and not str(data.get("channel") or "").strip()
@@ -481,6 +518,10 @@ def main() -> int:
                 and not str(data.get("format_text") or "").strip()
                 and not str(data.get("external_ref") or "").strip()
             ):
+                continue
+
+            # Pular linhas que são apenas cabeçalhos de seção (sem canal/programa/dias)
+            if is_section_header and not days and not str(data.get("channel") or "").strip() and not str(data.get("program") or "").strip():
                 continue
 
             parsed_rows.append(

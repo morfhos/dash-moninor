@@ -70,6 +70,53 @@ class LoginFlowTests(TestCase):
         self.assertContains(resp, cliente.logo.url)
 
 
+class UsuariosPermissoesAccessTests(TestCase):
+    def setUp(self) -> None:
+        User = get_user_model()
+        self.admin = User.objects.create_user(
+            username="adm",
+            email="adm@email.com",
+            password="senha1234",
+            role=getattr(User, "Role").ADMIN,
+        )
+        self.colab = User.objects.create_user(
+            username="colab",
+            email="colab@email.com",
+            password="senha1234",
+            role=getattr(User, "Role").COLABORADOR,
+        )
+
+    def test_admin_can_access_usuarios_permissoes(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get(reverse("web:usuarios_permissoes"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Usuários & Permissões")
+
+    def test_colaborador_cannot_access_usuarios_permissoes(self):
+        self.client.force_login(self.colab)
+        resp = self.client.get(reverse("web:usuarios_permissoes"), follow=False)
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp["Location"], reverse("web:dashboard"))
+
+    def test_colaborador_cannot_access_administracao(self):
+        self.client.force_login(self.colab)
+        resp = self.client.get(reverse("web:administracao"), follow=False)
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp["Location"], reverse("web:dashboard"))
+
+    def test_colaborador_cannot_access_configuracoes(self):
+        self.client.force_login(self.colab)
+        resp = self.client.get(reverse("web:configuracoes"), follow=False)
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp["Location"], reverse("web:dashboard"))
+
+    def test_colaborador_cannot_access_logs_auditoria(self):
+        self.client.force_login(self.colab)
+        resp = self.client.get(reverse("web:logs_auditoria"), follow=False)
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp["Location"], reverse("web:dashboard"))
+
+
 @override_settings(MEDIA_ROOT=tempfile.gettempdir())
 class ContractWizardTests(TestCase):
     def setUp(self) -> None:

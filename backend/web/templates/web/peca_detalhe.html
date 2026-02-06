@@ -1,0 +1,567 @@
+{% extends "web/base.html" %}
+{% load static %}
+
+{% block content %}
+  <!-- Header -->
+  <div class="piece-page-header">
+    
+    <div class="header-info">
+      <span class="breadcrumb">{{ cliente.nome }} &bull; {{ campaign.name }}</span>
+      <h1>{{ piece.title }}</h1>
+      <span class="status-badge {% if is_on %}on{% else %}off{% endif %}">
+        {% if is_on %}ON AIR{% else %}OFF{% endif %}
+      </span>
+    </div>
+    <!-- {% url 'web:campanha_detalhe' campaign.id %}?tab=pecas-->
+    <a onclick="history.back()" class="back-link" style="cursor: pointer; margin-top:10px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M19 12H5M12 19l-7-7 7-7"/>
+      </svg>
+      Voltar para Peças
+    </a>
+  </div>
+
+  <div class="piece-content">
+    <!-- Área de Mídia Principal -->
+    <div class="media-section">
+      <div class="media-container">
+        {% if media_url %}
+          {% if media_type == 'video' %}
+            <video src="{{ media_url }}" controls class="media-player">
+              Seu navegador não suporta vídeo.
+            </video>
+          {% elif media_type == 'audio' %}
+            <div class="audio-container">
+              <div class="audio-visual">
+                <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M11 5L6 9H2V15H6L11 19V5Z"></path>
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                </svg>
+              </div>
+              <audio src="{{ media_url }}" controls class="audio-player">
+                Seu navegador não suporta áudio.
+              </audio>
+            </div>
+          {% else %}
+            <img src="{{ media_url }}" alt="{{ piece.title }}" class="media-image" />
+          {% endif %}
+        {% else %}
+          <div class="no-media-large">
+            <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <circle cx="8.5" cy="8.5" r="1.5"></circle>
+              <polyline points="21 15 16 10 5 21"></polyline>
+            </svg>
+            <p>Nenhuma mídia cadastrada</p>
+            <a href="{% url 'web:uploads_midia_pecas' campaign.id %}" class="btn-upload">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+              Fazer Upload
+            </a>
+          </div>
+        {% endif %}
+      </div>
+
+      {% if assets|length > 1 %}
+        <div class="assets-gallery">
+          <h4>Outros arquivos ({{ assets|length }})</h4>
+          <div class="gallery-grid">
+            {% for asset in assets %}
+              <div class="gallery-item {% if forloop.first %}active{% endif %}" data-url="{{ asset.file.url }}" data-type="{{ asset.metadata.content_type|default:'' }}">
+                {% if 'image' in asset.metadata.content_type %}
+                  <img src="{{ asset.file.url }}" alt="Asset {{ forloop.counter }}" />
+                {% elif 'video' in asset.metadata.content_type %}
+                  <div class="thumb-video">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                      <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                  </div>
+                {% elif 'audio' in asset.metadata.content_type %}
+                  <div class="thumb-audio">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M11 5L6 9H2V15H6L11 19V5Z"></path>
+                    </svg>
+                  </div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Informações da Peça -->
+    <div class="info-section">
+      <div class="info-card">
+        <h3>Informações do Comercial</h3>
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="info-label">Código</span>
+            <span class="info-value">{{ piece.code }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Formato</span>
+            <span class="info-value">{{ format_text }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Duração</span>
+            <span class="info-value">{{ piece.duration_sec|default:"0" }} segundos</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Tipo</span>
+            <span class="info-value">{{ piece.get_type_display|default:piece.type|title }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-card">
+        <h3>Veiculação</h3>
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="info-label">Período</span>
+            <span class="info-value">
+              {% if piece_start %}{{ piece_start|date:"d/m/Y" }}{% endif %}
+              {% if piece_end %} a {{ piece_end|date:"d/m/Y" }}{% endif %}
+              {% if not piece_start and not piece_end %}N/A{% endif %}
+            </span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Total de Inserções</span>
+            <span class="info-value highlight">{{ total_insertions|default:"0" }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Canais</span>
+            <span class="info-value">{{ channels_text }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Praças</span>
+            <span class="info-value">{{ markets_text }}</span>
+          </div>
+        </div>
+      </div>
+
+      {% if veiculacao_data %}
+        <div class="info-card full-width">
+          <h3>Detalhamento por Canal</h3>
+          <table class="veiculacao-table">
+            <thead>
+              <tr>
+                <th>Canal/Veículo</th>
+                <th>Praça</th>
+                <th>Período</th>
+                <th>Inserções</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in veiculacao_data %}
+                <tr>
+                  <td title="{{ item.channel|default:'N/A' }}">{{ item.channel|default:"N/A" }}</td>
+                  <td title="{{ item.market|default:'N/A' }}">{{ item.market|default:"N/A" }}</td>
+                  <td>
+                    {% if item.start %}{{ item.start|date:"d/m" }}{% endif %}
+                    {% if item.end %} - {{ item.end|date:"d/m" }}{% endif %}
+                  </td>
+                  <td class="text-right">{{ item.insertions|default:"0" }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+
+      {% if piece.notes %}
+        <div class="info-card full-width">
+          <h3>Observações</h3>
+          <p class="notes-text">{{ piece.notes }}</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+<style>
+  .piece-page-header {
+    margin-bottom: 24px;
+  }
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    transition: color 0.2s ease;
+  }
+
+  .back-link:hover {
+    color: var(--brand-primary);
+  }
+
+  .header-info {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .breadcrumb {
+    width: 100%;
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  .header-info h1 {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin: 0;
+    text-transform: uppercase;
+  }
+
+  .status-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .status-badge.on {
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+    color: white;
+  }
+
+  .status-badge.off {
+    background: rgba(107, 114, 128, 0.15);
+    color: #4b5563;
+  }
+
+  .piece-content {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 24px;
+  }
+
+  .media-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .media-container {
+    background: #0f172a;
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+  }
+
+  .media-player {
+    width: 100%;
+    max-height: 500px;
+  }
+
+  .media-image {
+    max-width: 100%;
+    max-height: 500px;
+    object-fit: contain;
+  }
+
+  .audio-container {
+    width: 100%;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .audio-visual {
+    width: 160px;
+    height: 160px;
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #d97706;
+  }
+
+  .audio-player {
+    width: 100%;
+    max-width: 400px;
+  }
+
+  .no-media-large {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 60px 20px;
+    color: #64748b;
+  }
+
+  .no-media-large p {
+    margin: 0;
+    font-size: 14px;
+  }
+
+  .btn-upload {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: var(--brand-primary);
+    color: white;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s ease;
+  }
+
+  .btn-upload:hover {
+    background: #4f46e5;
+    transform: translateY(-1px);
+  }
+
+  .assets-gallery {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid var(--border-color);
+  }
+
+  .assets-gallery h4 {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    margin: 0 0 12px 0;
+  }
+
+  .gallery-grid {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .gallery-item {
+    width: 60px;
+    height: 60px;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.2s ease;
+  }
+
+  .gallery-item:hover, .gallery-item.active {
+    border-color: var(--brand-primary);
+  }
+
+  .gallery-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .thumb-video, .thumb-audio {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .thumb-video {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  }
+
+  .thumb-audio {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    color: #d97706;
+  }
+
+  .info-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .info-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid var(--border-color);
+  }
+
+  .info-card.full-width {
+    grid-column: 1 / -1;
+  }
+
+  .info-card h3 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 16px 0;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .info-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+  }
+
+  .info-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .info-value.highlight {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--brand-primary);
+  }
+
+  .veiculacao-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+
+  .veiculacao-table th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    padding: 8px 12px;
+    border-bottom: 2px solid var(--border-color);
+  }
+
+  .veiculacao-table th:nth-child(1) { width: 28%; }
+  .veiculacao-table th:nth-child(2) { width: 35%; }
+  .veiculacao-table th:nth-child(3) { width: 22%; }
+  .veiculacao-table th:nth-child(4) { width: 15%; }
+
+  .veiculacao-table td {
+    font-size: 13px;
+    color: var(--text-primary);
+    padding: 12px;
+    border-bottom: 1px solid var(--border-color);
+    max-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .veiculacao-table td:hover {
+    overflow: visible;
+    white-space: normal;
+    word-break: break-word;
+    background: #f8fafc;
+    position: relative;
+    z-index: 1;
+  }
+
+  .veiculacao-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .text-right {
+    text-align: right;
+    font-weight: 700;
+  }
+
+  .notes-text {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  @media (max-width: 1024px) {
+    .piece-content {
+      grid-template-columns: 1fr;
+    }
+
+    .info-section {
+      order: 2;
+    }
+
+    .media-section {
+      order: 1;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .info-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const galleryItems = document.querySelectorAll('.gallery-item');
+  const mediaContainer = document.querySelector('.media-container');
+
+  galleryItems.forEach(item => {
+    item.addEventListener('click', function() {
+      const url = this.dataset.url;
+      const type = this.dataset.type || '';
+
+      // Remove active de todos
+      galleryItems.forEach(i => i.classList.remove('active'));
+      this.classList.add('active');
+
+      // Atualiza o player principal
+      if (type.includes('video')) {
+        mediaContainer.innerHTML = `<video src="${url}" controls class="media-player"></video>`;
+      } else if (type.includes('audio')) {
+        mediaContainer.innerHTML = `
+          <div class="audio-container">
+            <div class="audio-visual">
+              <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M11 5L6 9H2V15H6L11 19V5Z"></path>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+              </svg>
+            </div>
+            <audio src="${url}" controls class="audio-player"></audio>
+          </div>
+        `;
+      } else {
+        mediaContainer.innerHTML = `<img src="${url}" alt="Asset" class="media-image" />`;
+      }
+    });
+  });
+});
+</script>
+{% endblock %}

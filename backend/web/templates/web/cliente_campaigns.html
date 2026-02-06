@@ -19,10 +19,10 @@
       <thead>
         <tr>
           <th>Nome</th>
-          <th style="width: 120px;">Meio</th>
-          <th style="width: 140px;">Status</th>
-          <th style="width: 230px;">Período</th>
-          <th style="width: 320px; text-align:right;">Ações</th>
+          <th style="width: 10px;">Meio</th>
+          <th style="width: 10px;">Status</th>
+          <th style="width: 320px;">Período</th>
+          <th style="width: 400px; text-align:right;">Ações</th>
         </tr>
       </thead>
       <tbody>
@@ -39,7 +39,8 @@
                 <a class="btn-link" href="{% url 'web:campaign_edit' c.id %}">Editar</a>
                 <a class="btn-link" href="{% url 'web:campaign_delete' c.id %}">Excluir</a>
                 <a class="btn-link" href="{% url 'web:campaign_media_plan_upload' c.id %}">Midia</a>
-                <a class="btn-link" href="{% url 'web:campaign_assets_upload' c.id %}">Peças</a>
+                <a class="btn-link" href="{% url 'web:uploads_midia_pecas' c.id %}">Peças</a>
+                <a class="btn-link" href="{% url 'web:campanha_detalhe' c.id  %}">Editar Peças</a>
                 <a class="btn-link" href="{% url 'web:campaign_link_matrix' c.id %}">Vinculação</a>
               </span>
             </td>

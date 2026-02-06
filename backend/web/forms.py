@@ -33,12 +33,17 @@ class CampaignWizardForm(forms.ModelForm):
         fields = ["name", "start_date", "end_date", "timezone", "media_type", "total_budget"]
         widgets = {
             "name": forms.TextInput(attrs={"class": "input", "placeholder": "Nome da campanha"}),
-            "start_date": forms.DateTimeInput(attrs={"class": "input", "type": "datetime-local"}),
-            "end_date": forms.DateTimeInput(attrs={"class": "input", "type": "datetime-local"}),
+            "start_date": forms.DateTimeInput(attrs={"class": "input", "type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
+            "end_date": forms.DateTimeInput(attrs={"class": "input", "type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
             "timezone": forms.TextInput(attrs={"class": "input", "placeholder": "America/Sao_Paulo"}),
             "media_type": forms.Select(attrs={"class": "input"}),
             "total_budget": forms.NumberInput(attrs={"class": "input", "step": "0.01", "placeholder": "Orçamento total (opcional)"}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["start_date"].localize = False
+        self.fields["end_date"].localize = False
 
 
 class CampaignEditForm(forms.ModelForm):
@@ -47,13 +52,19 @@ class CampaignEditForm(forms.ModelForm):
         fields = ["name", "start_date", "end_date", "timezone", "media_type", "total_budget", "status"]
         widgets = {
             "name": forms.TextInput(attrs={"class": "input", "placeholder": "Nome da campanha"}),
-            "start_date": forms.DateTimeInput(attrs={"class": "input", "type": "datetime-local"}),
-            "end_date": forms.DateTimeInput(attrs={"class": "input", "type": "datetime-local"}),
+            "start_date": forms.DateTimeInput(attrs={"class": "input", "type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
+            "end_date": forms.DateTimeInput(attrs={"class": "input", "type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
             "timezone": forms.TextInput(attrs={"class": "input", "placeholder": "America/Sao_Paulo"}),
             "media_type": forms.Select(attrs={"class": "input"}),
             "total_budget": forms.NumberInput(attrs={"class": "input", "step": "0.01", "placeholder": "Orçamento total (opcional)"}),
             "status": forms.Select(attrs={"class": "input"}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Desabilitar localização para campos datetime-local funcionarem corretamente
+        self.fields["start_date"].localize = False
+        self.fields["end_date"].localize = False
 
 
 class ContractUploadForm(forms.Form):

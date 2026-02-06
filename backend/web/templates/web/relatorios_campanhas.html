@@ -1,0 +1,436 @@
+{% extends "web/base.html" %}
+{% load static %}
+
+{% block content %}
+  <div class="topbar">
+    {% if show_back %}
+      <a href="{% url 'web:relatorios_clientes' %}" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        Voltar
+      </a>
+    {% endif %}
+    <h1>{{ page_title }}</h1>
+  </div>
+
+  <section class="main-panel">
+    <form id="relatorioForm" method="GET" action="{% url 'web:relatorios_consolidado' %}">
+      <div class="selection-toolbar">
+        <div class="selection-info">
+          <label class="select-all-label">
+            <input type="checkbox" id="selectAll" class="select-checkbox">
+            <span>Selecionar todas</span>
+          </label>
+          <span class="selected-count">0 selecionada(s)</span>
+        </div>
+        <button type="submit" class="btn-generate" disabled>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          Gerar Relatório Consolidado
+        </button>
+      </div>
+
+      <div class="campaigns-grid">
+        {% for item in campaigns_with_stats %}
+          <div class="campaign-card" data-campaign-id="{{ item.campaign.id }}">
+            <label class="card-checkbox-wrapper">
+              <input type="checkbox" name="campaigns" value="{{ item.campaign.id }}" class="campaign-checkbox">
+              <span class="checkmark"></span>
+            </label>
+            <div class="card-logo">
+              {% if cliente.logo %}
+                <img src="{{ cliente.logo.url }}" alt="{{ cliente.nome }}" />
+              {% else %}
+                <div class="logo-placeholder">
+                  <span>{{ cliente.nome|slice:":2"|upper }}</span>
+                </div>
+              {% endif %}
+            </div>
+            <div class="card-info">
+              <h3 class="cliente-name">{{ cliente.nome }}</h3>
+              <p class="campaign-name">{{ item.campaign.name }}</p>
+            </div>
+            <div class="card-stats">
+              <div class="stat-row">
+                <span class="stat-label">Investimento</span>
+                <span class="stat-value">R$ {{ item.investment|floatformat:0|default:"0" }}</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Inserções</span>
+                <span class="stat-value">{{ item.insertions|default:"0" }}</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">ON / OFF</span>
+                <span class="stat-value">{{ item.on_count }} : {{ item.off_count }}</span>
+              </div>
+            </div>
+            <div class="card-footer">
+              <span class="status-badge {% if item.campaign.status == 'active' %}active{% elif item.campaign.status == 'paused' %}paused{% else %}draft{% endif %}">
+                {{ item.campaign.status|upper }}
+              </span>
+              <span class="card-period">
+                {% if item.start %}{{ item.start|date:"d/m/y" }}{% endif %}
+                {% if item.end %} - {{ item.end|date:"d/m/y" }}{% endif %}
+              </span>
+            </div>
+          </div>
+        {% empty %}
+          <div class="empty-state">
+            <p>Nenhuma campanha cadastrada.</p>
+          </div>
+        {% endfor %}
+      </div>
+    </form>
+  </section>
+
+<style>
+  .selection-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: white;
+    border-radius: 12px;
+    margin-bottom: 24px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+
+  .selection-info {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .select-all-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .select-checkbox {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--brand-primary);
+  }
+
+  .selected-count {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    padding: 6px 12px;
+    background: #f1f5f9;
+    border-radius: 20px;
+  }
+
+  .btn-generate {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    background: linear-gradient(135deg, var(--brand-primary) 0%, #8b5cf6 100%);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  }
+
+  .btn-generate:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+  }
+
+  .btn-generate:disabled {
+    background: #d1d5db;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  .campaigns-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 24px;
+  }
+
+  .campaign-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background: white;
+    border-radius: 16px;
+    border: 2px solid var(--border-color);
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    cursor: pointer;
+  }
+
+  .campaign-card:hover {
+    border-color: var(--brand-primary);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+  }
+
+  .campaign-card.selected {
+    border-color: var(--brand-primary);
+    background: linear-gradient(to bottom, rgba(99, 102, 241, 0.03) 0%, white 100%);
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.2);
+  }
+
+  .card-checkbox-wrapper {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: white;
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    transition: all 0.2s ease;
+  }
+
+  .card-checkbox-wrapper:hover {
+    transform: scale(1.1);
+  }
+
+  .campaign-checkbox {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--brand-primary);
+  }
+
+  .card-logo {
+    width: 100%;
+    height: 140px;
+    background: linear-gradient(135deg, #dbeafe 0%, #2563eb 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .card-logo img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+
+  .logo-placeholder {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, var(--brand-primary) 0%, #8b5cf6 100%);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: 800;
+    color: white;
+    text-transform: uppercase;
+  }
+
+  .card-info {
+    padding: 16px 20px 12px;
+    text-align: center;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .cliente-name {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin: 0 0 4px 0;
+  }
+
+  .campaign-name {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0;
+    font-weight: 600;
+  }
+
+  .card-stats {
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .stat-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  .stat-value {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .card-footer {
+    padding: 12px 20px;
+    background: #f8fafc;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .status-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .status-badge.active {
+    background: rgba(34, 197, 94, 0.15);
+    color: #15803d;
+  }
+
+  .status-badge.paused {
+    background: rgba(245, 158, 11, 0.15);
+    color: #b45309;
+  }
+
+  .status-badge.draft {
+    background: rgba(107, 114, 128, 0.15);
+    color: #4b5563;
+  }
+
+  .card-period {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  .empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-secondary);
+  }
+
+  @media (max-width: 640px) {
+    .campaigns-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .selection-toolbar {
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .btn-generate {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    transition: color 0.2s ease;
+  }
+
+  .back-link:hover {
+    color: var(--brand-primary);
+  }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const checkboxes = document.querySelectorAll('.campaign-checkbox');
+  const selectAllCheckbox = document.getElementById('selectAll');
+  const selectedCountSpan = document.querySelector('.selected-count');
+  const generateBtn = document.querySelector('.btn-generate');
+  const cards = document.querySelectorAll('.campaign-card');
+
+  function updateState() {
+    const checked = document.querySelectorAll('.campaign-checkbox:checked');
+    const count = checked.length;
+    selectedCountSpan.textContent = count + ' selecionada(s)';
+    generateBtn.disabled = count === 0;
+
+    // Atualizar visual dos cards
+    cards.forEach(card => {
+      const checkbox = card.querySelector('.campaign-checkbox');
+      if (checkbox.checked) {
+        card.classList.add('selected');
+      } else {
+        card.classList.remove('selected');
+      }
+    });
+
+    // Atualizar estado do "selecionar todas"
+    selectAllCheckbox.checked = count === checkboxes.length && count > 0;
+    selectAllCheckbox.indeterminate = count > 0 && count < checkboxes.length;
+  }
+
+  // Click no card seleciona
+  cards.forEach(card => {
+    card.addEventListener('click', function(e) {
+      // Ignorar se clicou diretamente no checkbox
+      if (e.target.classList.contains('campaign-checkbox')) return;
+
+      const checkbox = card.querySelector('.campaign-checkbox');
+      checkbox.checked = !checkbox.checked;
+      updateState();
+    });
+  });
+
+  // Mudança nos checkboxes individuais
+  checkboxes.forEach(cb => {
+    cb.addEventListener('change', updateState);
+  });
+
+  // Selecionar todas
+  selectAllCheckbox.addEventListener('change', function() {
+    checkboxes.forEach(cb => {
+      cb.checked = selectAllCheckbox.checked;
+    });
+    updateState();
+  });
+
+  // Estado inicial
+  updateState();
+});
+</script>
+{% endblock %}
