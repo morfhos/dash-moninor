@@ -1,0 +1,98 @@
+{% extends "web/base_public.html" %}
+{% load static %}
+
+{% block content %}
+  <div class="full-gradient">
+    <div class="card" style="width: 380px; padding: 24px;">
+
+      <!-- Logo do Cliente -->
+      <div class="cliente-logo-container">
+        {% if cliente.logo %}
+          <img src="{{ cliente.logo.url }}" alt="{{ cliente.nome }}" class="cliente-logo" />
+        {% else %}
+          <div class="cliente-initials">{{ cliente.nome|slice:":2"|upper }}</div>
+        {% endif %}
+      </div>
+
+      <div style="margin-bottom: 18px;">
+        <div style="font-size:22px; font-weight:800; margin-bottom:6px; text-align:center;">Bem-vindo!</div>
+        <div style="text-align:center;">Acesse sua conta para monitorar suas campanhas em tempo real.</div>
+      </div>
+
+      {% if form_errors %}
+        <div style="margin-bottom: 12px; font-size: 13px; color: #b91c1c; font-weight: 600; text-align:center;">
+          {{ form_errors }}
+        </div>
+      {% endif %}
+
+      <form method="post" data-login-form>
+        {% csrf_token %}
+        {% if next %}
+          <input type="hidden" name="next" value="{{ next }}" />
+        {% endif %}
+        <div style="display:grid; gap:10px; margin-bottom:12px;">
+          <input class="input" type="text" name="login" value="{{ login_value|default:'' }}" placeholder="login ou e-mail" required />
+          <input class="input" type="password" name="password" placeholder="Sua senha" required />
+        </div>
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; color:var(--muted);">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+            <input type="checkbox" name="remember" {% if remember %}checked{% endif %} />
+            Lembrar de mim
+          </label>
+          <a href="#" style="text-decoration:none; color:var(--brand-primary);" onclick="event.preventDefault()">Esqueceu a senha?</a>
+        </div>
+        <button class="btn" style="width:100%" type="submit">
+          Entrar
+        </button>
+      </form>
+      <div style="margin-top:14px; text-align:center; font-size:13px; color:var(--muted);">
+        Precisa de ajuda? <a href="#" style="color:var(--brand-primary); text-decoration:none" onclick="event.preventDefault()">Suporte</a>
+      </div>
+      <div style="margin-top:8px; font-size:12px; text-align:center; color:#94a3b8">{{ cliente.nome }}</div>
+    </div>
+  </div>
+
+  <style>
+    .cliente-logo-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 20px;
+      height: 80px;
+      background: var(--brand-primary);
+      border-radius: 10px;
+    }
+
+    .cliente-logo {
+      max-height: 80px;
+      max-width: 200px;
+      object-fit: contain;
+    }
+
+    .cliente-initials {
+      width: 80px;
+      height: 80px;
+      background: linear-gradient(135deg, var(--brand-primary) 0%, #8b5cf6 100%);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      font-weight: 800;
+      color: white;
+    }
+  </style>
+
+  <script>
+    (function () {
+      var form = document.querySelector('[data-login-form]')
+      if (!form) return
+      form.addEventListener('submit', function () {
+        var btn = form.querySelector('button[type="submit"]')
+        if (!btn) return
+        btn.disabled = true
+        btn.textContent = 'Entrando...'
+      })
+    })()
+  </script>
+{% endblock %}

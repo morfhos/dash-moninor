@@ -2,302 +2,864 @@
 {% load static %}
 
 {% block content %}
-  <div class="topbar">
-    <h1>{{ page_title }}</h1>
-    {% if role == "cliente" and cliente %}
-      <span class="cliente-badge">{{ cliente.nome }}</span>
+<div class="topbar">
+  <h1>{{ page_title }}</h1>
+  {% if cliente %}
+    <span class="cliente-badge">{{ cliente.nome }}</span>
+    {% if role != "cliente" %}
+      <a href="{% url 'web:dashboard' %}" class="btn-clear-filter">Ver todos</a>
     {% endif %}
+  {% endif %}
+</div>
+
+{% if clientes_list and not selected_cliente_id %}
+<!-- Selecao de Clientes para Admin/Colaborador -->
+<section class="clientes-section">
+  <div class="clientes-grid">
+    {% for c in clientes_list %}
+    <a href="?cliente_id={{ c.id }}" class="cliente-card">
+      <div class="cliente-logo">
+        {% if c.logo %}
+          <img src="{{ c.logo.url }}" alt="{{ c.nome }}" />
+        {% else %}
+          <span class="cliente-initials">{{ c.nome|slice:":2"|upper }}</span>
+        {% endif %}
+      </div>
+      <div class="cliente-info">
+        <div class="cliente-name">{{ c.nome }}</div>
+      </div>
+    </a>
+    {% endfor %}
   </div>
-
-  <!-- Stats Cards -->
-  <div class="stats-cards">
-    <div class="stat-card purple">
-      <div class="stat-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-        </svg>
-      </div>
-      <div class="stat-content">
-        <div class="stat-value">R${{ stats.investment|floatformat:0|default:"0" }}</div>
-        <div class="stat-label">Investimento Total</div>
-      </div>
+</section>
+{% else %}
+<!-- Stats Cards (so aparece quando cliente selecionado ou role=cliente) -->
+ 
+<div class="stats-cards">
+  <!-- Termometro de Execucao -->
+  <div class="stat-card thermometer">
+    <div class="stat-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"></path>
+      </svg>
     </div>
-
-    <div class="stat-card blue">
-      <div class="stat-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"></circle>
-          <polyline points="12 6 12 12 16 14"></polyline>
-        </svg>
-      </div>
-      <div class="stat-content">
-        <div class="stat-value">{{ stats.on_count }} : {{ stats.off_count }}</div>
-        <div class="stat-label">Ativas / Inativas</div>
-      </div>
-    </div>
-
-    <div class="stat-card teal">
-      <div class="stat-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-          <polyline points="14 2 14 8 20 8"></polyline>
-          <line x1="16" y1="13" x2="8" y2="13"></line>
-          <line x1="16" y1="17" x2="8" y2="17"></line>
-        </svg>
-      </div>
-      <div class="stat-content">
-        <div class="stat-value">R${{ stats.cost|floatformat:0|default:"0" }}</div>
-        <div class="stat-label">Custo Total</div>
-      </div>
-    </div>
-
-    <div class="stat-card cyan">
-      <div class="stat-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M11 5L6 9H2V15H6L11 19V5Z"></path>
-          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
-          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-        </svg>
-      </div>
-      <div class="stat-content">
-        <div class="stat-value">{{ stats.insertions|default:"0" }}</div>
-        <div class="stat-label">Inserções Total</div>
+    <div class="stat-content">
+      <div class="stat-value">{{ stats.exec_percent }}%</div>
+      <div class="stat-label">Execucao</div>
+      <div class="thermometer-bar">
+        <div class="thermometer-fill" style="width: {{ stats.exec_percent }}%"></div>
       </div>
     </div>
   </div>
 
-  <!-- Main Content -->
-  <section class="dashboard-content">
-    <div class="modules-grid">
-      <!-- Timeline Campanhas Box -->
-      <a href="{% url 'web:grupo_campanhas' %}" class="module-card timeline-card">
-        <div class="module-icon">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-            <line x1="16" y1="2" x2="16" y2="6"></line>
-            <line x1="8" y1="2" x2="8" y2="6"></line>
-            <line x1="3" y1="10" x2="21" y2="10"></line>
-          </svg>
-        </div>
-        <div class="module-info">
-          <h3>Timeline Campanhas</h3>
-          <p>Visualize a programação das campanhas</p>
-        </div>
-        <div class="module-stats">
-          <span class="badge">{{ stats.total_campaigns }} ativa{{ stats.total_campaigns|pluralize:"s" }}</span>
-        </div>
-        <div class="module-arrow">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </div>
-      </a>
+  <!-- Pracas Ativas -->
+  <div class="stat-card green">
+    <div class="stat-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+        <circle cx="12" cy="10" r="3"></circle>
+      </svg>
+    </div>
+    <div class="stat-content">
+      <div class="stat-value">{{ stats.pracas_ativas }}</div>
+      <div class="stat-label">Pracas Ativas Agora</div>
+    </div>
+  </div>
 
-      <!-- Relatórios Box -->
-      <a href="{% url 'web:relatorios' %}" class="module-card">
-        <div class="module-icon">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="20" x2="18" y2="10"></line>
-            <line x1="12" y1="20" x2="12" y2="4"></line>
-            <line x1="6" y1="20" x2="6" y2="14"></line>
-          </svg>
-        </div>
-        <div class="module-info">
-          <h3>Relatórios</h3>
-          <p>Análises e métricas detalhadas</p>
-        </div>
-        <div class="module-arrow">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </div>
-      </a>
+  <!-- Campanhas em Andamento -->
+  <div class="stat-card blue">
+    <div class="stat-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"></circle>
+        <polyline points="12 6 12 12 16 14"></polyline>
+      </svg>
+    </div>
+    <div class="stat-content">
+      <div class="stat-value">{{ stats.campaigns_live }}</div>
+      <div class="stat-label">Campanhas em Andamento</div>
+    </div>
+  </div>
 
-      <!-- Analytics Box -->
-      <a href="{% url 'web:analytics' %}" class="module-card">
-        <div class="module-icon">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path>
-            <path d="M22 12A10 10 0 0 0 12 2v10z"></path>
-          </svg>
-        </div>
-        <div class="module-info">
-          <h3>Analytics</h3>
-          <p>Insights e performance</p>
-        </div>
-        <div class="module-arrow">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </div>
-      </a>
+  <!-- Insercoes -->
+  <div class="stat-card purple">
+    <div class="stat-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M11 5L6 9H2V15H6L11 19V5Z"></path>
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+      </svg>
+    </div>
+    <div class="stat-content">
+      <div class="stat-value">{{ stats.insertions_done|default:0 }}<span class="stat-sub">/{{ stats.insertions|default:0 }}</span></div>
+      <div class="stat-label">Insercoes (Realizadas/Planejadas)</div>
+    </div>
+  </div>
+
+  <!-- Investimento -->
+  <div class="stat-card teal">
+    <div class="stat-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="1" x2="12" y2="23"></line>
+        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+      </svg>
+    </div>
+    <div class="stat-content">
+      <div class="stat-value">R${{ stats.investment|floatformat:0|default:"0" }}</div>
+      <div class="stat-label">Investimento Total</div>
+    </div>
+  </div>
+
+  <!-- Linhas Ativas/Inativas -->
+  <div class="stat-card cyan">
+    <div class="stat-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+      </svg>
+    </div>
+    <div class="stat-content">
+      <div class="stat-value">{{ stats.on_count }} <span class="stat-sub">/ {{ stats.off_count }}</span></div>
+      <div class="stat-label">Linhas ON / OFF</div>
+    </div>
+  </div>
+</div>
+
+<!-- GRAFICOS -->
+<div class="dashboard-grids">
+
+  <!-- Row 1: Linha grande (full) -->
+  <section class="charts-grid one-col">
+    <div class="chart-card chart-lg">
+      <h3>Evolucao de Insercoes (Ultimos 30 dias)</h3>
+      <div class="chart-canvas">
+        <canvas id="insertionsChart"></canvas>
+      </div>
     </div>
   </section>
 
+  <!-- Row 2: Donut + Top 5 (2 colunas) -->
+  <section class="charts-grid two-cols">
+    <div class="chart-card">
+      <h3>Investimento por Regiao</h3>
+      <div class="chart-canvas">
+        <canvas id="regionChart"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3>Top 5 Pracas por Insercao</h3>
+      <div class="chart-canvas">
+        <canvas id="pracasChart"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <!-- Row 3: Canal + Peças (2 colunas) -->
+  <section class="charts-grid two-cols">
+    <div class="chart-card">
+      <h3>Distribuicao por Canal</h3>
+      <div class="chart-canvas">
+        <canvas id="channelChart"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3>Top 5 Pecas por Insercao</h3>
+      <div class="chart-canvas">
+        <canvas id="piecesChart"></canvas>
+      </div>
+    </div>
+  </section>
+
+</div>
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Dados do backend
+const daysLabels = {{ days_labels|safe }};
+const daysInsertions = {{ days_insertions|safe }};
+const regionLabels = {{ region_labels|safe }};
+const regionValues = {{ region_values|safe }};
+const pracasLabels = {{ pracas_labels|safe }};
+const pracasValues = {{ pracas_values|safe }};
+const channelLabels = {{ channel_labels|safe }};
+const channelValues = {{ channel_values|safe }};
+const piecesLabels = {{ pieces_labels|safe }};
+const piecesValues = {{ pieces_values|safe }};
+const heatmapWeeks = {{ heatmap_weeks|safe }};
+
+// Cores
+const chartColors = [
+  '#7c3aed', '#3b82f6', '#14b8a6', '#f59e0b', '#ef4444',
+  '#8b5cf6', '#06b6d4', '#22c55e', '#f97316', '#ec4899'
+];
+
+// 1. Grafico de Evolucao de Insercoes (Linha)
+if (daysLabels.length > 0) {
+  new Chart(document.getElementById('insertionsChart'), {
+    type: 'line',
+    data: {
+      labels: daysLabels,
+      datasets: [{
+        label: 'Insercoes',
+        data: daysInsertions,
+        borderColor: '#7c3aed',
+        backgroundColor: 'rgba(124, 58, 237, 0.1)',
+        fill: true,
+        tension: 0.3,
+        pointBackgroundColor: '#7c3aed',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        pointRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+} else {
+  document.getElementById('insertionsChart').parentElement.innerHTML += '<div class="empty-chart">Sem dados de insercoes no periodo</div>';
+}
+
+// 2. Grafico de Investimento por Regiao (Donut)
+if (regionLabels.length > 0) {
+  new Chart(document.getElementById('regionChart'), {
+    type: 'doughnut',
+    data: {
+      labels: regionLabels,
+      datasets: [{
+        data: regionValues,
+        backgroundColor: chartColors.slice(0, regionLabels.length),
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '65%',
+      plugins: {
+        legend: { position: 'right', labels: { boxWidth: 12, padding: 8 } }
+      }
+    }
+  });
+} else {
+  document.getElementById('regionChart').parentElement.innerHTML += '<div class="empty-chart">Sem dados de regiao</div>';
+}
+
+// 3. Top 5 Pracas (Barra Horizontal)
+if (pracasLabels.length > 0) {
+  new Chart(document.getElementById('pracasChart'), {
+    type: 'bar',
+    data: {
+      labels: pracasLabels,
+      datasets: [{
+        label: 'Insercoes',
+        data: pracasValues,
+        backgroundColor: chartColors,
+        borderRadius: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+} else {
+  document.getElementById('pracasChart').parentElement.innerHTML += '<div class="empty-chart">Sem dados de pracas</div>';
+}
+
+// 4. Distribuicao por Canal (Barra)
+if (channelLabels.length > 0) {
+  new Chart(document.getElementById('channelChart'), {
+    type: 'bar',
+    data: {
+      labels: channelLabels,
+      datasets: [{
+        label: 'Insercoes',
+        data: channelValues,
+        backgroundColor: chartColors,
+        borderRadius: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+} else {
+  document.getElementById('channelChart').parentElement.innerHTML += '<div class="empty-chart">Sem dados de canal</div>';
+}
+
+// 5. Insercoes por Peca (Barra)
+if (piecesLabels.length > 0) {
+  new Chart(document.getElementById('piecesChart'), {
+    type: 'bar',
+    data: {
+      labels: piecesLabels,
+      datasets: [{
+        label: 'Insercoes',
+        data: piecesValues,
+        backgroundColor: ['#7c3aed', '#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe'],
+        borderRadius: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+} else {
+  document.getElementById('piecesChart').parentElement.innerHTML += '<div class="empty-chart">Sem dados de pecas</div>';
+}
+
+</script>
+
 <style>
-  .topbar {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin-bottom: 24px;
+/* Wrapper geral */
+.dashboard-grids {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: 18px;
+}
+
+/* Grids */
+.charts-grid {
+  display: grid;
+  gap: 20px;
+}
+
+.charts-grid.one-col {
+  grid-template-columns: 1fr;
+}
+
+.charts-grid.two-cols {
+  grid-template-columns: 1.2fr 1.8fr; /* donut menor, ranking maior */
+  align-items: stretch;
+}
+
+/* Card do gráfico */
+.chart-card {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 18px 18px 14px 18px;
+  position: relative;
+  overflow: hidden;
+  min-height: 360px; /* garante altura consistente */
+}
+
+.chart-card h3 {
+  font-size: 14px;
+  font-weight: 800;
+  margin: 0 0 12px 0;
+  color: var(--text-primary);
+}
+
+
+/* Remove o !important do canvas (ele quebra o responsivo do Chart.js) */
+.chart-card canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Responsivo */
+@media (max-width: 1200px) {
+  .charts-grid.two-cols {
+    grid-template-columns: 1fr;
   }
 
-  .topbar h1 {
-    margin: 0;
-    font-size: 24px;
-    font-weight: 800;
+  .chart-card {
+    min-height: 340px;
   }
 
-  .cliente-badge {
-    background: var(--brand-primary);
-    color: white;
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 600;
+  .chart-card.chart-lg {
+    min-height: 380px;
   }
 
+
+  .chart-card.chart-lg .chart-canvas {
+    height: 320px;
+  }
+}
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.cliente-badge {
+  background: var(--brand-primary);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.btn-clear-filter {
+  background: #f3f4f6;
+  color: var(--text-secondary);
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s;
+  margin-left: auto;
+}
+
+.btn-clear-filter:hover {
+  background: #e5e7eb;
+  color: var(--text-primary);
+}
+
+/* Clientes Section */
+.clientes-section {
+  margin-bottom: 24px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 16px 0;
+  color: var(--text-primary);
+}
+
+.clientes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.cliente-card {
+  background: white;
+  border: 2px solid var(--border-color);
+  border-radius: 16px;
+  padding: 0;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+
+.cliente-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(124, 58, 237, 0.15);
+  border-color: var(--brand-primary);
+}
+
+.cliente-logo {
+  height: 120px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.cliente-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 16px;
+}
+
+.cliente-initials {
+  font-size: 48px;
+  font-weight: 800;
+  color: white;
+  text-transform: uppercase;
+}
+
+.cliente-info {
+  padding: 16px;
+  text-align: center;
+}
+
+.cliente-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.cliente-campaigns {
+  font-size: 12px;
+  color: var(--brand-primary);
+  font-weight: 600;
+}
+
+/* Stats Cards */
+/* Stats Cards */
+.stats-cards{
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+/* <= 1400px: 3 por linha */
+@media (max-width: 1400px){
+  .stats-cards{
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* <= 1024px: 2 por linha (blocos de 2) */
+@media (max-width: 1024px){
+  .stats-cards{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* <= 420px: 1 por linha (se quiser manter 2 até no mobile, apague este bloco) */
+@media (max-width: 420px){
+  .stats-cards{
+    grid-template-columns: 1fr;
+  }
+}
+
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  color: white;
+}
+
+.stat-card.thermometer { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+.stat-card.purple { background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); }
+.stat-card.blue { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+.stat-card.teal { background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); }
+.stat-card.cyan { background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); }
+.stat-card.green { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); }
+
+.stat-icon {
+  width: 40px;
+  height: 40px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.stat-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.stat-sub {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.stat-label {
+  font-size: 11px;
+  opacity: 0.9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Termometro */
+.thermometer-bar {
+  height: 6px;
+  background: rgba(255,255,255,0.3);
+  border-radius: 3px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.thermometer-fill {
+  height: 100%;
+  background: white;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+/* Charts Grid */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.charts-grid.three-cols {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.chart-card {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px;
+  position: relative;
+}
+
+.chart-card.wide {
+  /* default */
+}
+
+.chart-card.full-width {
+  grid-column: 1 / -1;
+}
+
+.chart-card h3 {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0 0 16px 0;
+  color: var(--text-primary);
+}
+
+.chart-card canvas {
+  height: 250px !important;
+}
+
+.empty-chart {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* Heatmap */
+.heatmap-section {
+  margin-bottom: 24px;
+}
+
+.heatmap-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.heatmap-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.heatmap-cell {
+  aspect-ratio: 1;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.heatmap-cell:hover {
+  transform: scale(1.1);
+}
+
+.heatmap-cell.l0 { background: #ebedf0; }
+.heatmap-cell.l1 { background: #c4b5fd; }
+.heatmap-cell.l2 { background: #a78bfa; }
+.heatmap-cell.l3 { background: #8b5cf6; }
+.heatmap-cell.l4 { background: #7c3aed; }
+
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.legend-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.legend-scale {
+  display: flex;
+  gap: 2px;
+}
+
+.legend-cell {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.legend-cell.l0 { background: #ebedf0; }
+.legend-cell.l1 { background: #c4b5fd; }
+.legend-cell.l2 { background: #a78bfa; }
+.legend-cell.l3 { background: #8b5cf6; }
+.legend-cell.l4 { background: #7c3aed; }
+
+/* Quick Links */
+.section-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 16px 0;
+  color: var(--text-primary);
+}
+
+.dashboard-content {
+  margin-top: 24px;
+}
+
+.modules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.module-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.2s ease;
+}
+
+.module-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  border-color: var(--brand-primary);
+}
+
+.module-card.timeline-card {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border-color: #bae6fd;
+}
+
+.module-icon {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, var(--brand-primary) 0%, #8b5cf6 100%);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+}
+
+.module-info {
+  flex: 1;
+}
+
+.module-info h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 2px 0;
+}
+
+.module-info p {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.module-stats .badge {
+  background: rgba(34, 197, 94, 0.15);
+  color: #15803d;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.module-arrow {
+  color: var(--text-secondary);
+}
+
+/* Responsivo */
+@media (max-width: 1400px) {
   .stats-cards {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-    margin-bottom: 32px;
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 1200px) {
+  .charts-grid {
+    grid-template-columns: 1fr;
   }
 
-  .stat-card {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 16px 20px;
-    border-radius: 12px;
-    color: white;
+  .charts-grid.three-cols {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 1024px) {
+  .stats-cards {
+    grid-template-columns: repeat(2, 1fr);
   }
 
-  .stat-card.purple { background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); }
-  .stat-card.blue { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
-  .stat-card.teal { background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); }
-  .stat-card.cyan { background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); }
-
-  .stat-icon {
-    width: 40px;
-    height: 40px;
-    background: rgba(255,255,255,0.2);
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  .charts-grid.three-cols {
+    grid-template-columns: 1fr;
   }
+}
 
-  .stat-value {
-    font-size: 20px;
-    font-weight: 700;
-  }
-
-  .stat-label {
-    font-size: 12px;
-    opacity: 0.9;
-  }
-
-  .dashboard-content {
-    margin-top: 24px;
+@media (max-width: 640px) {
+  .stats-cards {
+    grid-template-columns: 1fr;
   }
 
   .modules-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 20px;
+    grid-template-columns: 1fr;
   }
-
-  .module-card {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    background: white;
-    border: 1px solid var(--border-color);
-    border-radius: 16px;
-    padding: 24px;
-    text-decoration: none;
-    color: inherit;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-  }
-
-  .module-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-    border-color: var(--brand-primary);
-  }
-
-  .module-card.timeline-card {
-    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-    border-color: #bae6fd;
-  }
-
-  .module-card.timeline-card:hover {
-    background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
-    border-color: var(--brand-primary);
-  }
-
-  .module-icon {
-    width: 56px;
-    height: 56px;
-    background: linear-gradient(135deg, var(--brand-primary) 0%, #8b5cf6 100%);
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    flex-shrink: 0;
-  }
-
-  .module-info {
-    flex: 1;
-  }
-
-  .module-info h3 {
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0 0 4px 0;
-  }
-
-  .module-info p {
-    font-size: 13px;
-    color: var(--text-secondary);
-    margin: 0;
-  }
-
-  .module-stats {
-    margin-right: 8px;
-  }
-
-  .module-stats .badge {
-    background: rgba(34, 197, 94, 0.15);
-    color: #15803d;
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 700;
-  }
-
-  .module-arrow {
-    color: var(--text-secondary);
-  }
-
-  @media (max-width: 1024px) {
-    .stats-cards {
-      grid-template-columns: repeat(2, 1fr);
-    }
-  }
-
-  @media (max-width: 640px) {
-    .stats-cards {
-      grid-template-columns: 1fr;
-    }
-
-    .modules-grid {
-      grid-template-columns: 1fr;
-    }
-  }
+}
 </style>
 {% endblock %}

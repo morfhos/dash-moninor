@@ -15,10 +15,17 @@
     <form method="post" enctype="multipart/form-data" style="display:grid; gap: 14px;">
       {% csrf_token %}
       <div class="form-grid">
-        <div class="full">
+        <div>
           <div style="font-size: 12px; font-weight: 800; color: var(--text-secondary); margin-bottom: 6px;">Nome</div>
           {{ form.nome }}
           {% if form.nome.errors %}<div style="color:#b91c1c; font-size: 12px; margin-top: 6px;">{{ form.nome.errors|striptags }}</div>{% endif %}
+        </div>
+
+        <div>
+          <div style="font-size: 12px; font-weight: 800; color: var(--text-secondary); margin-bottom: 6px;">Slug (URL de login)</div>
+          {{ form.slug }}
+          {% if form.slug.errors %}<div style="color:#b91c1c; font-size: 12px; margin-top: 6px;">{{ form.slug.errors|striptags }}</div>{% endif %}
+          <div style="color: var(--text-secondary); font-size: 11px; margin-top: 4px;">Ex: /login/<strong>sabesp</strong></div>
         </div>
 
         <div>

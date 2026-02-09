@@ -5,6 +5,7 @@ from django.utils import timezone
 
 class Cliente(models.Model):
     nome = models.CharField(max_length=200)
+    slug = models.SlugField(max_length=100, unique=True, blank=True, null=True)
     cnpj = models.CharField(max_length=30, blank=True, default="")
     ativo = models.BooleanField(default=True)
     logo = models.FileField(upload_to="clientes/logos/", blank=True, null=True)
@@ -129,3 +130,55 @@ class AuditLog(models.Model):
             user_agent=user_agent,
             details=details or {},
         )
+
+
+class Alert(models.Model):
+    """Modelo para alertas/mensagens enviadas pelo admin para clientes."""
+
+    class Priority(models.TextChoices):
+        LOW = "low", "Baixa"
+        NORMAL = "normal", "Normal"
+        HIGH = "high", "Alta"
+        URGENT = "urgent", "Urgente"
+
+    titulo = models.CharField(max_length=200)
+    mensagem = models.TextField()
+    prioridade = models.CharField(max_length=20, choices=Priority.choices, default=Priority.NORMAL)
+    cliente = models.ForeignKey(
+        Cliente,
+        on_delete=models.CASCADE,
+        related_name="alertas",
+    )
+    enviado_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="alertas_enviados",
+    )
+    lido = models.BooleanField(default=False)
+    lido_em = models.DateTimeField(null=True, blank=True)
+    lido_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="alertas_lidos",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Alerta"
+        verbose_name_plural = "Alertas"
+        ordering = ["-criado_em"]
+
+    def __str__(self) -> str:
+        return f"{self.titulo} - {self.cliente.nome}"
+
+    def marcar_como_lido(self, user):
+        """Marca o alerta como lido."""
+        if not self.lido:
+            self.lido = True
+            self.lido_em = timezone.now()
+            self.lido_por = user
+            self.save(update_fields=["lido", "lido_em", "lido_por"])

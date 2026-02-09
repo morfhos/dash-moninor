@@ -54,6 +54,7 @@
               <polyline points="21 15 16 10 5 21"></polyline>
             </svg>
             <p>Nenhuma mídia cadastrada</p>
+            {% if role != "cliente" %}
             <a href="{% url 'web:uploads_midia_pecas' campaign.id %}" class="btn-upload">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -62,6 +63,7 @@
               </svg>
               Fazer Upload
             </a>
+            {% endif %}
           </div>
         {% endif %}
       </div>

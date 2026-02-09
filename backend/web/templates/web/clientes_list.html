@@ -10,12 +10,13 @@
     <table class="table">
       <thead>
         <tr>
-          <th style="width: 60px;">Logo</th>
-          <th>Nome</th>
+          <th style="width: 60px;">LOGO</th>
+          <th style="width: 100px;">NOME</th>
+          <th style="width: 60px;">slug</th>
           <th style="width: 160px;">CNPJ</th>
-          <th style="width: 140px;">Status</th>
-          <th style="width: 170px;">Última atualização</th>
-          <th style="width: 160px; text-align:right;">Ações</th>
+          <th style="width: 100px;">STATUS</th>
+          <th style="width: 150px;">ÚLTIMA ATUALIZAÇÃO</th>
+          <th style="width: 220px; text-align:right;">AÇÕES</th>
         </tr>
       </thead>
       <tbody>
@@ -35,6 +36,7 @@
                 {{ c.nome }}
               </a>
             </td>
+            <td style="color: var(--text-secondary); font-weight: 700;">{{ c.slug|default:"-" }}</td>
             <td style="color: var(--text-secondary); font-weight: 700;">{{ c.cnpj|default:"-" }}</td>
             <td>
               {% if c.ativo %}
@@ -57,7 +59,7 @@
           </tr>
         {% empty %}
           <tr>
-            <td colspan="6" style="color: var(--text-secondary); text-align:center; padding: 18px;">
+            <td colspan="7" style="color: var(--text-secondary); text-align:center; padding: 18px;">
               Nenhum cliente cadastrado.
             </td>
           </tr>

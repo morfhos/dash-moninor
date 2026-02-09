@@ -113,24 +113,28 @@
 
 <!-- Graficos -->
 <div class="charts-grid">
-  <!-- Grafico de Logins por Hora -->
   <div class="chart-card">
     <h3>Logins por Hora</h3>
-    <canvas id="loginsChart"></canvas>
+    <div class="chart-canvas chart-md">
+      <canvas id="loginsChart"></canvas>
+    </div>
   </div>
 
-  <!-- Grafico de Eventos por Tipo -->
   <div class="chart-card">
     <h3>Eventos por Tipo</h3>
-    <canvas id="eventsTypeChart"></canvas>
+    <div class="chart-canvas chart-md">
+      <canvas id="eventsTypeChart"></canvas>
+    </div>
   </div>
 
-  <!-- Grafico de Eventos por Dia -->
   <div class="chart-card full-width">
     <h3>Eventos por Dia</h3>
-    <canvas id="eventsDayChart"></canvas>
+    <div class="chart-canvas chart-sm">
+      <canvas id="eventsDayChart"></canvas>
+    </div>
   </div>
 </div>
+
 
 <!-- Top Usuarios e Tabela de Logs -->
 <div class="logs-grid">
@@ -185,9 +189,10 @@
             <td class="cell-ip">{{ log.ip_address|default:"-" }}</td>
             <td class="cell-details">
               {% if log.details %}
-                <button class="btn-details" onclick="showDetails(this)" data-details='{{ log.details|escapejs }}'>
+                <button class="btn-details" onclick="showDetails({{ log.id }})">
                   Ver
                 </button>
+                <script type="application/json" id="details-{{ log.id }}">{{ log.details_json|safe }}</script>
               {% else %}
                 -
               {% endif %}
@@ -339,10 +344,13 @@ document.querySelectorAll('.btn-preset').forEach(btn => {
 });
 
 // Modal de detalhes
-function showDetails(btn) {
-  const details = JSON.parse(btn.dataset.details);
-  document.getElementById('detailsContent').textContent = JSON.stringify(details, null, 2);
-  document.getElementById('detailsModal').classList.add('show');
+function showDetails(logId) {
+  const scriptEl = document.getElementById('details-' + logId);
+  if (scriptEl) {
+    const details = JSON.parse(scriptEl.textContent);
+    document.getElementById('detailsContent').textContent = JSON.stringify(details, null, 2);
+    document.getElementById('detailsModal').classList.add('show');
+  }
 }
 
 function closeModal() {
@@ -441,11 +449,21 @@ document.getElementById('detailsModal').addEventListener('click', function(e) {
 }
 
 /* Stats Cards */
-.stats-cards {
+.stats-cards{
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap:16px;
+  margin-bottom:24px;
+}
+
+@media (max-width: 768px){
+  .stats-cards{ 
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 16px;
-  margin-bottom: 24px;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+    width: 100%;
+  }
 }
 
 .stat-card {
@@ -455,6 +473,13 @@ document.getElementById('detailsModal').addEventListener('click', function(e) {
   padding: 16px;
   border-radius: 12px;
   color: white;
+}
+
+.stats-cards {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
 }
 
 .stat-card.purple { background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); }
@@ -486,34 +511,56 @@ document.getElementById('detailsModal').addEventListener('click', function(e) {
 }
 
 /* Charts Grid */
-.charts-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-  margin-bottom: 24px;
+.charts-grid{
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap:20px;
+  margin-bottom:24px;
+  align-items: stretch;
 }
 
-.chart-card {
-  background: white;
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 20px;
-  position: relative;
+.chart-card{
+  background:#fff;
+  border:1px solid var(--border-color);
+  border-radius:12px;
+  padding:18px;
+  position:relative;
+  overflow:hidden;
 }
 
-.chart-card.full-width {
+.chart-card.full-width{
   grid-column: 1 / -1;
 }
 
-.chart-card h3 {
-  font-size: 16px;
-  font-weight: 700;
-  margin: 0 0 16px 0;
-  color: var(--text-primary);
+.chart-card h3{
+  font-size:15px;
+  font-weight:800;
+  margin:0 0 12px 0;
+  color:var(--text-primary);
 }
 
-.chart-card canvas {
-  height: 280px !important;
+/* Wrapper que define altura real do Chart.js */
+.chart-canvas{
+  position:relative;
+  width:100%;
+}
+
+.chart-canvas.chart-md{ height: 280px; }
+.chart-canvas.chart-sm{ height: 220px; }
+
+/* Deixa o canvas ocupar o wrapper (sem “height: 280px !important”) */
+.chart-canvas canvas{
+  width:100% !important;
+  height:100% !important;
+  display:block;
+}
+
+/* Responsivo */
+@media (max-width: 1024px){
+  .charts-grid{ grid-template-columns: 1fr; }
+  .chart-card.full-width{ grid-column: auto; }
+  .chart-canvas.chart-md{ height: 260px; }
+  .chart-canvas.chart-sm{ height: 220px; }
 }
 
 .chart-card.full-width canvas {

@@ -9,6 +9,7 @@ app_name = "web"
 urlpatterns = [
     path("", views.root, name="root"),
     path("login/", views.login_view, name="login"),
+    path("login/<slug:cliente_slug>/", views.login_cliente_view, name="login_cliente"),
     path("logout/", views.logout_view, name="logout"),
     path("administracao/", views.administracao, name="administracao"),
     path("dashboard/", views.dashboard, name="dashboard"),
@@ -75,6 +76,7 @@ urlpatterns = [
     path("api/me/", views.api_me, name="api_me"),
     path("api/users/", views.api_users, name="api_users"),
     path("api/users/<int:user_id>/", views.api_user_detail, name="api_user_detail"),
+    path("api/alertas/<int:alerta_id>/lido/", views.api_alerta_lido, name="api_alerta_lido"),
     path("configuracoes/", views.configuracoes, name="configuracoes"),
     path("logs-auditoria/", views.logs_auditoria, name="logs_auditoria"),
 ]

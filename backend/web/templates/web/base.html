@@ -8,6 +8,177 @@
     <link rel="stylesheet" href="{% static 'styles.css' %}" />
     <link rel="stylesheet" href="{% static 'django.css' %}" />
     <link rel="icon" type="image/x-icon" href="{% static 'favicon.ico' %}" />
+    <style>
+      /* Notification Badge */
+      .notification-btn {
+        position: relative;
+      }
+      .notification-btn.has-notifications {
+        animation: bell-shake 0.5s ease-in-out;
+      }
+      .notification-badge {
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        background: #ef4444;
+        color: white;
+        font-size: 10px;
+        font-weight: 700;
+        min-width: 16px;
+        height: 16px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 4px;
+      }
+      @keyframes bell-shake {
+        0%, 100% { transform: rotate(0); }
+        25% { transform: rotate(10deg); }
+        50% { transform: rotate(-10deg); }
+        75% { transform: rotate(5deg); }
+      }
+
+      /* Alertas Modal */
+      .alertas-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 9999;
+        align-items: center;
+        justify-content: center;
+      }
+      .alertas-modal.show {
+        display: flex;
+      }
+      .alertas-modal-content {
+        background: white;
+        border-radius: 16px;
+        width: 90%;
+        max-width: 500px;
+        max-height: 80vh;
+        overflow: hidden;
+        box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+      }
+      .alertas-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px 24px;
+        border-bottom: 1px solid var(--border-color);
+        background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+        color: white;
+      }
+      .alertas-modal-header h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .alertas-modal-close {
+        background: rgba(255,255,255,0.2);
+        border: none;
+        color: white;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s;
+      }
+      .alertas-modal-close:hover {
+        background: rgba(255,255,255,0.3);
+      }
+      .alertas-modal-body {
+        padding: 0;
+        max-height: 60vh;
+        overflow-y: auto;
+      }
+      .alerta-item {
+        padding: 20px 24px;
+        border-bottom: 1px solid var(--border-color);
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .alerta-item:hover {
+        background: #f9fafb;
+      }
+      .alerta-item:last-child {
+        border-bottom: none;
+      }
+      .alerta-item-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+      .alerta-titulo {
+        font-weight: 700;
+        font-size: 15px;
+        color: var(--text-primary);
+      }
+      .alerta-priority {
+        padding: 3px 8px;
+        border-radius: 12px;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+      .alerta-priority.low { background: #f3f4f6; color: #6b7280; }
+      .alerta-priority.normal { background: #dbeafe; color: #1e40af; }
+      .alerta-priority.high { background: #fef3c7; color: #92400e; }
+      .alerta-priority.urgent { background: #fee2e2; color: #991b1b; }
+      .alerta-mensagem {
+        font-size: 14px;
+        color: var(--text-secondary);
+        line-height: 1.5;
+        margin-bottom: 8px;
+      }
+      .alerta-data {
+        font-size: 12px;
+        color: #9ca3af;
+      }
+      .alerta-actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 12px;
+      }
+      .btn-marcar-lido {
+        background: var(--brand-primary);
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: background 0.2s;
+      }
+      .btn-marcar-lido:hover {
+        background: #6d28d9;
+      }
+      .alertas-empty {
+        padding: 48px 24px;
+        text-align: center;
+        color: var(--text-secondary);
+      }
+      .alertas-empty svg {
+        margin-bottom: 16px;
+        opacity: 0.5;
+      }
+    </style>
   </head>
   <body>
     <div class="layout">
@@ -17,6 +188,116 @@
         {% block content %}{% endblock %}
       </main>
     </div>
+
+    <!-- Modal de Alertas -->
+    <div id="alertasModal" class="alertas-modal">
+      <div class="alertas-modal-content">
+        <div class="alertas-modal-header">
+          <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+            </svg>
+            Alertas
+          </h3>
+          <button class="alertas-modal-close" onclick="closeAlertasModal()">&times;</button>
+        </div>
+        <div class="alertas-modal-body">
+          {% if alertas_pendentes %}
+            {% for alerta in alertas_pendentes %}
+            <div class="alerta-item" id="alerta-{{ alerta.id }}">
+              <div class="alerta-item-header">
+                <span class="alerta-titulo">{{ alerta.titulo }}</span>
+                <span class="alerta-priority {{ alerta.prioridade }}">{{ alerta.prioridade }}</span>
+              </div>
+              <div class="alerta-mensagem">{{ alerta.mensagem }}</div>
+              <div class="alerta-data">{{ alerta.criado_em|date:"d/m/Y H:i" }}</div>
+              <div class="alerta-actions">
+                <button class="btn-marcar-lido" onclick="marcarAlertaLido({{ alerta.id }})">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                  OK, Entendi
+                </button>
+              </div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="alertas-empty">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+              </svg>
+              <div>Nenhum alerta pendente</div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
     <script src="{% static 'django.js' %}"></script>
+    <script>
+      function openAlertasModal() {
+        document.getElementById('alertasModal').classList.add('show');
+      }
+
+      function closeAlertasModal() {
+        document.getElementById('alertasModal').classList.remove('show');
+      }
+
+      document.getElementById('alertasModal').addEventListener('click', function(e) {
+        if (e.target === this) closeAlertasModal();
+      });
+
+      function marcarAlertaLido(alertaId) {
+        fetch('/api/alertas/' + alertaId + '/lido/', {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json'
+          }
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            // Remover o alerta da lista
+            const alertaEl = document.getElementById('alerta-' + alertaId);
+            if (alertaEl) {
+              alertaEl.style.opacity = '0';
+              alertaEl.style.transform = 'translateX(20px)';
+              alertaEl.style.transition = 'all 0.3s ease';
+              setTimeout(() => {
+                alertaEl.remove();
+                // Atualizar contador
+                const badge = document.querySelector('.notification-badge');
+                if (badge) {
+                  const count = parseInt(badge.textContent) - 1;
+                  if (count <= 0) {
+                    badge.remove();
+                    document.querySelector('.notification-btn').classList.remove('has-notifications');
+                  } else {
+                    badge.textContent = count;
+                  }
+                }
+                // Se não há mais alertas, mostrar mensagem vazia
+                const remaining = document.querySelectorAll('.alerta-item');
+                if (remaining.length === 0) {
+                  document.querySelector('.alertas-modal-body').innerHTML = `
+                    <div class="alertas-empty">
+                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                      </svg>
+                      <div>Nenhum alerta pendente</div>
+                    </div>
+                  `;
+                }
+              }, 300);
+            }
+          }
+        })
+        .catch(err => console.error('Erro ao marcar alerta como lido:', err));
+      }
+    </script>
   </body>
 </html>

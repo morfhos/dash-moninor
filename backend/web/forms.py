@@ -13,9 +13,10 @@ class LoginForm(forms.Form):
 class ClienteForm(forms.ModelForm):
     class Meta:
         model = Cliente
-        fields = ["nome", "cnpj", "ativo", "logo"]
+        fields = ["nome", "slug", "cnpj", "ativo", "logo"]
         widgets = {
             "nome": forms.TextInput(attrs={"class": "input", "placeholder": "Nome"}),
+            "slug": forms.TextInput(attrs={"class": "input", "placeholder": "Slug (ex: sabesp)"}),
             "cnpj": forms.TextInput(attrs={"class": "input", "placeholder": "CNPJ"}),
         }
 

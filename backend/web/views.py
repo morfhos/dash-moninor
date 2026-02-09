@@ -99,6 +99,75 @@ def login_view(request: HttpRequest) -> HttpResponse:
     )
 
 
+def login_cliente_view(request: HttpRequest, cliente_slug: str) -> HttpResponse:
+    """Login personalizado para cliente com logo próprio."""
+    cliente = Cliente.objects.filter(slug__iexact=cliente_slug, ativo=True).first()
+    if cliente is None:
+        return redirect("web:login")
+
+    next_url = request.GET.get("next") or request.POST.get("next") or ""
+    if request.user.is_authenticated:
+        return redirect(next_url or ("web:dashboard" if effective_role(request) == "cliente" else "web:administracao"))
+
+    form_errors = ""
+    login_value = ""
+    remember = True
+
+    if request.method == "POST":
+        form = LoginForm(request.POST)
+        if form.is_valid():
+            login_value = form.cleaned_data["login"]
+            password = form.cleaned_data["password"]
+            remember = bool(form.cleaned_data.get("remember"))
+
+            user = authenticate(request, username=login_value, password=password)
+            if user is None:
+                User = get_user_model()
+                by_email = User.objects.filter(email__iexact=login_value).only("username").first()
+                if by_email is not None:
+                    user = authenticate(request, username=by_email.username, password=password)
+            if user is None:
+                form_errors = "Login/e-mail ou senha inválidos."
+                AuditLog.log(
+                    AuditLog.EventType.LOGIN_FAILED,
+                    request=request,
+                    details={"login": login_value, "cliente_slug": cliente_slug},
+                )
+            else:
+                auth_login(request, user)
+                if not remember:
+                    request.session.set_expiry(0)
+                # Salvar o slug do cliente na sessão para redirecionamento no logout
+                request.session["login_cliente_slug"] = cliente_slug
+                AuditLog.log(
+                    AuditLog.EventType.LOGIN,
+                    request=request,
+                    user=user,
+                    cliente=user.cliente or cliente,
+                    details={"login": login_value, "cliente_slug": cliente_slug},
+                )
+                if effective_role(request) == "cliente":
+                    return redirect(next_url or "web:dashboard")
+                return redirect(next_url or "web:administracao")
+        else:
+            login_value = request.POST.get("login", "")
+            remember = bool(request.POST.get("remember"))
+            form_errors = "Preencha os campos corretamente."
+
+    return render(
+        request,
+        "web/login_cliente.html",
+        {
+            "page_title": f"Login - {cliente.nome}",
+            "form_errors": form_errors,
+            "next": next_url,
+            "login_value": login_value,
+            "remember": remember,
+            "cliente": cliente,
+        },
+    )
+
+
 def logout_view(request: HttpRequest) -> HttpResponse:
     # Log de logout antes de deslogar
     if request.user.is_authenticated:
@@ -108,8 +177,14 @@ def logout_view(request: HttpRequest) -> HttpResponse:
             user=request.user,
             cliente=getattr(request.user, "cliente", None),
         )
+    # Capturar o slug do cliente antes de limpar a sessão
+    cliente_slug = request.session.get("login_cliente_slug")
     request.session.pop("impersonate_cliente_id", None)
+    request.session.pop("login_cliente_slug", None)
     auth_logout(request)
+    # Redirecionar para a tela de login personalizada se existir
+    if cliente_slug:
+        return redirect("web:login_cliente", cliente_slug=cliente_slug)
     return redirect("web:login")
 
 
@@ -132,58 +207,85 @@ def _render_module(request: HttpRequest, *, active: str, title: str) -> HttpResp
 @login_required
 @require_true_admin
 def administracao(request: HttpRequest) -> HttpResponse:
-    now = timezone.localtime()
-    cards = [
-        {
-            "key": "clientes",
-            "class": "purple",
-            "value": "128",
-            "label": "Clientes ativos",
-            "href": reverse("web:clientes"),
-        },
-        {
-            "key": "campanhas",
-            "class": "blue",
-            "value": "12",
-            "label": "Campanhas ativas",
-            "href": reverse("web:campanhas"),
-        },
-        {
-            "key": "pecas_criativos",
-            "class": "teal",
-            "value": "42 / 7",
-            "label": "Peças ON / OFF",
-            "href": reverse("web:pecas_criativos"),
-        },
-        {
-            "key": "integracoes_meta",
-            "class": "cyan",
-            "value": now.strftime("%d/%m %H:%M"),
-            "label": "Último sync Meta",
-            "href": reverse("web:integracoes"),
-        },
-        {
-            "key": "integracoes_google",
-            "class": "blue",
-            "value": now.strftime("%d/%m %H:%M"),
-            "label": "Último sync Google",
-            "href": reverse("web:integracoes"),
-        },
-        {
-            "key": "uploads_planilhas",
-            "class": "purple",
-            "value": now.strftime("%d/%m %H:%M"),
-            "label": "Última planilha processada",
-            "href": reverse("web:uploads_planilhas"),
-        },
-    ]
+    """Tela de Alertas - envio de mensagens para clientes."""
+    from accounts.models import Alert
+    from datetime import datetime, timedelta
+
+    # Listar clientes ativos para o select
+    clientes = Cliente.objects.filter(ativo=True).order_by("nome")
+
+    # Filtros de data - padrão: últimos 30 dias
+    hoje = timezone.now().date()
+    trinta_dias_atras = hoje - timedelta(days=30)
+
+    data_de = request.GET.get("data_de", trinta_dias_atras.isoformat())
+    data_ate = request.GET.get("data_ate", hoje.isoformat())
+    filtro_cliente = request.GET.get("filtro_cliente", "")
+
+    try:
+        data_de_parsed = datetime.strptime(data_de, "%Y-%m-%d").date()
+        data_ate_parsed = datetime.strptime(data_ate, "%Y-%m-%d").date()
+    except ValueError:
+        data_de_parsed = trinta_dias_atras
+        data_ate_parsed = hoje
+
+    # Converter para datetime com timezone
+    data_ate_dt = timezone.make_aware(datetime.combine(data_ate_parsed, datetime.max.time()))
+    data_de_dt = timezone.make_aware(datetime.combine(data_de_parsed, datetime.min.time()))
+
+    # Processar envio de alerta
+    success_message = ""
+    error_message = ""
+    if request.method == "POST":
+        cliente_id = request.POST.get("cliente_id")
+        titulo = request.POST.get("titulo", "").strip()
+        mensagem = request.POST.get("mensagem", "").strip()
+        prioridade = request.POST.get("prioridade", "normal")
+
+        if not cliente_id:
+            error_message = "Selecione um cliente."
+        elif not titulo:
+            error_message = "Informe o título do alerta."
+        elif not mensagem:
+            error_message = "Informe a mensagem do alerta."
+        else:
+            cliente = Cliente.objects.filter(id=cliente_id).first()
+            if cliente:
+                Alert.objects.create(
+                    cliente=cliente,
+                    titulo=titulo,
+                    mensagem=mensagem,
+                    prioridade=prioridade,
+                    enviado_por=request.user,
+                )
+                success_message = f"Alerta enviado para {cliente.nome} com sucesso!"
+            else:
+                error_message = "Cliente não encontrado."
+
+    # Listar alertas com filtros
+    alertas_qs = Alert.objects.select_related("cliente", "enviado_por", "lido_por").filter(
+        criado_em__gte=data_de_dt,
+        criado_em__lte=data_ate_dt,
+    )
+
+    if filtro_cliente:
+        alertas_qs = alertas_qs.filter(cliente_id=filtro_cliente)
+
+    alertas = alertas_qs.order_by("-criado_em")[:100]
+
     return render(
         request,
-        "web/admin_home.html",
+        "web/alertas.html",
         {
             "active": "administracao",
-            "page_title": "Administração",
-            "cards": cards,
+            "page_title": "Alertas",
+            "clientes": clientes,
+            "alertas": alertas,
+            "success_message": success_message,
+            "error_message": error_message,
+            "data_de": data_de,
+            "data_ate": data_ate,
+            "filtro_cliente": filtro_cliente,
         },
     )
 
@@ -191,6 +293,12 @@ def administracao(request: HttpRequest) -> HttpResponse:
 @login_required
 def dashboard(request: HttpRequest) -> HttpResponse:
     role = effective_role(request)
+    today = timezone.localdate()
+    now = timezone.now()
+
+    # Para admin/colaborador: permitir filtrar por cliente via query string
+    selected_cliente_id = request.GET.get("cliente_id")
+    clientes_list = []
 
     # Filtrar campanhas baseado no role
     if role == "cliente":
@@ -198,14 +306,44 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         campaigns_qs = Campaign.objects.filter(cliente_id=cliente_id, status="active")
         cliente = Cliente.objects.filter(id=cliente_id).first()
     else:
-        campaigns_qs = Campaign.objects.filter(status="active")
-        cliente = None
+        # Admin/Colaborador - listar clientes com campanhas
+        clientes_list = list(
+            Cliente.objects.filter(campaigns__isnull=False)
+            .distinct()
+            .annotate(
+                total_campaigns=Count("campaigns", filter=models.Q(campaigns__status="active")),
+            )
+            .filter(total_campaigns__gt=0)
+            .order_by("nome")
+        )
+
+        # Se um cliente foi selecionado, filtrar por ele
+        if selected_cliente_id:
+            try:
+                selected_cliente_id = int(selected_cliente_id)
+                campaigns_qs = Campaign.objects.filter(cliente_id=selected_cliente_id, status="active")
+                cliente = Cliente.objects.filter(id=selected_cliente_id).first()
+            except (ValueError, TypeError):
+                campaigns_qs = Campaign.objects.filter(status="active")
+                cliente = None
+        else:
+            campaigns_qs = Campaign.objects.filter(status="active")
+            cliente = None
 
     # Contadores
     total_campaigns = campaigns_qs.count()
 
-    # Contar linhas ativas (data final >= hoje) vs inativas (data final < hoje)
-    today = timezone.localdate()
+    # Campanhas em andamento (now between start_date and end_date)
+    campaigns_live = campaigns_qs.filter(start_date__lte=now, end_date__gte=now).count()
+
+    # Praças ativas agora (markets distintos com inserções hoje ou no período atual)
+    pracas_ativas = PlacementLine.objects.filter(
+        campaign__in=campaigns_qs,
+        days__date=today,
+        days__insertions__gt=0,
+    ).values("market").distinct().count()
+
+    # Contar linhas ativas vs inativas
     on_count = PlacementLine.objects.filter(
         campaign__in=campaigns_qs
     ).annotate(
@@ -218,16 +356,104 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         max_day=Max("days__date")
     ).filter(max_day__lt=today).count()
 
-    # Totais consolidados
+    # Totais consolidados (inserções planejadas = todas as inserções)
     totals = PlacementDay.objects.filter(placement_line__campaign__in=campaigns_qs).aggregate(
         insertions=Sum("insertions"),
         impressions=Sum("impressions"),
         clicks=Sum("clicks"),
         cost=Sum("cost"),
     )
+    total_insertions_planned = totals.get("insertions") or 0
+
+    # Inserções realizadas (até hoje)
+    insertions_done = PlacementDay.objects.filter(
+        placement_line__campaign__in=campaigns_qs,
+        date__lte=today,
+    ).aggregate(total=Sum("insertions"))["total"] or 0
+
+    # Percentual de execução
+    exec_percent = round((insertions_done / total_insertions_planned * 100), 1) if total_insertions_planned > 0 else 0
 
     # Investimento total (budget das campanhas)
     investment = campaigns_qs.aggregate(total=Sum("total_budget"))["total"] or 0
+
+    # ========== DADOS PARA GRÁFICOS ==========
+
+    # 1. Evolução de Inserções por Dia (últimos 30 dias)
+    thirty_days_ago = today - timedelta(days=30)
+    insertions_by_day = list(
+        PlacementDay.objects.filter(
+            placement_line__campaign__in=campaigns_qs,
+            date__gte=thirty_days_ago,
+            date__lte=today,
+        )
+        .values("date")
+        .annotate(total=Sum("insertions"))
+        .order_by("date")
+    )
+    days_labels = [item["date"].strftime("%d/%m") for item in insertions_by_day]
+    days_insertions = [item["total"] for item in insertions_by_day]
+
+    # 2. Investimento por Região (donut)
+    region_investments = list(
+        RegionInvestment.objects.filter(campaign__in=campaigns_qs)
+        .values("region_name")
+        .annotate(total_pct=Sum("percentage"))
+        .order_by("-total_pct")[:8]
+    )
+    region_labels = [r["region_name"] for r in region_investments]
+    region_values = [float(r["total_pct"]) for r in region_investments]
+
+    # 3. Top 5 Praças por Inserção (barra horizontal)
+    top_pracas = list(
+        PlacementDay.objects.filter(placement_line__campaign__in=campaigns_qs)
+        .values("placement_line__market")
+        .annotate(total=Sum("insertions"))
+        .order_by("-total")[:5]
+    )
+    pracas_labels = [p["placement_line__market"] for p in top_pracas]
+    pracas_values = [p["total"] for p in top_pracas]
+
+    # 4. Distribuição por Canal (media_channel)
+    channel_dist = list(
+        PlacementDay.objects.filter(placement_line__campaign__in=campaigns_qs)
+        .values("placement_line__media_channel")
+        .annotate(total=Sum("insertions"))
+        .order_by("-total")
+    )
+    channel_labels_map = dict(PlacementLine.MediaChannel.choices)
+    channel_labels = [channel_labels_map.get(c["placement_line__media_channel"], c["placement_line__media_channel"]) for c in channel_dist]
+    channel_values = [c["total"] for c in channel_dist]
+
+    # 5. Inserções por Peça - Top 5 criativos
+    top_pieces = list(
+        PlacementDay.objects.filter(
+            placement_line__campaign__in=campaigns_qs,
+            placement_line__placement_creatives__isnull=False,
+        )
+        .values(
+            "placement_line__placement_creatives__piece__code",
+            "placement_line__placement_creatives__piece__title",
+        )
+        .annotate(total=Sum("insertions"))
+        .order_by("-total")[:5]
+    )
+    pieces_labels = [f"{p['placement_line__placement_creatives__piece__code']}" for p in top_pieces if p['placement_line__placement_creatives__piece__code']]
+    pieces_values = [p["total"] for p in top_pieces if p['placement_line__placement_creatives__piece__code']]
+
+    # 6. Heatmap - últimas 4 semanas (7 dias × 4 semanas)
+    heatmap_weeks = []
+    for week_offset in range(4):
+        week_start = today - timedelta(days=today.weekday() + 7 * (3 - week_offset))
+        week_data = []
+        for day_offset in range(7):
+            day_date = week_start + timedelta(days=day_offset)
+            day_total = PlacementDay.objects.filter(
+                placement_line__campaign__in=campaigns_qs,
+                date=day_date,
+            ).aggregate(total=Sum("insertions"))["total"] or 0
+            week_data.append({"date": day_date.strftime("%d/%m"), "value": day_total})
+        heatmap_weeks.append(week_data)
 
     return render(
         request,
@@ -237,21 +463,60 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             "page_title": "Dashboard",
             "role": role,
             "cliente": cliente,
+            "clientes_list": clientes_list,
+            "selected_cliente_id": selected_cliente_id,
             "stats": {
                 "investment": investment,
                 "on_count": on_count,
                 "off_count": off_count,
                 "cost": totals.get("cost") or 0,
-                "insertions": totals.get("insertions") or 0,
+                "insertions": total_insertions_planned,
+                "insertions_done": insertions_done,
+                "exec_percent": exec_percent,
                 "total_campaigns": total_campaigns,
+                "campaigns_live": campaigns_live,
+                "pracas_ativas": pracas_ativas,
             },
+            # Dados para gráficos
+            "days_labels": json.dumps(days_labels),
+            "days_insertions": json.dumps(days_insertions),
+            "region_labels": json.dumps(region_labels),
+            "region_values": json.dumps(region_values),
+            "pracas_labels": json.dumps(pracas_labels),
+            "pracas_values": json.dumps(pracas_values),
+            "channel_labels": json.dumps(channel_labels),
+            "channel_values": json.dumps(channel_values),
+            "pieces_labels": json.dumps(pieces_labels),
+            "pieces_values": json.dumps(pieces_values),
+            "heatmap_weeks": json.dumps(heatmap_weeks),
         },
     )
 
 
 @login_required
 def timeline_campanhas(request: HttpRequest) -> HttpResponse:
-    return _render_module(request, active="timeline_campanhas", title="Timeline Campanhas")
+    role = effective_role(request)
+
+    # Filtrar campanhas baseado no role
+    if role == "cliente":
+        cliente_id = effective_cliente_id(request)
+        campaigns_qs = Campaign.objects.filter(cliente_id=cliente_id, status="active")
+    else:
+        campaigns_qs = Campaign.objects.filter(status="active")
+
+    total_campaigns = campaigns_qs.count()
+
+    return render(
+        request,
+        "web/timeline_campanhas.html",
+        {
+            "active": "timeline_campanhas",
+            "page_title": "Timeline Campanhas",
+            "stats": {
+                "total_campaigns": total_campaigns,
+            },
+        },
+    )
 
 
 @login_required
@@ -575,7 +840,10 @@ def logs_auditoria(request: HttpRequest) -> HttpResponse:
     )
 
     # Últimos 50 logs para tabela
-    recent_logs = logs_qs.select_related("user", "cliente")[:50]
+    recent_logs = list(logs_qs.select_related("user", "cliente")[:50])
+    # Adicionar details_json para serialização correta no template
+    for log in recent_logs:
+        log.details_json = json.dumps(log.details, default=str) if log.details else "{}"
 
     context = {
         "active": "logs_auditoria",
@@ -1720,6 +1988,31 @@ def api_user_detail(request: HttpRequest, user_id: int) -> HttpResponse:
     return JsonResponse({"success": False, "error": "Método não permitido"}, status=405)
 
 
+@csrf_exempt
+@login_required
+def api_alerta_lido(request: HttpRequest, alerta_id: int) -> HttpResponse:
+    """API para marcar um alerta como lido."""
+    from accounts.models import Alert
+
+    if request.method != "POST":
+        return JsonResponse({"success": False, "error": "Método não permitido"}, status=405)
+
+    # Buscar o alerta
+    alerta = Alert.objects.filter(id=alerta_id).first()
+    if alerta is None:
+        return JsonResponse({"success": False, "error": "Alerta não encontrado"}, status=404)
+
+    # Verificar se o usuário tem acesso ao alerta (pertence ao cliente dele)
+    cliente_id = effective_cliente_id(request)
+    if cliente_id and alerta.cliente_id != cliente_id:
+        return JsonResponse({"success": False, "error": "Acesso negado"}, status=403)
+
+    # Marcar como lido
+    alerta.marcar_como_lido(request.user)
+
+    return JsonResponse({"success": True, "alerta_id": alerta_id})
+
+
 @login_required
 def relatorios_clientes(request: HttpRequest) -> HttpResponse:
     """Lista os clientes para seleção de relatórios."""
@@ -2495,6 +2788,7 @@ def peca_detalhe(request: HttpRequest, piece_id: int) -> HttpResponse:
         {
             "active": "campanhas",
             "page_title": piece.title,
+            "role": effective_role(request),
             "piece": piece,
             "campaign": campaign,
             "cliente": cliente,

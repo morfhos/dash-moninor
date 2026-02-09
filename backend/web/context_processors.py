@@ -1,4 +1,4 @@
-from accounts.models import Cliente
+from accounts.models import Alert, Cliente
 
 from .authz import effective_cliente_id, effective_role, is_admin
 
@@ -30,9 +30,22 @@ def nav_context(request):
     user_role = getattr(request.user, "role", "") if request.user.is_authenticated else ""
     is_true_admin = request.user.is_authenticated and (request.user.is_superuser or user_role == "admin")
 
+    # Contar alertas não lidos para o cliente
+    alertas_nao_lidos = 0
+    alertas_pendentes = []
+    if cliente_id and request.user.is_authenticated:
+        alertas_pendentes = list(
+            Alert.objects.filter(cliente_id=cliente_id, lido=False)
+            .order_by("-criado_em")
+            .values("id", "titulo", "mensagem", "prioridade", "criado_em")[:10]
+        )
+        alertas_nao_lidos = len(alertas_pendentes)
+
     return {
         "nav_mode": nav_mode,
         "nav_cliente": nav_cliente,
         "impersonating_cliente": impersonating_cliente,
         "is_true_admin": is_true_admin,
+        "alertas_nao_lidos": alertas_nao_lidos,
+        "alertas_pendentes": alertas_pendentes,
     }

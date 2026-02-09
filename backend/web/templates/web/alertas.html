@@ -1,0 +1,605 @@
+{% extends "web/base.html" %}
+
+{% block content %}
+<div class="topbar">
+  <h1>{{ page_title }}</h1>
+</div>
+
+{% if success_message %}
+<div class="alert alert-success">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+  </svg>
+  {{ success_message }}
+</div>
+{% endif %}
+
+{% if error_message %}
+<div class="alert alert-error">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <circle cx="12" cy="12" r="10"></circle>
+    <line x1="15" y1="9" x2="9" y2="15"></line>
+    <line x1="9" y1="9" x2="15" y2="15"></line>
+  </svg>
+  {{ error_message }}
+</div>
+{% endif %}
+
+<!-- Tabs de Navegação -->
+<div class="alertas-tabs">
+  <button class="tab-btn active" data-tab="enviar">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <line x1="22" y1="2" x2="11" y2="13"></line>
+      <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+    </svg>
+    Enviar Alerta
+  </button>
+  <button class="tab-btn" data-tab="enviados">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+    </svg>
+    Alertas Enviados
+    {% if alertas|length > 0 %}
+      <span class="tab-badge">{{ alertas|length }}</span>
+    {% endif %}
+  </button>
+</div>
+
+<!-- Tab: Enviar Alerta -->
+<div class="tab-content active" id="tab-enviar">
+  <section class="main-panel">
+    <h3 class="section-title">Enviar Novo Alerta</h3>
+  <form method="POST" class="alert-form">
+    {% csrf_token %}
+    <div class="form-grid">
+      <div>
+        <label class="form-label">Cliente</label>
+        <select name="cliente_id" class="input" required>
+          <option value="">Selecione um cliente...</option>
+          {% for c in clientes %}
+            <option value="{{ c.id }}">{{ c.nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Prioridade</label>
+        <select name="prioridade" class="input">
+          <option value="low">Baixa</option>
+          <option value="normal" selected>Normal</option>
+          <option value="high">Alta</option>
+          <option value="urgent">Urgente</option>
+        </select>
+      </div>
+      <div class="full">
+        <label class="form-label">Titulo</label>
+        <input type="text" name="titulo" class="input" placeholder="Titulo do alerta..." required />
+      </div>
+      <div class="full">
+        <label class="form-label">Mensagem</label>
+        <textarea name="mensagem" class="input textarea" rows="4" placeholder="Escreva a mensagem do alerta..." required></textarea>
+      </div>
+    </div>
+    <button type="submit" class="btn" style="margin-top: 16px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="22" y1="2" x2="11" y2="13"></line>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+      </svg>
+      Enviar Alerta
+    </button>
+  </form>
+  </section>
+</div>
+
+<!-- Tab: Alertas Enviados -->
+<div class="tab-content" id="tab-enviados">
+  <!-- Filtros -->
+  <div class="filters-card">
+  <form method="GET" class="filters-form">
+    <div class="filter-group">
+      <label for="data_de">De:</label>
+      <input type="date" id="data_de" name="data_de" value="{{ data_de }}" />
+    </div>
+    <div class="filter-group">
+      <label for="data_ate">Ate:</label>
+      <input type="date" id="data_ate" name="data_ate" value="{{ data_ate }}" />
+    </div>
+    <div class="filter-group">
+      <label for="filtro_cliente">Cliente:</label>
+      <select id="filtro_cliente" name="filtro_cliente" class="input" style="min-width: 180px;">
+        <option value="">Todos</option>
+        {% for c in clientes %}
+          <option value="{{ c.id }}" {% if filtro_cliente|stringformat:"s" == c.id|stringformat:"s" %}selected{% endif %}>{{ c.nome }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn-filter">Filtrar</button>
+    <div class="filter-presets">
+      <button type="button" class="btn-preset" data-days="1">Hoje</button>
+      <button type="button" class="btn-preset" data-days="7">7 dias</button>
+      <button type="button" class="btn-preset" data-days="30">30 dias</button>
+    </div>
+  </form>
+</div>
+
+<!-- Lista de Alertas Enviados -->
+<section class="main-panel" style="margin-top: 20px;">
+  <h3 class="section-title">Alertas Enviados</h3>
+  <div class="table-wrapper">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Data/Hora</th>
+          <th>Cliente</th>
+          <th>Titulo</th>
+          <th>Prioridade</th>
+          <th>Status</th>
+          <th>Lido em</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for alerta in alertas %}
+        <tr>
+          <td class="cell-date">{{ alerta.criado_em|date:"d/m/Y H:i" }}</td>
+          <td>
+            <div class="cliente-cell">
+              {% if alerta.cliente.logo %}
+                <img src="{{ alerta.cliente.logo.url }}" alt="{{ alerta.cliente.nome }}" class="cliente-thumb" />
+              {% endif %}
+              <span>{{ alerta.cliente.nome }}</span>
+            </div>
+          </td>
+          <td>
+            <div class="titulo-cell">
+              <strong>{{ alerta.titulo }}</strong>
+              <span class="mensagem-preview">{{ alerta.mensagem|truncatewords:10 }}</span>
+            </div>
+          </td>
+          <td>
+            <span class="priority-badge priority-{{ alerta.prioridade }}">
+              {{ alerta.get_prioridade_display }}
+            </span>
+          </td>
+          <td>
+            {% if alerta.lido %}
+              <span class="status-badge status-lido">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                Lido
+              </span>
+            {% else %}
+              <span class="status-badge status-pendente">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                Pendente
+              </span>
+            {% endif %}
+          </td>
+          <td class="cell-date">
+            {% if alerta.lido_em %}
+              {{ alerta.lido_em|date:"d/m/Y H:i" }}
+              {% if alerta.lido_por %}
+                <span class="lido-por">por {{ alerta.lido_por.first_name|default:alerta.lido_por.username }}</span>
+              {% endif %}
+            {% else %}
+              -
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="empty-state">Nenhum alerta enviado ainda.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  </section>
+</div>
+
+<style>
+/* Tabs */
+.alertas-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  background: white;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab-btn:hover {
+  background: #f3f4f6;
+  color: var(--text-primary);
+}
+
+.tab-btn.active {
+  background: var(--brand-primary);
+  color: white;
+}
+
+.tab-btn.active:hover {
+  background: #6d28d9;
+}
+
+.tab-badge {
+  background: rgba(255,255,255,0.25);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tab-btn:not(.active) .tab-badge {
+  background: #e5e7eb;
+  color: var(--text-secondary);
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.main-panel {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 20px 0;
+  color: var(--text-primary);
+}
+
+/* Alerts */
+.alert {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.alert-success {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+}
+
+.alert-error {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+/* Form */
+.alert-form .form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.alert-form .form-grid .full {
+  grid-column: 1 / -1;
+}
+
+.form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.btn svg {
+  margin-right: 6px;
+}
+
+/* Table */
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th {
+  text-align: left;
+  padding: 12px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  background: #f9fafb;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.table td {
+  padding: 14px 10px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 14px;
+}
+
+.table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.cell-date {
+  white-space: nowrap;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.cliente-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cliente-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.titulo-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.titulo-cell strong {
+  font-size: 14px;
+}
+
+.mensagem-preview {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Priority badges */
+.priority-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.priority-low {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.priority-normal {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.priority-high {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.priority-urgent {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.status-lido {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-pendente {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.lido-por {
+  display: block;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 32px;
+  color: var(--text-secondary);
+}
+
+/* Filtros */
+.filters-card {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px 24px;
+}
+
+.filters-form {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-group label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.filter-group input[type="date"] {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.btn-filter {
+  background: var(--brand-primary);
+  color: white;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-filter:hover {
+  background: #6d28d9;
+}
+
+.filter-presets {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.btn-preset {
+  background: #f3f4f6;
+  border: 1px solid var(--border-color);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-preset:hover {
+  background: var(--brand-primary);
+  color: white;
+  border-color: var(--brand-primary);
+}
+
+@media (max-width: 768px) {
+  .alertas-tabs {
+    flex-direction: column;
+  }
+
+  .tab-btn {
+    justify-content: center;
+  }
+
+  .alert-form .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .alert-form .form-grid .full {
+    grid-column: auto;
+  }
+
+  .filters-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-presets {
+    margin-left: 0;
+    justify-content: center;
+  }
+}
+</style>
+
+<script>
+// Tab switching
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    // Remove active from all tabs and contents
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+    // Add active to clicked tab and corresponding content
+    this.classList.add('active');
+    const tabId = 'tab-' + this.dataset.tab;
+    document.getElementById(tabId).classList.add('active');
+  });
+});
+
+// Filtros rapidos
+document.querySelectorAll('.btn-preset').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const days = parseInt(this.dataset.days);
+    const hoje = new Date();
+    const dataAte = hoje.toISOString().split('T')[0];
+    const dataDe = new Date(hoje.getTime() - (days - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    document.getElementById('data_de').value = dataDe;
+    document.getElementById('data_ate').value = dataAte;
+    document.querySelector('.filters-form').submit();
+  });
+});
+
+// Se houver filtros aplicados, mostrar aba de enviados
+{% if data_de or data_ate or filtro_cliente %}
+document.querySelector('[data-tab="enviados"]').click();
+{% endif %}
+</script>
+{% endblock %}
