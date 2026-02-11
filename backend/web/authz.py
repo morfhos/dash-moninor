@@ -48,6 +48,21 @@ def effective_cliente_id(request: HttpRequest) -> int | None:
     return getattr(request.user, "cliente_id", None)
 
 
+def selected_cliente_id(request: HttpRequest) -> int | None:
+    """Returns the admin's globally-selected client ID from the sidebar dropdown.
+
+    Unlike effective_cliente_id(), this does NOT change effective_role() to 'cliente'.
+    Returns None if no client is selected, user is not admin, or already impersonating.
+    """
+    if not request.user.is_authenticated:
+        return None
+    if not is_admin(request.user):
+        return None
+    if request.session.get("impersonate_cliente_id"):
+        return None
+    return request.session.get("selected_cliente_id")
+
+
 T = TypeVar("T", bound=Callable[..., HttpResponse])
 
 

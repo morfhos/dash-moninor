@@ -1,0 +1,586 @@
+{% extends "web/base.html" %}
+{% load static %}
+
+{% block content %}
+<style>
+  .integracoes-container { padding: 0 0 40px; }
+
+  .platform-card {
+    background: var(--surface);
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+  .platform-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .platform-info {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .platform-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #4285f4 0%, #34a853 50%, #fbbc05 75%, #ea4335 100%);
+    color: white;
+  }
+  .platform-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+  .platform-desc {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+  }
+  .platform-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+  .status-dot.connected { background: #22c55e; }
+  .status-dot.disconnected { background: #94a3b8; }
+
+  .connect-section {
+    padding: 24px;
+    background: var(--surface-2);
+  }
+  .connect-form {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .connect-form .form-group { flex: 1; min-width: 200px; }
+  .connect-form label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+  }
+  .connect-form select {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    font-size: 14px;
+    font-family: inherit;
+    background: var(--surface);
+    color: var(--text-primary);
+  }
+  .btn-connect {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: var(--brand-primary);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.2s;
+  }
+  .btn-connect:hover { background: #4c2bc2; }
+
+  .accounts-list { padding: 0; }
+  .account-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border-color);
+    transition: background 0.15s;
+  }
+  .account-row:last-child { border-bottom: none; }
+  .account-row:hover { background: var(--surface-2); }
+  .account-info { display: flex; flex-direction: column; gap: 4px; }
+  .account-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  .account-meta {
+    font-size: 12px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .account-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .btn-sync, .btn-disconnect {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--surface);
+    color: var(--text-primary);
+  }
+  .btn-sync:hover { background: #f0f9ff; border-color: #3b82f6; color: #3b82f6; }
+  .btn-disconnect {
+    color: #ef4444;
+    border-color: #fecaca;
+  }
+  .btn-disconnect:hover { background: #fef2f2; border-color: #ef4444; }
+
+  .sync-logs-section {
+    background: var(--surface);
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+  .sync-logs-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+  .sync-logs-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .sync-logs-table th {
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border-color);
+  }
+  .sync-logs-table td {
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-color);
+  }
+  .sync-logs-table tr:last-child td { border-bottom: none; }
+  .sync-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .sync-status.success { background: #dcfce7; color: #166534; }
+  .sync-status.error { background: #fee2e2; color: #991b1b; }
+  .sync-status.running { background: #dbeafe; color: #1e40af; }
+
+  .empty-state {
+    padding: 48px 24px;
+    text-align: center;
+    color: var(--text-secondary);
+  }
+  .empty-state svg { margin-bottom: 16px; opacity: 0.4; }
+  .empty-state p { font-size: 14px; margin-top: 8px; }
+
+  .flash-msg {
+    padding: 14px 20px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    line-height: 1.5;
+  }
+  .flash-msg.error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+  }
+  .flash-msg.success {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+  }
+</style>
+
+<div class="topbar">
+  <h1>{{ page_title }}</h1>
+</div>
+
+<div class="integracoes-container">
+  {% if gads_error or mads_error %}
+  <div class="flash-msg error">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+    <span>{{ gads_error }}{{ mads_error }}</span>
+  </div>
+  {% endif %}
+  {% if gads_success or mads_success %}
+  <div class="flash-msg success">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+    <span>{{ gads_success }}{{ mads_success }}</span>
+  </div>
+  {% endif %}
+
+  <!-- Google Ads Platform Card -->
+  <div class="platform-card">
+    <div class="platform-header">
+      <div class="platform-info">
+        <div class="platform-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="platform-name">Google Ads</div>
+          <div class="platform-desc">Campanhas, impressoes, cliques e investimento</div>
+        </div>
+      </div>
+      <div class="platform-status">
+        {% if accounts %}
+          <span class="status-dot connected"></span>
+          {{ accounts|length }} conta{{ accounts|length|pluralize:"s" }} conectada{{ accounts|length|pluralize:"s" }}
+        {% else %}
+          <span class="status-dot disconnected"></span>
+          Nao conectado
+        {% endif %}
+      </div>
+    </div>
+
+    {% if accounts %}
+    <div class="accounts-list">
+      {% for acc in accounts %}
+      <div class="account-row">
+        <div class="account-info">
+          <span class="account-name">{{ acc.descriptive_name|default:acc.customer_id }}</span>
+          <span class="account-meta">
+            <span>ID: {{ acc.customer_id }}</span>
+            <span>Cliente: {{ acc.cliente.nome }}</span>
+            {% if acc.last_sync %}
+              <span>Ultimo sync: {{ acc.last_sync|date:"d/m/Y H:i" }}</span>
+            {% else %}
+              <span>Nunca sincronizado</span>
+            {% endif %}
+          </span>
+        </div>
+        <div class="account-actions">
+          <form method="post" action="{% url 'web:gads_sync' acc.id %}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn-sync">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+              Sincronizar
+            </button>
+          </form>
+          <form method="post" action="{% url 'web:gads_disconnect' acc.id %}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn-disconnect" onclick="return confirm('Desconectar esta conta?')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+              Desconectar
+            </button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="connect-section">
+      <form class="connect-form" method="get" action="{% url 'web:gads_auth_url' %}">
+        <div class="form-group">
+          <label for="connectCliente">Associar ao cliente</label>
+          <select name="cliente_id" id="connectCliente" required>
+            <option value="">Selecione um cliente...</option>
+            {% for c in clientes %}
+              <option value="{{ c.id }}">{{ c.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="connectCustomerId">Customer ID do Google Ads</label>
+          <input type="text" name="customer_id" id="connectCustomerId" placeholder="xxx-xxx-xxxx" required
+                 style="width:100%; padding:10px 14px; border:1px solid var(--border-color); border-radius:10px; font-size:14px; font-family:inherit; background:var(--surface); color:var(--text-primary);">
+        </div>
+        <button type="submit" class="btn-connect">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10 13a5 5 0 0 1 0-7l1-1a5 5 0 0 1 7 7l-1 1"></path>
+            <path d="M14 11a5 5 0 0 1 0 7l-1 1a5 5 0 0 1-7-7l1-1"></path>
+          </svg>
+          Conectar Google Ads
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Help Section -->
+  {% if has_token_error %}
+  <div class="platform-card" style="border-color: #fde68a;">
+    <div class="platform-header" style="background: #fffbeb; border-bottom-color: #fde68a;">
+      <div class="platform-info">
+        <div class="platform-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+        </div>
+        <div>
+          <div class="platform-name">Developer Token: Acesso de Teste</div>
+          <div class="platform-desc">Seu token so tem acesso a contas de teste. Para acessar contas reais:</div>
+        </div>
+      </div>
+    </div>
+    <div style="padding: 20px 24px; font-size: 14px; line-height: 1.8; color: var(--text-primary);">
+      <ol style="margin: 0; padding-left: 20px;">
+        <li>Acesse <strong>ads.google.com</strong> com a conta administrativa</li>
+        <li>Va em <strong>Ferramentas e Configuracoes</strong> > <strong>Configuracao</strong> > <strong>Centro da API</strong></li>
+        <li>Solicite <strong>Basic Access</strong> (permite leitura de campanhas e metricas)</li>
+        <li>Apos aprovado, clique em "Sincronizar" novamente</li>
+      </ol>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Meta Ads Platform Card -->
+  <div class="platform-card">
+    <div class="platform-header">
+      <div class="platform-info">
+        <div class="platform-icon" style="background: linear-gradient(135deg, #0081fb, #0064e0);">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+            <path d="M12 2.04c-5.5 0-10 4.49-10 10.02 0 5 3.66 9.15 8.44 9.9v-7H7.9v-2.9h2.54V9.85c0-2.51 1.49-3.89 3.78-3.89 1.09 0 2.23.19 2.23.19v2.47h-1.26c-1.24 0-1.63.77-1.63 1.56v1.88h2.78l-.45 2.9h-2.33v7a10 10 0 0 0 8.44-9.9c0-5.53-4.5-10.02-10-10.02z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="platform-name">Meta Ads</div>
+          <div class="platform-desc">Facebook e Instagram Ads — campanhas, impressoes, cliques e investimento</div>
+        </div>
+      </div>
+      <div class="platform-status">
+        {% if mads_accounts %}
+          <span class="status-dot connected"></span>
+          {{ mads_accounts|length }} conta{{ mads_accounts|length|pluralize:"s" }} conectada{{ mads_accounts|length|pluralize:"s" }}
+        {% else %}
+          <span class="status-dot disconnected"></span>
+          Nao conectado
+        {% endif %}
+      </div>
+    </div>
+
+    {% if mads_accounts %}
+    <div class="accounts-list">
+      {% for acc in mads_accounts %}
+      <div class="account-row">
+        <div class="account-info">
+          <span class="account-name">{{ acc.descriptive_name|default:acc.ad_account_id }}</span>
+          <span class="account-meta">
+            <span>ID: {{ acc.ad_account_id }}</span>
+            <span>Cliente: {{ acc.cliente.nome }}</span>
+            {% if acc.last_sync %}
+              <span>Ultimo sync: {{ acc.last_sync|date:"d/m/Y H:i" }}</span>
+            {% else %}
+              <span>Nunca sincronizado</span>
+            {% endif %}
+          </span>
+        </div>
+        <div class="account-actions">
+          <form method="post" action="{% url 'web:mads_sync' acc.id %}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn-sync">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+              Sincronizar
+            </button>
+          </form>
+          <form method="post" action="{% url 'web:mads_disconnect' acc.id %}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn-disconnect" onclick="return confirm('Desconectar esta conta?')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+              Desconectar
+            </button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="connect-section">
+      <form class="connect-form" method="get" action="{% url 'web:mads_auth_url' %}">
+        <div class="form-group">
+          <label for="metaCliente">Associar ao cliente</label>
+          <select name="cliente_id" id="metaCliente" required>
+            <option value="">Selecione um cliente...</option>
+            {% for c in clientes %}
+              <option value="{{ c.id }}">{{ c.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="metaAdAccountId">Ad Account ID do Meta</label>
+          <input type="text" name="ad_account_id" id="metaAdAccountId" placeholder="act_XXXXXXXXX" required
+                 style="width:100%; padding:10px 14px; border:1px solid var(--border-color); border-radius:10px; font-size:14px; font-family:inherit; background:var(--surface); color:var(--text-primary);">
+        </div>
+        <button type="submit" class="btn-connect" style="background: #0081fb;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10 13a5 5 0 0 1 0-7l1-1a5 5 0 0 1 7 7l-1 1"></path>
+            <path d="M14 11a5 5 0 0 1 0 7l-1 1a5 5 0 0 1-7-7l1-1"></path>
+          </svg>
+          Conectar Meta Ads
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Google Ads Sync Logs -->
+  {% if recent_logs %}
+  <div class="sync-logs-section">
+    <div class="sync-logs-header" style="display:flex; align-items:center; justify-content:space-between;">
+      Google Ads — Historico de Sincronizacoes
+      <form method="post" action="{% url 'web:gads_clear_logs' %}" style="margin:0;"
+            onsubmit="return confirm('Limpar todo o historico de sincronizacoes?');">
+        {% csrf_token %}
+        <button type="submit" style="background:none; border:1px solid var(--border-color); border-radius:8px; padding:6px 14px; font-size:13px; color:var(--text-secondary); cursor:pointer; display:flex; align-items:center; gap:6px; font-family:inherit;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+          Limpar historico
+        </button>
+      </form>
+    </div>
+    <table class="sync-logs-table">
+      <thead>
+        <tr>
+          <th>Conta</th>
+          <th>Cliente</th>
+          <th>Inicio</th>
+          <th>Status</th>
+          <th>Campanhas</th>
+          <th>Metricas</th>
+          <th>Erro</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in recent_logs %}
+        <tr>
+          <td>{{ log.account.descriptive_name|default:log.account.customer_id }}</td>
+          <td>{{ log.account.cliente.nome }}</td>
+          <td>{{ log.started_at|date:"d/m/Y H:i" }}</td>
+          <td>
+            <span class="sync-status {{ log.status }}">
+              {% if log.status == "success" %}Sucesso
+              {% elif log.status == "error" %}Erro
+              {% else %}Em execucao{% endif %}
+            </span>
+          </td>
+          <td>{{ log.campaigns_synced }}</td>
+          <td>{{ log.metrics_synced }}</td>
+          <td style="max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ log.error_message }}">
+            {{ log.error_message|truncatechars:120 }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- Meta Ads Sync Logs -->
+  {% if mads_logs %}
+  <div class="sync-logs-section" style="margin-top: 24px;">
+    <div class="sync-logs-header" style="display:flex; align-items:center; justify-content:space-between;">
+      Meta Ads — Historico de Sincronizacoes
+      <form method="post" action="{% url 'web:mads_clear_logs' %}" style="margin:0;"
+            onsubmit="return confirm('Limpar historico de sincronizacoes Meta Ads?');">
+        {% csrf_token %}
+        <button type="submit" style="background:none; border:1px solid var(--border-color); border-radius:8px; padding:6px 14px; font-size:13px; color:var(--text-secondary); cursor:pointer; display:flex; align-items:center; gap:6px; font-family:inherit;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+          Limpar historico
+        </button>
+      </form>
+    </div>
+    <table class="sync-logs-table">
+      <thead>
+        <tr>
+          <th>Conta</th>
+          <th>Cliente</th>
+          <th>Inicio</th>
+          <th>Status</th>
+          <th>Campanhas</th>
+          <th>Metricas</th>
+          <th>Erro</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in mads_logs %}
+        <tr>
+          <td>{{ log.account.descriptive_name|default:log.account.ad_account_id }}</td>
+          <td>{{ log.account.cliente.nome }}</td>
+          <td>{{ log.started_at|date:"d/m/Y H:i" }}</td>
+          <td>
+            <span class="sync-status {{ log.status }}">
+              {% if log.status == "success" %}Sucesso
+              {% elif log.status == "error" %}Erro
+              {% else %}Em execucao{% endif %}
+            </span>
+          </td>
+          <td>{{ log.campaigns_synced }}</td>
+          <td>{{ log.metrics_synced }}</td>
+          <td style="max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ log.error_message }}">
+            {{ log.error_message|truncatechars:120 }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -10,6 +10,26 @@
     </div>
   </div>
 
+  {% if sidebar_clientes %}
+  <div class="sidebar-client-selector">
+    <label class="sidebar-selector-label" for="sidebarClienteSelect">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="7" width="18" height="14" rx="2"></rect>
+        <path d="M16 7V5a2 2 0 0 0-2-2H10a2 2 0 0 0-2 2v2"></path>
+      </svg>
+      Cliente
+    </label>
+    <select id="sidebarClienteSelect" class="sidebar-select" data-action="select-cliente">
+      <option value="">Todos os clientes</option>
+      {% for c in sidebar_clientes %}
+        <option value="{{ c.id }}" {% if c.id == sidebar_selected_cliente_id %}selected{% endif %}>
+          {{ c.nome }}
+        </option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
+
   <nav class="nav">
     <a href="{% url 'web:dashboard' %}" class="menu-item{% if active == 'dashboard' %} active{% endif %}">
       <div class="item-content">
@@ -47,6 +67,15 @@
       </div>
     </a>
 
+    <a href="{% url 'web:dashon' %}" class="menu-item{% if active == 'dashon' %} active{% endif %}">
+      <div class="item-content">
+        <span class="icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+        </span>
+        <span>DashON</span>
+      </div>
+    </a>
+
     {% if nav_mode != 'cliente' %}
       <a href="{% url 'web:campanhas' %}" class="menu-item{% if active == 'campanhas' %} active{% endif %}">
         <div class="item-content">
@@ -66,12 +95,21 @@
         </div>
       </a>
 
-      <a href="{% url 'web:veiculacao' %}" class="menu-item{% if active == 'veiculacao' %} active{% endif %}">
+      <a href="{% url 'web:veiculacao_google' %}" class="menu-item{% if active == 'veiculacao_google' %} active{% endif %}">
         <div class="item-content">
           <span class="icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2"></rect><path d="M16 2H8v5h8z"></path></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10h-10z"></path><path d="M21.2 8H12V2.8A10 10 0 0 1 21.2 8z"></path></svg>
           </span>
-          <span>Veiculação</span>
+          <span>Google Ads</span>
+        </div>
+      </a>
+
+      <a href="{% url 'web:veiculacao_meta' %}" class="menu-item{% if active == 'veiculacao_meta' %} active{% endif %}">
+        <div class="item-content">
+          <span class="icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+          </span>
+          <span>Meta Ads</span>
         </div>
       </a>
 

@@ -16,7 +16,7 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 import json
 
-from .authz import effective_cliente_id, effective_role, is_admin, require_admin, require_true_admin
+from .authz import effective_cliente_id, effective_role, is_admin, require_admin, require_true_admin, selected_cliente_id
 from .forms import (
     CampaignEditForm,
     CampaignWizardForm,
@@ -296,8 +296,10 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     today = timezone.localdate()
     now = timezone.now()
 
-    # Para admin/colaborador: permitir filtrar por cliente via query string
-    selected_cliente_id = request.GET.get("cliente_id")
+    # Para admin/colaborador: prioridade sessão (sidebar) > query param
+    qp_cliente = request.GET.get("cliente_id")
+    sel_cliente = selected_cliente_id(request)
+    active_cliente_filter = None
     clientes_list = []
 
     # Filtrar campanhas baseado no role
@@ -305,6 +307,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         cliente_id = effective_cliente_id(request)
         campaigns_qs = Campaign.objects.filter(cliente_id=cliente_id, status="active")
         cliente = Cliente.objects.filter(id=cliente_id).first()
+        active_cliente_filter = cliente_id
     else:
         # Admin/Colaborador - listar clientes com campanhas
         clientes_list = list(
@@ -317,13 +320,15 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             .order_by("nome")
         )
 
-        # Se um cliente foi selecionado, filtrar por ele
-        if selected_cliente_id:
+        # Prioridade: sidebar selection > query param > mostrar tudo
+        active_cliente_filter = sel_cliente or (int(qp_cliente) if qp_cliente else None)
+        if active_cliente_filter:
             try:
-                selected_cliente_id = int(selected_cliente_id)
-                campaigns_qs = Campaign.objects.filter(cliente_id=selected_cliente_id, status="active")
-                cliente = Cliente.objects.filter(id=selected_cliente_id).first()
+                active_cliente_filter = int(active_cliente_filter)
+                campaigns_qs = Campaign.objects.filter(cliente_id=active_cliente_filter, status="active")
+                cliente = Cliente.objects.filter(id=active_cliente_filter).first()
             except (ValueError, TypeError):
+                active_cliente_filter = None
                 campaigns_qs = Campaign.objects.filter(status="active")
                 cliente = None
         else:
@@ -464,7 +469,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             "role": role,
             "cliente": cliente,
             "clientes_list": clientes_list,
-            "selected_cliente_id": selected_cliente_id,
+            "selected_cliente_id": active_cliente_filter,
             "stats": {
                 "investment": investment,
                 "on_count": on_count,
@@ -502,7 +507,11 @@ def timeline_campanhas(request: HttpRequest) -> HttpResponse:
         cliente_id = effective_cliente_id(request)
         campaigns_qs = Campaign.objects.filter(cliente_id=cliente_id, status="active")
     else:
-        campaigns_qs = Campaign.objects.filter(status="active")
+        sel_cliente = selected_cliente_id(request)
+        if sel_cliente:
+            campaigns_qs = Campaign.objects.filter(cliente_id=sel_cliente, status="active")
+        else:
+            campaigns_qs = Campaign.objects.filter(status="active")
 
     total_campaigns = campaigns_qs.count()
 
@@ -528,6 +537,11 @@ def grupo_campanhas(request: HttpRequest) -> HttpResponse:
     if role == "cliente":
         cliente_id = effective_cliente_id(request)
         return redirect("web:campanhas_cliente", cliente_id=cliente_id)
+
+    # Se admin selecionou cliente no sidebar, pula a página intermediária
+    sel_cliente = selected_cliente_id(request)
+    if sel_cliente:
+        return redirect("web:campanhas_cliente", cliente_id=sel_cliente)
 
     # Para admins, lista todos os clientes que têm campanhas
     clientes_com_campanhas = (
@@ -618,6 +632,11 @@ def pecas_criativos(request: HttpRequest) -> HttpResponse:
         cliente_id = effective_cliente_id(request)
         return redirect("web:pecas_campanhas", cliente_id=cliente_id)
 
+    # Se admin selecionou cliente no sidebar, pula a página intermediária
+    sel_cliente = selected_cliente_id(request)
+    if sel_cliente:
+        return redirect("web:pecas_campanhas", cliente_id=sel_cliente)
+
     # Para admins, lista todos os clientes que têm campanhas
     clientes_com_campanhas = (
         Cliente.objects.filter(campaigns__isnull=False)
@@ -686,8 +705,346 @@ def pecas_campanhas(request: HttpRequest, cliente_id: int) -> HttpResponse:
 
 
 @login_required
-def veiculacao(request: HttpRequest) -> HttpResponse:
-    return _render_module(request, active="veiculacao", title="Veiculação")
+def veiculacao(request: HttpRequest, platform: str = "all") -> HttpResponse:
+    from integrations.models import GoogleAdsAccount, MetaAdsAccount
+
+    role = effective_role(request)
+    if role == "cliente":
+        allowed = {"dashboard", "timeline_campanhas", "relatorios", "analytics"}
+        if "veiculacao" not in allowed:
+            return redirect("web:dashboard")
+
+    # Determine which client to filter by
+    cliente_id = effective_cliente_id(request)
+    if not cliente_id and is_admin(request.user):
+        cliente_id = selected_cliente_id(request)
+
+    # Platform-specific configuration
+    google_channels = ["google", "youtube", "display", "search"]
+    meta_channels = ["meta"]
+
+    if platform == "google":
+        channels = google_channels
+        page_title = "Google Ads"
+        active_key = "veiculacao_google"
+        table_title = "Campanhas Google Ads"
+        empty_msg = "Conecte sua conta do Google Ads para visualizar campanhas, impressoes, cliques e investimento."
+    elif platform == "meta":
+        channels = meta_channels
+        page_title = "Meta Ads"
+        active_key = "veiculacao_meta"
+        table_title = "Campanhas Meta Ads"
+        empty_msg = "Conecte sua conta do Meta Ads para visualizar campanhas, impressoes, cliques e investimento."
+    else:
+        channels = google_channels + meta_channels
+        page_title = "Veiculação"
+        active_key = "veiculacao"
+        table_title = "Campanhas Digitais"
+        empty_msg = "Conecte sua conta do Google Ads ou Meta Ads para visualizar campanhas, impressoes, cliques e investimento."
+
+    # Check if there are any connected accounts
+    gads_qs = GoogleAdsAccount.objects.filter(is_active=True)
+    mads_qs = MetaAdsAccount.objects.filter(is_active=True)
+    if cliente_id:
+        gads_qs = gads_qs.filter(cliente_id=cliente_id)
+        mads_qs = mads_qs.filter(cliente_id=cliente_id)
+
+    if platform == "google":
+        has_accounts = gads_qs.exists()
+    elif platform == "meta":
+        has_accounts = mads_qs.exists()
+    else:
+        has_accounts = gads_qs.exists() or mads_qs.exists()
+
+    # Fetch placement data
+    lines_qs = PlacementLine.objects.filter(media_channel__in=channels)
+    if cliente_id:
+        lines_qs = lines_qs.filter(campaign__cliente_id=cliente_id)
+
+    line_ids = list(lines_qs.values_list("id", flat=True))
+
+    # Date filter
+    date_from = request.GET.get("date_from", "")
+    date_to = request.GET.get("date_to", "")
+    days_qs = PlacementDay.objects.filter(placement_line_id__in=line_ids)
+    if date_from:
+        days_qs = days_qs.filter(date__gte=date_from)
+    if date_to:
+        days_qs = days_qs.filter(date__lte=date_to)
+
+    # Aggregate stats
+    stats = days_qs.aggregate(
+        total_impressions=Sum("impressions"),
+        total_clicks=Sum("clicks"),
+        total_cost=Sum("cost"),
+    )
+    total_impressions = stats["total_impressions"] or 0
+    total_clicks = stats["total_clicks"] or 0
+    total_cost = stats["total_cost"] or 0
+    ctr = (total_clicks / total_impressions * 100) if total_impressions > 0 else 0
+
+    # Campaigns table: per-PlacementLine aggregation
+    campaigns_data = []
+    for line in lines_qs.select_related("campaign", "campaign__cliente"):
+        line_days = days_qs.filter(placement_line=line)
+        agg = line_days.aggregate(
+            imp=Sum("impressions"),
+            clk=Sum("clicks"),
+            cst=Sum("cost"),
+        )
+        imp = agg["imp"] or 0
+        clk = agg["clk"] or 0
+        cst = float(agg["cst"] or 0)
+        line_ctr = (clk / imp * 100) if imp > 0 else 0
+        cpc = (cst / clk) if clk > 0 else 0
+        plat_label = "Meta Ads" if line.media_channel in meta_channels else "Google Ads"
+        campaigns_data.append({
+            "id": line.id,
+            "name": line.channel or line.property_text or f"Campaign #{line.external_ref}",
+            "client": line.campaign.cliente.nome if line.campaign else "",
+            "channel": line.get_media_channel_display(),
+            "platform": plat_label,
+            "impressions": imp,
+            "clicks": clk,
+            "ctr": round(line_ctr, 2),
+            "cost": round(cst, 2),
+            "cpc": round(cpc, 2),
+            "external_ref": line.external_ref,
+        })
+
+    # Daily metrics for chart
+    daily_metrics = list(
+        days_qs.values("date")
+        .annotate(
+            imp=Sum("impressions"),
+            clk=Sum("clicks"),
+            cst=Sum("cost"),
+        )
+        .order_by("date")
+    )
+
+    # Serialize for Chart.js
+    chart_labels = [str(d["date"]) for d in daily_metrics]
+    chart_impressions = [d["imp"] or 0 for d in daily_metrics]
+    chart_clicks = [d["clk"] or 0 for d in daily_metrics]
+    chart_cost = [float(d["cst"] or 0) for d in daily_metrics]
+
+    # Cost per campaign for pie chart
+    pie_labels = [c["name"] for c in campaigns_data if c["cost"] > 0]
+    pie_values = [c["cost"] for c in campaigns_data if c["cost"] > 0]
+
+    # Show platform column only when viewing all platforms
+    show_platform_col = (platform == "all")
+
+    return render(
+        request,
+        "web/veiculacao.html",
+        {
+            "active": active_key,
+            "page_title": page_title,
+            "table_title": table_title,
+            "empty_msg": empty_msg,
+            "show_platform_col": show_platform_col,
+            "has_accounts": has_accounts,
+            "total_impressions": total_impressions,
+            "total_clicks": total_clicks,
+            "total_cost": total_cost,
+            "ctr": round(ctr, 2),
+            "campaigns_data": campaigns_data,
+            "chart_labels_json": json.dumps(chart_labels),
+            "chart_impressions_json": json.dumps(chart_impressions),
+            "chart_clicks_json": json.dumps(chart_clicks),
+            "chart_cost_json": json.dumps(chart_cost),
+            "pie_labels_json": json.dumps(pie_labels),
+            "pie_values_json": json.dumps(pie_values),
+            "date_from": date_from,
+            "date_to": date_to,
+        },
+    )
+
+
+@login_required
+def dashon(request: HttpRequest) -> HttpResponse:
+    """DashON – KPI overview dashboard for all digital platforms."""
+    from collections import defaultdict
+    from integrations.models import GoogleAdsAccount, MetaAdsAccount
+
+    role = effective_role(request)
+    cliente_id = effective_cliente_id(request)
+    if not cliente_id and is_admin(request.user):
+        cliente_id = selected_cliente_id(request)
+
+    # Check connected accounts
+    gads_qs = GoogleAdsAccount.objects.filter(is_active=True)
+    mads_qs = MetaAdsAccount.objects.filter(is_active=True)
+    if cliente_id:
+        gads_qs = gads_qs.filter(cliente_id=cliente_id)
+        mads_qs = mads_qs.filter(cliente_id=cliente_id)
+    has_accounts = gads_qs.exists() or mads_qs.exists()
+
+    # Digital channels
+    google_channels = ["google", "youtube", "display", "search"]
+    meta_channels = ["meta"]
+    all_channels = google_channels + meta_channels
+
+    lines_qs = PlacementLine.objects.filter(media_channel__in=all_channels)
+    if cliente_id:
+        lines_qs = lines_qs.filter(campaign__cliente_id=cliente_id)
+
+    line_ids = list(lines_qs.values_list("id", flat=True))
+
+    # Date filter (defaults to last 30 days)
+    date_from = request.GET.get("date_from", "")
+    date_to = request.GET.get("date_to", "")
+    if not date_from:
+        date_from = (timezone.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+    if not date_to:
+        date_to = timezone.now().strftime("%Y-%m-%d")
+
+    days_qs = PlacementDay.objects.filter(
+        placement_line_id__in=line_ids,
+        date__gte=date_from,
+        date__lte=date_to,
+    )
+
+    # ── Global stats ──
+    stats = days_qs.aggregate(
+        total_impressions=Sum("impressions"),
+        total_clicks=Sum("clicks"),
+        total_cost=Sum("cost"),
+    )
+    total_impressions = stats["total_impressions"] or 0
+    total_clicks = stats["total_clicks"] or 0
+    total_cost = float(stats["total_cost"] or 0)
+    ctr = round((total_clicks / total_impressions * 100), 2) if total_impressions > 0 else 0
+    cpc = round((total_cost / total_clicks), 2) if total_clicks > 0 else 0
+    active_campaigns = lines_qs.filter(
+        id__in=days_qs.values_list("placement_line_id", flat=True).distinct()
+    ).count()
+
+    # ── Per-platform stats ──
+    google_line_ids = list(lines_qs.filter(media_channel__in=google_channels).values_list("id", flat=True))
+    meta_line_ids = list(lines_qs.filter(media_channel__in=meta_channels).values_list("id", flat=True))
+
+    g_stats = days_qs.filter(placement_line_id__in=google_line_ids).aggregate(
+        imp=Sum("impressions"), clk=Sum("clicks"), cst=Sum("cost"),
+    )
+    m_stats = days_qs.filter(placement_line_id__in=meta_line_ids).aggregate(
+        imp=Sum("impressions"), clk=Sum("clicks"), cst=Sum("cost"),
+    )
+
+    def _plat(s):
+        imp = s["imp"] or 0
+        clk = s["clk"] or 0
+        cst = float(s["cst"] or 0)
+        return {
+            "impressions": imp,
+            "clicks": clk,
+            "cost": round(cst, 2),
+            "ctr": round((clk / imp * 100), 2) if imp > 0 else 0,
+        }
+
+    google_platform = _plat(g_stats)
+    meta_platform = _plat(m_stats)
+
+    # ── Trend data (daily, per platform) ──
+    google_daily = defaultdict(lambda: {"imp": 0, "clk": 0, "cst": 0})
+    meta_daily = defaultdict(lambda: {"imp": 0, "clk": 0, "cst": 0})
+
+    for row in days_qs.filter(placement_line_id__in=google_line_ids).values("date").annotate(
+        imp=Sum("impressions"), clk=Sum("clicks"), cst=Sum("cost"),
+    ).order_by("date"):
+        d = str(row["date"])
+        google_daily[d] = {"imp": row["imp"] or 0, "clk": row["clk"] or 0, "cst": float(row["cst"] or 0)}
+
+    for row in days_qs.filter(placement_line_id__in=meta_line_ids).values("date").annotate(
+        imp=Sum("impressions"), clk=Sum("clicks"), cst=Sum("cost"),
+    ).order_by("date"):
+        d = str(row["date"])
+        meta_daily[d] = {"imp": row["imp"] or 0, "clk": row["clk"] or 0, "cst": float(row["cst"] or 0)}
+
+    all_dates = sorted(set(list(google_daily.keys()) + list(meta_daily.keys())))
+    trend_labels = all_dates
+    trend_google_imp = [google_daily[d]["imp"] for d in all_dates]
+    trend_meta_imp = [meta_daily[d]["imp"] for d in all_dates]
+    trend_google_cost = [google_daily[d]["cst"] for d in all_dates]
+    trend_meta_cost = [meta_daily[d]["cst"] for d in all_dates]
+
+    # ── Donut: investment by platform ──
+    donut_labels = []
+    donut_values = []
+    if google_platform["cost"] > 0:
+        donut_labels.append("Google Ads")
+        donut_values.append(google_platform["cost"])
+    if meta_platform["cost"] > 0:
+        donut_labels.append("Meta Ads")
+        donut_values.append(meta_platform["cost"])
+
+    # ── Top 10 campaigns by investment ──
+    campaigns_data = []
+    for line in lines_qs.select_related("campaign", "campaign__cliente"):
+        line_days = days_qs.filter(placement_line=line)
+        agg = line_days.aggregate(imp=Sum("impressions"), clk=Sum("clicks"), cst=Sum("cost"))
+        imp = agg["imp"] or 0
+        clk = agg["clk"] or 0
+        cst = float(agg["cst"] or 0)
+        if imp == 0 and clk == 0 and cst == 0:
+            continue
+        line_ctr = round((clk / imp * 100), 2) if imp > 0 else 0
+        line_cpc = round((cst / clk), 2) if clk > 0 else 0
+        platform = "Meta Ads" if line.media_channel in meta_channels else "Google Ads"
+        campaigns_data.append({
+            "name": line.channel or line.property_text or f"Campaign #{line.external_ref}",
+            "client": line.campaign.cliente.nome if line.campaign else "",
+            "platform": platform,
+            "impressions": imp,
+            "clicks": clk,
+            "ctr": line_ctr,
+            "cost": round(cst, 2),
+            "cpc": line_cpc,
+        })
+    campaigns_data.sort(key=lambda c: c["cost"], reverse=True)
+
+    # Top 10 for bar chart
+    top10 = campaigns_data[:10]
+    bar_labels = [c["name"][:30] for c in top10]
+    bar_values = [c["cost"] for c in top10]
+    bar_colors = ["#1877F2" if c["platform"] == "Meta Ads" else "#FBBC04" for c in top10]
+
+    return render(
+        request,
+        "web/dashon.html",
+        {
+            "active": "dashon",
+            "page_title": "DashON",
+            "has_accounts": has_accounts,
+            "date_from": date_from,
+            "date_to": date_to,
+            # Global stats
+            "total_impressions": total_impressions,
+            "total_clicks": total_clicks,
+            "total_cost": round(total_cost, 2),
+            "ctr": ctr,
+            "cpc": cpc,
+            "active_campaigns": active_campaigns,
+            # Platform stats
+            "google": google_platform,
+            "meta": meta_platform,
+            # Charts JSON
+            "trend_labels_json": json.dumps(trend_labels),
+            "trend_google_imp_json": json.dumps(trend_google_imp),
+            "trend_meta_imp_json": json.dumps(trend_meta_imp),
+            "trend_google_cost_json": json.dumps(trend_google_cost),
+            "trend_meta_cost_json": json.dumps(trend_meta_cost),
+            "donut_labels_json": json.dumps(donut_labels),
+            "donut_values_json": json.dumps(donut_values),
+            "bar_labels_json": json.dumps(bar_labels),
+            "bar_values_json": json.dumps(bar_values),
+            "bar_colors_json": json.dumps(bar_colors),
+            # Table
+            "campaigns_data": campaigns_data,
+        },
+    )
 
 
 @login_required
@@ -698,7 +1055,73 @@ def relatorios(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def integracoes(request: HttpRequest) -> HttpResponse:
-    return _render_module(request, active="integracoes", title="Integrações")
+    from integrations.models import GoogleAdsAccount, SyncLog, MetaAdsAccount, MetaSyncLog
+
+    role = effective_role(request)
+    if role == "cliente":
+        return redirect("web:dashboard")
+
+    # Flash messages from OAuth callback
+    gads_error = request.session.pop("gads_error", "")
+    gads_success = request.session.pop("gads_success", "")
+    mads_error = request.session.pop("mads_error", "")
+    mads_success = request.session.pop("mads_success", "")
+
+    # Google Ads accounts
+    gads_accounts = list(
+        GoogleAdsAccount.objects.filter(is_active=True)
+        .select_related("cliente")
+        .order_by("cliente__nome", "descriptive_name")
+    )
+
+    # Google Ads sync logs (last 20)
+    gads_logs = list(
+        SyncLog.objects.select_related("account", "account__cliente")
+        .order_by("-started_at")[:20]
+    )
+
+    # Detect developer token issues from recent errors
+    has_token_error = any(
+        log.error_message and "Developer Token" in log.error_message
+        for log in gads_logs
+    )
+
+    # Meta Ads accounts
+    mads_accounts = list(
+        MetaAdsAccount.objects.filter(is_active=True)
+        .select_related("cliente")
+        .order_by("cliente__nome", "descriptive_name")
+    )
+
+    # Meta Ads sync logs (last 20)
+    mads_logs = list(
+        MetaSyncLog.objects.select_related("account", "account__cliente")
+        .order_by("-started_at")[:20]
+    )
+
+    # Sidebar clientes for the "connect" form
+    clientes = list(
+        Cliente.objects.filter(ativo=True).order_by("nome").values("id", "nome")
+    )
+
+    return render(
+        request,
+        "web/integracoes.html",
+        {
+            "active": "integracoes",
+            "page_title": "Integrações",
+            "accounts": gads_accounts,
+            "recent_logs": gads_logs,
+            "mads_accounts": mads_accounts,
+            "mads_logs": mads_logs,
+            "clientes": clientes,
+            "gads_error": gads_error,
+            "gads_success": gads_success,
+            "mads_error": mads_error,
+            "mads_success": mads_success,
+            "has_token_error": has_token_error,
+        },
+    )
 
 
 @login_required
@@ -1086,6 +1509,31 @@ def sair_visao_cliente(request: HttpRequest) -> HttpResponse:
     if is_admin(request.user):
         return redirect("web:clientes")
     return redirect("web:dashboard")
+
+
+@login_required
+@require_admin
+def set_selected_cliente(request: HttpRequest) -> HttpResponse:
+    """AJAX endpoint: sets session['selected_cliente_id'] for admin global filter."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        body = request.POST
+    cliente_id = body.get("cliente_id")
+    if cliente_id:
+        try:
+            cliente_id = int(cliente_id)
+            if Cliente.objects.filter(id=cliente_id, ativo=True).exists():
+                request.session["selected_cliente_id"] = cliente_id
+            else:
+                request.session.pop("selected_cliente_id", None)
+        except (ValueError, TypeError):
+            request.session.pop("selected_cliente_id", None)
+    else:
+        request.session.pop("selected_cliente_id", None)
+    return JsonResponse({"ok": True})
 
 
 @login_required
@@ -2022,6 +2470,11 @@ def relatorios_clientes(request: HttpRequest) -> HttpResponse:
         cliente_id = effective_cliente_id(request)
         return redirect("web:relatorios_campanhas", cliente_id=cliente_id)
 
+    # Se admin selecionou cliente no sidebar, pula a página intermediária
+    sel_cliente = selected_cliente_id(request)
+    if sel_cliente:
+        return redirect("web:relatorios_campanhas", cliente_id=sel_cliente)
+
     clientes_com_campanhas = (
         Cliente.objects.filter(campaigns__isnull=False)
         .distinct()
@@ -2338,6 +2791,11 @@ def relatorios_consolidado(request: HttpRequest) -> HttpResponse:
 @require_admin
 def uploads_midia_clientes(request: HttpRequest) -> HttpResponse:
     """Lista os clientes para upload de mídia."""
+    # Se admin selecionou cliente no sidebar, pula a página intermediária
+    sel_cliente = selected_cliente_id(request)
+    if sel_cliente:
+        return redirect("web:uploads_midia_campanhas", cliente_id=sel_cliente)
+
     clientes_com_campanhas = (
         Cliente.objects.filter(campaigns__isnull=False)
         .distinct()
@@ -2926,3 +3384,348 @@ def api_region_investments(request: HttpRequest, campaign_id: int) -> HttpRespon
         return JsonResponse({"ok": True, "investments": created})
 
     return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+
+# ---------------------------------------------------------------------------
+# Google Ads integration views
+# ---------------------------------------------------------------------------
+
+
+@login_required
+@require_admin
+def gads_auth_url(request: HttpRequest) -> HttpResponse:
+    """Generate Google OAuth authorization URL and redirect."""
+    from integrations.services.google_ads import get_authorization_url
+
+    cliente_id = request.GET.get("cliente_id", "")
+    customer_id = request.GET.get("customer_id", "")
+    # Encode both in state as "cliente_id:customer_id"
+    state = f"{cliente_id}:{customer_id}"
+    url = get_authorization_url(state=state)
+    return redirect(url)
+
+
+@login_required
+@require_admin
+def gads_callback(request: HttpRequest) -> HttpResponse:
+    """Handle the OAuth callback from Google."""
+    import logging
+    from integrations.services.google_ads import exchange_code
+    from integrations.models import GoogleAdsAccount
+
+    logger = logging.getLogger("web.gads")
+    code = request.GET.get("code", "")
+    state = request.GET.get("state", "")  # "cliente_id:customer_id"
+    error = request.GET.get("error", "")
+
+    if error:
+        logger.warning("Google OAuth error: %s", error)
+        request.session["gads_error"] = f"Google recusou a autorização: {error}"
+        return redirect("web:integracoes")
+
+    if not code:
+        return redirect("web:integracoes")
+
+    # Parse state — format: "cliente_id:customer_id"
+    parts = state.split(":", 1)
+    raw_cliente_id = parts[0] if parts else ""
+    raw_customer_id = parts[1] if len(parts) > 1 else ""
+
+    cliente_id = int(raw_cliente_id) if raw_cliente_id.isdigit() else None
+    if not cliente_id:
+        request.session["gads_error"] = "Cliente não identificado no retorno do OAuth."
+        return redirect("web:integracoes")
+
+    cliente = Cliente.objects.filter(id=cliente_id).first()
+    if not cliente:
+        request.session["gads_error"] = "Cliente não encontrado."
+        return redirect("web:integracoes")
+
+    customer_id = raw_customer_id.strip()
+    if not customer_id:
+        request.session["gads_error"] = "Customer ID do Google Ads não informado."
+        return redirect("web:integracoes")
+
+    # Exchange authorization code for tokens
+    try:
+        tokens = exchange_code(code)
+        logger.info("Token exchange OK for cliente=%s customer_id=%s", cliente_id, customer_id)
+    except Exception as exc:
+        logger.exception("Token exchange failed: %s", exc)
+        request.session["gads_error"] = f"Erro ao trocar código OAuth: {exc}"
+        return redirect("web:integracoes")
+
+    # Validate that the customer ID is accessible with these credentials
+    from integrations.services.google_ads import list_accessible_customers
+    accessible = list_accessible_customers(tokens["access_token"])
+    cid_clean = customer_id.replace("-", "")
+    if accessible and cid_clean not in accessible:
+        formatted = [f"{c[:3]}-{c[3:6]}-{c[6:]}" for c in accessible]
+        request.session["gads_error"] = (
+            f"O Customer ID {customer_id} nao esta acessivel com esta conta Google. "
+            f"Contas acessiveis: {', '.join(formatted)}"
+        )
+        return redirect("web:integracoes")
+
+    # Save the account with the manually-provided Customer ID
+    obj, created = GoogleAdsAccount.objects.get_or_create(
+        cliente=cliente,
+        customer_id=customer_id,
+        defaults={
+            "descriptive_name": f"Google Ads — {cliente.nome}",
+            "token_expiry": tokens.get("expiry"),
+            "is_active": True,
+        },
+    )
+    obj.access_token = tokens["access_token"]
+    obj.refresh_token = tokens["refresh_token"]
+    obj.token_expiry = tokens.get("expiry")
+    obj.is_active = True
+    obj.save()
+
+    # Remove any leftover "pending" placeholder for this client
+    GoogleAdsAccount.objects.filter(cliente=cliente, customer_id="pending").delete()
+
+    request.session["gads_success"] = (
+        f"Conta Google Ads {customer_id} conectada com sucesso para {cliente.nome}."
+    )
+    return redirect("web:integracoes")
+
+
+@login_required
+@require_admin
+def gads_disconnect(request: HttpRequest, account_id: int) -> HttpResponse:
+    """Disconnect (deactivate) a Google Ads account."""
+    from integrations.models import GoogleAdsAccount
+
+    if request.method == "POST":
+        account = GoogleAdsAccount.objects.filter(id=account_id).first()
+        if account:
+            account.is_active = False
+            account.save(update_fields=["is_active", "updated_at"])
+    return redirect("web:integracoes")
+
+
+@login_required
+@require_admin
+def gads_sync(request: HttpRequest, account_id: int) -> HttpResponse:
+    """Trigger a manual sync for a Google Ads account."""
+    from integrations.models import GoogleAdsAccount
+    from integrations.services.google_ads import full_sync
+
+    if request.method == "POST":
+        account = GoogleAdsAccount.objects.filter(id=account_id, is_active=True).first()
+        if account:
+            log = full_sync(account, days=30)
+            if log.status == "success":
+                request.session["gads_success"] = (
+                    f"Sync concluido: {log.campaigns_synced} campanhas, "
+                    f"{log.metrics_synced} metricas."
+                )
+            else:
+                request.session["gads_error"] = (
+                    f"Erro no sync: {log.error_message}"
+                )
+    return redirect("web:integracoes")
+
+
+@login_required
+@require_admin
+def gads_clear_logs(request: HttpRequest) -> HttpResponse:
+    """Clear all sync logs."""
+    from integrations.models import SyncLog
+
+    if request.method == "POST":
+        count, _ = SyncLog.objects.all().delete()
+        request.session["gads_success"] = f"{count} registros de log removidos."
+    return redirect("web:integracoes")
+
+
+# ---------------------------------------------------------------------------
+# Meta Ads views
+# ---------------------------------------------------------------------------
+
+
+@login_required
+@require_admin
+def mads_auth_url(request: HttpRequest) -> HttpResponse:
+    """Generate Meta OAuth authorization URL and redirect."""
+    from integrations.services.meta_ads import get_authorization_url
+
+    cliente_id = request.GET.get("cliente_id", "")
+    ad_account_id = request.GET.get("ad_account_id", "")
+    state = f"{cliente_id}:{ad_account_id}"
+    url = get_authorization_url(state=state)
+    return redirect(url)
+
+
+@login_required
+@require_admin
+def mads_callback(request: HttpRequest) -> HttpResponse:
+    """Handle the OAuth callback from Meta."""
+    import logging
+    from integrations.services.meta_ads import exchange_code
+    from integrations.models import MetaAdsAccount
+
+    logger = logging.getLogger("web.mads")
+    code = request.GET.get("code", "")
+    state = request.GET.get("state", "")  # "cliente_id:ad_account_id"
+    error = request.GET.get("error", "")
+    error_reason = request.GET.get("error_reason", "")
+
+    if error:
+        logger.warning("Meta OAuth error: %s (%s)", error, error_reason)
+        request.session["mads_error"] = f"Meta recusou a autorizacao: {error_reason or error}"
+        return redirect("web:integracoes")
+
+    if not code:
+        return redirect("web:integracoes")
+
+    # Parse state — format: "cliente_id:ad_account_id"
+    parts = state.split(":", 1)
+    raw_cliente_id = parts[0] if parts else ""
+    raw_ad_account_id = parts[1] if len(parts) > 1 else ""
+
+    cliente_id = int(raw_cliente_id) if raw_cliente_id.isdigit() else None
+    if not cliente_id:
+        request.session["mads_error"] = "Cliente nao identificado no retorno do OAuth."
+        return redirect("web:integracoes")
+
+    cliente = Cliente.objects.filter(id=cliente_id).first()
+    if not cliente:
+        request.session["mads_error"] = "Cliente nao encontrado."
+        return redirect("web:integracoes")
+
+    ad_account_id = raw_ad_account_id.strip()
+    if not ad_account_id:
+        request.session["mads_error"] = "Ad Account ID do Meta Ads nao informado."
+        return redirect("web:integracoes")
+
+    # Exchange code for long-lived token
+    try:
+        tokens = exchange_code(code)
+        logger.info("Meta token exchange OK for cliente=%s ad_account=%s", cliente_id, ad_account_id)
+    except Exception as exc:
+        logger.exception("Meta token exchange failed: %s", exc)
+        request.session["mads_error"] = f"Erro ao trocar codigo OAuth: {exc}"
+        return redirect("web:integracoes")
+
+    from datetime import timedelta as _td
+
+    # Save the account
+    obj, created = MetaAdsAccount.objects.get_or_create(
+        cliente=cliente,
+        ad_account_id=ad_account_id,
+        defaults={
+            "descriptive_name": f"Meta Ads — {cliente.nome}",
+            "token_expiry": timezone.now() + _td(seconds=tokens.get("expires_in", 3600)),
+            "is_active": True,
+        },
+    )
+    obj.access_token = tokens["access_token"]
+    obj.token_expiry = timezone.now() + _td(seconds=tokens.get("expires_in", 3600))
+    obj.is_active = True
+    obj.save()
+
+    request.session["mads_success"] = (
+        f"Conta Meta Ads {ad_account_id} conectada com sucesso para {cliente.nome}."
+    )
+    return redirect("web:integracoes")
+
+
+@login_required
+@require_admin
+def mads_disconnect(request: HttpRequest, account_id: int) -> HttpResponse:
+    """Disconnect (deactivate) a Meta Ads account."""
+    from integrations.models import MetaAdsAccount
+
+    if request.method == "POST":
+        account = MetaAdsAccount.objects.filter(id=account_id).first()
+        if account:
+            account.is_active = False
+            account.save(update_fields=["is_active", "updated_at"])
+    return redirect("web:integracoes")
+
+
+@login_required
+@require_admin
+def mads_sync(request: HttpRequest, account_id: int) -> HttpResponse:
+    """Trigger a manual sync for a Meta Ads account."""
+    from integrations.models import MetaAdsAccount
+    from integrations.services.meta_ads import full_sync
+
+    if request.method == "POST":
+        account = MetaAdsAccount.objects.filter(id=account_id, is_active=True).first()
+        if account:
+            log = full_sync(account, days=30)
+            if log.status == "success":
+                request.session["mads_success"] = (
+                    f"Sync concluido: {log.campaigns_synced} campanhas, "
+                    f"{log.metrics_synced} metricas."
+                )
+            else:
+                request.session["mads_error"] = (
+                    f"Erro no sync: {log.error_message}"
+                )
+    return redirect("web:integracoes")
+
+
+@login_required
+@require_admin
+def mads_clear_logs(request: HttpRequest) -> HttpResponse:
+    """Clear all Meta Ads sync logs."""
+    from integrations.models import MetaSyncLog
+
+    if request.method == "POST":
+        count, _ = MetaSyncLog.objects.all().delete()
+        request.session["mads_success"] = f"{count} registros de log removidos."
+    return redirect("web:integracoes")
+
+
+@login_required
+def api_veiculacao_data(request: HttpRequest) -> JsonResponse:
+    """API endpoint for veiculação chart data (JSON)."""
+    cliente_id = effective_cliente_id(request)
+    if not cliente_id and is_admin(request.user):
+        cliente_id = selected_cliente_id(request)
+
+    platform = request.GET.get("platform", "all")
+    google_channels = ["google", "youtube", "display", "search"]
+    meta_channels = ["meta"]
+    if platform == "google":
+        channels = google_channels
+    elif platform == "meta":
+        channels = meta_channels
+    else:
+        channels = google_channels + meta_channels
+    lines_qs = PlacementLine.objects.filter(media_channel__in=channels)
+    if cliente_id:
+        lines_qs = lines_qs.filter(campaign__cliente_id=cliente_id)
+
+    line_ids = list(lines_qs.values_list("id", flat=True))
+
+    date_from = request.GET.get("date_from", "")
+    date_to = request.GET.get("date_to", "")
+    days_qs = PlacementDay.objects.filter(placement_line_id__in=line_ids)
+    if date_from:
+        days_qs = days_qs.filter(date__gte=date_from)
+    if date_to:
+        days_qs = days_qs.filter(date__lte=date_to)
+
+    daily = list(
+        days_qs.values("date")
+        .annotate(
+            impressions=Sum("impressions"),
+            clicks=Sum("clicks"),
+            cost=Sum("cost"),
+        )
+        .order_by("date")
+    )
+
+    for d in daily:
+        d["date"] = str(d["date"])
+        d["cost"] = float(d["cost"] or 0)
+        d["impressions"] = d["impressions"] or 0
+        d["clicks"] = d["clicks"] or 0
+
+    return JsonResponse({"daily": daily})

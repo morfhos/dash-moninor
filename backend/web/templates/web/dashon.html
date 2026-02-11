@@ -1,0 +1,622 @@
+{% extends "web/base.html" %}
+{% load static %}
+
+{% block content %}
+<style>
+  .dashon-container { padding: 0 0 40px; }
+
+  .dashon-filters {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .dashon-filters .filter-group { display: flex; flex-direction: column; gap: 4px; }
+  .dashon-filters label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .dashon-filters input[type="date"] {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--surface);
+    color: var(--text-primary);
+  }
+  .btn-filter {
+    padding: 8px 16px;
+    background: var(--brand-primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .btn-filter:hover { background: #4c2bc2; }
+
+  /* Stat cards */
+  .dashon-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .dashon-stat-card {
+    background: var(--surface);
+    border-radius: 14px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .dashon-stat-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .dashon-stat-icon.impressions { background: linear-gradient(135deg, #dbeafe, #bfdbfe); color: #2563eb; }
+  .dashon-stat-icon.clicks { background: linear-gradient(135deg, #dcfce7, #bbf7d0); color: #16a34a; }
+  .dashon-stat-icon.ctr { background: linear-gradient(135deg, #fef3c7, #fde68a); color: #d97706; }
+  .dashon-stat-icon.cost { background: linear-gradient(135deg, #ede9fe, #ddd6fe); color: #7c3aed; }
+  .dashon-stat-icon.campaigns { background: linear-gradient(135deg, #fce7f3, #fbcfe8); color: #db2777; }
+  .dashon-stat-icon.cpc { background: linear-gradient(135deg, #ccfbf1, #99f6e4); color: #0d9488; }
+  .dashon-stat-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1.1;
+  }
+  .dashon-stat-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    margin-top: 2px;
+  }
+
+  /* Platform comparison cards */
+  .platform-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  @media (max-width: 700px) { .platform-cards { grid-template-columns: 1fr; } }
+  .platform-card {
+    background: var(--surface);
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    padding: 24px;
+  }
+  .platform-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+  .platform-card-header .plat-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 14px;
+    color: white;
+  }
+  .plat-icon.google { background: linear-gradient(135deg, #FBBC04, #EA4335); }
+  .plat-icon.meta { background: linear-gradient(135deg, #1877F2, #0d65d9); }
+  .platform-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .plat-metric {
+    padding: 12px;
+    border-radius: 10px;
+    background: var(--surface-2);
+  }
+  .plat-metric-value {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1.2;
+  }
+  .plat-metric-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-top: 2px;
+  }
+
+  /* Charts */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+  }
+  @media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
+  .chart-container {
+    background: var(--surface);
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    padding: 24px;
+  }
+  .chart-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+  }
+
+  .bar-chart-section {
+    background: var(--surface);
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+
+  /* Table */
+  .dashon-section {
+    background: var(--surface);
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+  .dashon-section-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .dashon-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .dashon-table th {
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border-color);
+  }
+  .dashon-table td {
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-color);
+  }
+  .dashon-table tr:last-child td { border-bottom: none; }
+  .dashon-table tr:hover { background: var(--surface-2); }
+  .dashon-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .platform-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+  .platform-badge.google { background: #fef3c7; color: #92400e; }
+  .platform-badge.meta { background: #dbeafe; color: #1e40af; }
+
+  .empty-state {
+    padding: 64px 24px;
+    text-align: center;
+    color: var(--text-secondary);
+  }
+  .empty-state svg { margin-bottom: 16px; opacity: 0.3; }
+  .empty-state h3 { font-size: 18px; color: var(--text-primary); margin-bottom: 8px; }
+  .empty-state p { font-size: 14px; line-height: 1.6; }
+  .empty-state .btn-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 20px;
+    padding: 10px 20px;
+    background: var(--brand-primary);
+    color: white;
+    border-radius: 10px;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+    transition: background 0.2s;
+  }
+  .empty-state .btn-link:hover { background: #4c2bc2; }
+</style>
+
+<div class="topbar">
+  <h1>{{ page_title }}</h1>
+</div>
+
+<div class="dashon-container">
+  {% if not has_accounts and not campaigns_data %}
+  <!-- Empty State -->
+  <div class="dashon-section">
+    <div class="empty-state">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+      </svg>
+      <h3>Nenhuma conta de anuncios conectada</h3>
+      <p>Conecte suas contas do Google Ads e Meta Ads para ver KPIs consolidados de todas as plataformas.</p>
+      <a href="{% url 'web:integracoes' %}" class="btn-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M10 13a5 5 0 0 1 0-7l1-1a5 5 0 0 1 7 7l-1 1"></path>
+          <path d="M14 11a5 5 0 0 1 0 7l-1 1a5 5 0 0 1-7-7l1-1"></path>
+        </svg>
+        Ir para Integracoes
+      </a>
+    </div>
+  </div>
+  {% else %}
+
+  <!-- Date Filters -->
+  <form class="dashon-filters" method="get">
+    <div class="filter-group">
+      <label for="dateFrom">Data inicio</label>
+      <input type="date" id="dateFrom" name="date_from" value="{{ date_from }}">
+    </div>
+    <div class="filter-group">
+      <label for="dateTo">Data fim</label>
+      <input type="date" id="dateTo" name="date_to" value="{{ date_to }}">
+    </div>
+    <button type="submit" class="btn-filter">Filtrar</button>
+  </form>
+
+  <!-- Stat Cards -->
+  <div class="dashon-stats">
+    <div class="dashon-stat-card">
+      <div class="dashon-stat-icon impressions">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+          <circle cx="12" cy="12" r="3"></circle>
+        </svg>
+      </div>
+      <div>
+        <div class="dashon-stat-value">{{ total_impressions|floatformat:0 }}</div>
+        <div class="dashon-stat-label">Impressoes</div>
+      </div>
+    </div>
+    <div class="dashon-stat-card">
+      <div class="dashon-stat-icon clicks">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"></path>
+        </svg>
+      </div>
+      <div>
+        <div class="dashon-stat-value">{{ total_clicks|floatformat:0 }}</div>
+        <div class="dashon-stat-label">Cliques</div>
+      </div>
+    </div>
+    <div class="dashon-stat-card">
+      <div class="dashon-stat-icon ctr">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+        </svg>
+      </div>
+      <div>
+        <div class="dashon-stat-value">{{ ctr }}%</div>
+        <div class="dashon-stat-label">CTR Medio</div>
+      </div>
+    </div>
+    <div class="dashon-stat-card">
+      <div class="dashon-stat-icon cost">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="1" x2="12" y2="23"></line>
+          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+        </svg>
+      </div>
+      <div>
+        <div class="dashon-stat-value">R$ {{ total_cost|floatformat:2 }}</div>
+        <div class="dashon-stat-label">Investimento</div>
+      </div>
+    </div>
+    <div class="dashon-stat-card">
+      <div class="dashon-stat-icon campaigns">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+          <path d="M3 9h18"></path>
+          <path d="M9 21V9"></path>
+        </svg>
+      </div>
+      <div>
+        <div class="dashon-stat-value">{{ active_campaigns }}</div>
+        <div class="dashon-stat-label">Campanhas Ativas</div>
+      </div>
+    </div>
+    <div class="dashon-stat-card">
+      <div class="dashon-stat-icon cpc">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M16 8l-8 8"></path>
+          <path d="M8 8h8v8"></path>
+        </svg>
+      </div>
+      <div>
+        <div class="dashon-stat-value">R$ {{ cpc|floatformat:2 }}</div>
+        <div class="dashon-stat-label">CPC Medio</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Platform Comparison -->
+  <div class="platform-cards">
+    <div class="platform-card">
+      <div class="platform-card-header">
+        <div class="plat-icon google">G</div>
+        Google Ads
+      </div>
+      <div class="platform-metrics">
+        <div class="plat-metric">
+          <div class="plat-metric-value">{{ google.impressions|floatformat:0 }}</div>
+          <div class="plat-metric-label">Impressoes</div>
+        </div>
+        <div class="plat-metric">
+          <div class="plat-metric-value">{{ google.clicks|floatformat:0 }}</div>
+          <div class="plat-metric-label">Cliques</div>
+        </div>
+        <div class="plat-metric">
+          <div class="plat-metric-value">{{ google.ctr }}%</div>
+          <div class="plat-metric-label">CTR</div>
+        </div>
+        <div class="plat-metric">
+          <div class="plat-metric-value">R$ {{ google.cost|floatformat:2 }}</div>
+          <div class="plat-metric-label">Investimento</div>
+        </div>
+      </div>
+    </div>
+    <div class="platform-card">
+      <div class="platform-card-header">
+        <div class="plat-icon meta">M</div>
+        Meta Ads
+      </div>
+      <div class="platform-metrics">
+        <div class="plat-metric">
+          <div class="plat-metric-value">{{ meta.impressions|floatformat:0 }}</div>
+          <div class="plat-metric-label">Impressoes</div>
+        </div>
+        <div class="plat-metric">
+          <div class="plat-metric-value">{{ meta.clicks|floatformat:0 }}</div>
+          <div class="plat-metric-label">Cliques</div>
+        </div>
+        <div class="plat-metric">
+          <div class="plat-metric-value">{{ meta.ctr }}%</div>
+          <div class="plat-metric-label">CTR</div>
+        </div>
+        <div class="plat-metric">
+          <div class="plat-metric-value">R$ {{ meta.cost|floatformat:2 }}</div>
+          <div class="plat-metric-label">Investimento</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts: Trend + Donut -->
+  <div class="charts-grid">
+    <div class="chart-container">
+      <div class="chart-title">Tendencia de Impressoes (30 dias)</div>
+      <canvas id="trendChart" height="280"></canvas>
+    </div>
+    <div class="chart-container">
+      <div class="chart-title">Investimento por Plataforma</div>
+      <canvas id="donutChart" height="280"></canvas>
+    </div>
+  </div>
+
+  <!-- Bar Chart: Top Campaigns -->
+  <div class="bar-chart-section">
+    <div class="chart-title">Top 10 Campanhas por Investimento</div>
+    <canvas id="barChart" height="300"></canvas>
+  </div>
+
+  <!-- Campaigns Table -->
+  <div class="dashon-section">
+    <div class="dashon-section-header">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+        <path d="M3 9h18"></path>
+        <path d="M9 21V9"></path>
+      </svg>
+      Campanhas Ativas
+    </div>
+    {% if campaigns_data %}
+    <table class="dashon-table">
+      <thead>
+        <tr>
+          <th>Plataforma</th>
+          <th>Campanha</th>
+          <th>Cliente</th>
+          <th class="num">Impressoes</th>
+          <th class="num">Cliques</th>
+          <th class="num">CTR</th>
+          <th class="num">Investimento</th>
+          <th class="num">CPC</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in campaigns_data %}
+        <tr>
+          <td><span class="platform-badge {% if c.platform == 'Meta Ads' %}meta{% else %}google{% endif %}">{{ c.platform }}</span></td>
+          <td><strong>{{ c.name }}</strong></td>
+          <td>{{ c.client }}</td>
+          <td class="num">{{ c.impressions|floatformat:0 }}</td>
+          <td class="num">{{ c.clicks|floatformat:0 }}</td>
+          <td class="num">{{ c.ctr }}%</td>
+          <td class="num">R$ {{ c.cost|floatformat:2 }}</td>
+          <td class="num">R$ {{ c.cpc|floatformat:2 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state" style="padding:40px;">
+      <p>Nenhum dado de campanha encontrado para o periodo selecionado.</p>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% if has_accounts or campaigns_data %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+  var trendLabels = {{ trend_labels_json|safe }};
+  var trendGoogleImp = {{ trend_google_imp_json|safe }};
+  var trendMetaImp = {{ trend_meta_imp_json|safe }};
+  var donutLabels = {{ donut_labels_json|safe }};
+  var donutValues = {{ donut_values_json|safe }};
+  var barLabels = {{ bar_labels_json|safe }};
+  var barValues = {{ bar_values_json|safe }};
+  var barColors = {{ bar_colors_json|safe }};
+
+  // Trend Chart (line – Google vs Meta impressions)
+  var trendCtx = document.getElementById('trendChart');
+  if (trendCtx && trendLabels.length > 0) {
+    new Chart(trendCtx, {
+      type: 'line',
+      data: {
+        labels: trendLabels,
+        datasets: [
+          {
+            label: 'Google Ads',
+            data: trendGoogleImp,
+            borderColor: '#FBBC04',
+            backgroundColor: 'rgba(251,188,4,0.1)',
+            fill: true,
+            tension: 0.3,
+          },
+          {
+            label: 'Meta Ads',
+            data: trendMetaImp,
+            borderColor: '#1877F2',
+            backgroundColor: 'rgba(24,119,242,0.1)',
+            fill: true,
+            tension: 0.3,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'top', labels: { usePointStyle: true, padding: 16 } }
+        },
+        scales: {
+          y: { beginAtZero: true, title: { display: true, text: 'Impressoes' } },
+          x: { ticks: { maxTicksLimit: 15 } }
+        }
+      }
+    });
+  }
+
+  // Donut Chart (investment by platform)
+  var donutCtx = document.getElementById('donutChart');
+  if (donutCtx && donutLabels.length > 0) {
+    new Chart(donutCtx, {
+      type: 'doughnut',
+      data: {
+        labels: donutLabels,
+        datasets: [{
+          data: donutValues,
+          backgroundColor: ['#FBBC04', '#1877F2'],
+          borderWidth: 2,
+          borderColor: '#fff',
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { usePointStyle: true, padding: 12, font: { size: 12 } } },
+          tooltip: {
+            callbacks: {
+              label: function(ctx) {
+                var total = ctx.dataset.data.reduce(function(a, b) { return a + b; }, 0);
+                var pct = total > 0 ? ((ctx.parsed / total) * 100).toFixed(1) : 0;
+                return ctx.label + ': R$ ' + ctx.parsed.toFixed(2) + ' (' + pct + '%)';
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // Bar Chart (top 10 campaigns)
+  var barCtx = document.getElementById('barChart');
+  if (barCtx && barLabels.length > 0) {
+    new Chart(barCtx, {
+      type: 'bar',
+      data: {
+        labels: barLabels,
+        datasets: [{
+          label: 'Investimento (R$)',
+          data: barValues,
+          backgroundColor: barColors,
+          borderRadius: 6,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        indexAxis: 'y',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(ctx) { return 'R$ ' + ctx.parsed.x.toFixed(2); }
+            }
+          }
+        },
+        scales: {
+          x: { beginAtZero: true, title: { display: true, text: 'Investimento (R$)' } },
+          y: { ticks: { font: { size: 11 } } }
+        }
+      }
+    });
+  }
+})();
+</script>
+{% endif %}
+{% endblock %}

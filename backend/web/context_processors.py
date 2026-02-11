@@ -41,6 +41,25 @@ def nav_context(request):
         )
         alertas_nao_lidos = len(alertas_pendentes)
 
+    # Sidebar client selector (admin-only, not impersonating)
+    sidebar_clientes = []
+    sidebar_selected_cliente_id = None
+    if (
+        request.user.is_authenticated
+        and is_admin(request.user)
+        and not request.session.get("impersonate_cliente_id")
+    ):
+        sidebar_clientes = list(
+            Cliente.objects.filter(ativo=True)
+            .order_by("nome")
+            .values("id", "nome")
+        )
+        sidebar_selected_cliente_id = request.session.get("selected_cliente_id")
+        if sidebar_selected_cliente_id:
+            if not any(c["id"] == sidebar_selected_cliente_id for c in sidebar_clientes):
+                request.session.pop("selected_cliente_id", None)
+                sidebar_selected_cliente_id = None
+
     return {
         "nav_mode": nav_mode,
         "nav_cliente": nav_cliente,
@@ -48,4 +67,6 @@ def nav_context(request):
         "is_true_admin": is_true_admin,
         "alertas_nao_lidos": alertas_nao_lidos,
         "alertas_pendentes": alertas_pendentes,
+        "sidebar_clientes": sidebar_clientes,
+        "sidebar_selected_cliente_id": sidebar_selected_cliente_id,
     }

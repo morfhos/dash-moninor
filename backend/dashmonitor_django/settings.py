@@ -29,6 +29,7 @@ ALLOWED_HOSTS = ["*"]
 INSTALLED_APPS = [
     "accounts",
     "campaigns",
+    "integrations",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -113,3 +114,20 @@ LOGOUT_REDIRECT_URL = "/login/"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# --- Google Ads Integration ---
+GOOGLE_ADS_CLIENT_ID = os.environ.get("GOOGLE_ADS_CLIENT_ID", "")
+GOOGLE_ADS_CLIENT_SECRET = os.environ.get("GOOGLE_ADS_CLIENT_SECRET", "")
+GOOGLE_ADS_DEVELOPER_TOKEN = os.environ.get("GOOGLE_ADS_DEVELOPER_TOKEN", "")
+GOOGLE_ADS_REDIRECT_URI = os.environ.get(
+    "GOOGLE_ADS_REDIRECT_URI",
+    "http://localhost:8000/integracoes/google-ads/callback/",
+)
+
+# --- Meta Ads Integration ---
+META_ADS_APP_ID = os.environ.get("META_ADS_APP_ID", "")
+META_ADS_APP_SECRET = os.environ.get("META_ADS_APP_SECRET", "")
+META_ADS_REDIRECT_URI = os.environ.get(
+    "META_ADS_REDIRECT_URI",
+    "http://localhost:8000/integracoes/meta-ads/callback/",
+)

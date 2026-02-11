@@ -49,13 +49,43 @@
     })
   }
 
+  function setupClienteSelector() {
+    var select = document.querySelector('[data-action="select-cliente"]')
+    if (!select) return
+
+    select.addEventListener('change', function () {
+      var clienteId = this.value
+      var csrfMatch = document.cookie.match(/csrftoken=([^;]+)/)
+      var csrfToken = csrfMatch ? csrfMatch[1] : ''
+
+      fetch('/api/set-selected-cliente/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({ cliente_id: clienteId || null })
+      })
+      .then(function (response) {
+        if (response.ok) {
+          window.location.reload()
+        }
+      })
+      .catch(function (err) {
+        console.error('Error setting client filter:', err)
+      })
+    })
+  }
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () {
       setupProfileMenu()
       setupActions()
+      setupClienteSelector()
     })
   } else {
     setupProfileMenu()
     setupActions()
+    setupClienteSelector()
   }
 })()
