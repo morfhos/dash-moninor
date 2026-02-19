@@ -17,7 +17,7 @@
   <section class="main-panel">
     <div class="campaigns-grid">
       {% for item in campaigns_with_stats %}
-        <a href="{% url 'web:contract_done' item.campaign.id %}" class="campaign-card">
+        <a href="{{ item.link_url }}" class="campaign-card">
           <div class="card-logo">
             {% if item.cliente.logo %}
               <img src="{{ item.cliente.logo.url }}" alt="{{ item.cliente.nome }}" />

@@ -1,0 +1,1376 @@
+{% extends "web/base.html" %}
+{% load static %}
+
+{% block content %}
+<style>
+  .analytics-container { padding: 0 0 40px; }
+
+  /* Filters */
+  .analytics-filters {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .analytics-filters .filter-group { display: flex; flex-direction: column; gap: 4px; }
+  .analytics-filters label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .analytics-filters input[type="date"] {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--surface);
+    color: var(--text-primary);
+  }
+  .btn-filter {
+    padding: 8px 16px;
+    background: var(--brand-primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .btn-filter:hover { background: #4c2bc2; }
+
+  /* Section block */
+  .analytics-section {
+    background: var(--surface);
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+  .section-header .section-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .section-header .section-badge {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* ──── BLOCO 1: Performance Score ──── */
+  .score-container {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 32px;
+    align-items: start;
+  }
+  @media (max-width: 700px) { .score-container { grid-template-columns: 1fr; } }
+
+  .score-gauge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .score-circle {
+    position: relative;
+    width: 180px;
+    height: 180px;
+  }
+  .score-circle svg {
+    width: 180px;
+    height: 180px;
+    transform: rotate(-90deg);
+  }
+  .score-circle .bg { stroke: var(--border-color); }
+  .score-circle .fg { transition: stroke-dashoffset 1s ease-out; stroke-linecap: round; }
+  .score-circle .fg.excellent { stroke: #22c55e; }
+  .score-circle .fg.good { stroke: #3b82f6; }
+  .score-circle .fg.average { stroke: #f59e0b; }
+  .score-circle .fg.poor { stroke: #ef4444; }
+  .score-number {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+  }
+  .score-number .value {
+    font-size: 42px;
+    font-weight: 900;
+    line-height: 1;
+  }
+  .score-number .value.excellent { color: #22c55e; }
+  .score-number .value.good { color: #3b82f6; }
+  .score-number .value.average { color: #f59e0b; }
+  .score-number .value.poor { color: #ef4444; }
+  .score-number .label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    margin-top: 4px;
+  }
+  .score-class-badge {
+    font-size: 13px;
+    font-weight: 700;
+    padding: 6px 16px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .score-class-badge.excellent { background: rgba(34,197,94,0.15); color: #15803d; }
+  .score-class-badge.good { background: rgba(59,130,246,0.15); color: #1d4ed8; }
+  .score-class-badge.average { background: rgba(245,158,11,0.15); color: #b45309; }
+  .score-class-badge.poor { background: rgba(239,68,68,0.15); color: #b91c1c; }
+
+  .score-breakdown { display: flex; flex-direction: column; gap: 14px; }
+  .breakdown-item { display: flex; flex-direction: column; gap: 4px; }
+  .breakdown-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+  .breakdown-header .bk-score { color: var(--text-primary); font-weight: 700; }
+  .breakdown-bar {
+    height: 8px;
+    background: var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .breakdown-bar .fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.8s ease-out;
+  }
+  .breakdown-bar .fill.high { background: linear-gradient(90deg, #22c55e, #16a34a); }
+  .breakdown-bar .fill.mid { background: linear-gradient(90deg, #f59e0b, #d97706); }
+  .breakdown-bar .fill.low { background: linear-gradient(90deg, #ef4444, #b91c1c); }
+
+  /* ──── BLOCO 2: Insights ──── */
+  .insights-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 16px;
+  }
+  .insight-card {
+    display: flex;
+    gap: 14px;
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    background: var(--surface-2);
+  }
+  .insight-card.positive { border-left: 4px solid #22c55e; }
+  .insight-card.negative { border-left: 4px solid #ef4444; }
+  .insight-card.warning { border-left: 4px solid #f59e0b; }
+  .insight-card.info { border-left: 4px solid #3b82f6; }
+  .insight-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .insight-card.positive .insight-icon { background: rgba(34,197,94,0.15); color: #16a34a; }
+  .insight-card.negative .insight-icon { background: rgba(239,68,68,0.15); color: #ef4444; }
+  .insight-card.warning .insight-icon { background: rgba(245,158,11,0.15); color: #d97706; }
+  .insight-card.info .insight-icon { background: rgba(59,130,246,0.15); color: #3b82f6; }
+  .insight-content { flex: 1; min-width: 0; }
+  .insight-title { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+  .insight-text { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+
+  /* ──── BLOCO 3: Recommendations ──── */
+  .recommendations-list { display: flex; flex-direction: column; gap: 14px; }
+  .rec-card {
+    display: flex;
+    gap: 14px;
+    padding: 18px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    background: var(--surface-2);
+    align-items: flex-start;
+  }
+  .rec-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .rec-card .priority-high .rec-icon,
+  .rec-card.priority-high .rec-icon { background: linear-gradient(135deg, #fecaca, #fca5a5); color: #b91c1c; }
+  .rec-card.priority-medium .rec-icon { background: linear-gradient(135deg, #fef3c7, #fde68a); color: #b45309; }
+  .rec-card.priority-low .rec-icon { background: linear-gradient(135deg, #dcfce7, #bbf7d0); color: #15803d; }
+  .rec-content { flex: 1; min-width: 0; }
+  .rec-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .rec-title { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+  .rec-priority {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .rec-priority.high { background: rgba(239,68,68,0.15); color: #b91c1c; }
+  .rec-priority.medium { background: rgba(245,158,11,0.15); color: #b45309; }
+  .rec-priority.low { background: rgba(34,197,94,0.15); color: #15803d; }
+  .rec-text { font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 8px; }
+  .rec-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--brand-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  /* ──── BLOCO 4: Funnel ──── */
+  .funnel-container { display: flex; flex-direction: column; gap: 0; }
+  .funnel-step {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 24px;
+    position: relative;
+  }
+  .funnel-step:not(:last-child) { border-bottom: 1px dashed var(--border-color); }
+  .funnel-bar-wrap { flex: 1; min-width: 0; }
+  .funnel-bar {
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    color: white;
+    font-weight: 700;
+    font-size: 13px;
+    transition: width 0.8s ease-out;
+    min-width: 60px;
+  }
+  .funnel-step:nth-child(1) .funnel-bar { background: linear-gradient(90deg, #6366f1, #8b5cf6); }
+  .funnel-step:nth-child(2) .funnel-bar { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+  .funnel-step:nth-child(3) .funnel-bar { background: linear-gradient(90deg, #0ea5e9, #38bdf8); }
+  .funnel-step:nth-child(4) .funnel-bar { background: linear-gradient(90deg, #22c55e, #4ade80); }
+  .funnel-label {
+    width: 140px;
+    flex-shrink: 0;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+  .funnel-value {
+    width: 120px;
+    flex-shrink: 0;
+    text-align: right;
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--text-primary);
+  }
+  .funnel-drop {
+    width: 80px;
+    flex-shrink: 0;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-secondary);
+  }
+  .funnel-drop .drop-value { color: #ef4444; font-size: 12px; }
+
+  /* ──── BLOCO 5: Alerts ──── */
+  .alerts-list { display: flex; flex-direction: column; gap: 12px; }
+  .alert-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 20px;
+    border-radius: 12px;
+    border: 1px solid;
+  }
+  .alert-card.critical { background: rgba(239,68,68,0.06); border-color: rgba(239,68,68,0.3); }
+  .alert-card.warning { background: rgba(245,158,11,0.06); border-color: rgba(245,158,11,0.3); }
+  .alert-card.info { background: rgba(59,130,246,0.06); border-color: rgba(59,130,246,0.3); }
+  .alert-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .alert-card.critical .alert-icon { background: rgba(239,68,68,0.15); color: #ef4444; }
+  .alert-card.warning .alert-icon { background: rgba(245,158,11,0.15); color: #d97706; }
+  .alert-card.info .alert-icon { background: rgba(59,130,246,0.15); color: #3b82f6; }
+  .alert-content { flex: 1; min-width: 0; }
+  .alert-title { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+  .alert-text { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+  /* ──── Stats summary ──── */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .stat-mini {
+    background: var(--surface);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    padding: 16px;
+    text-align: center;
+  }
+  .stat-mini-value {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1.2;
+  }
+  .stat-mini-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  /* Chart */
+  .chart-container {
+    background: var(--surface);
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    padding: 24px;
+    position: relative;
+    height: 320px;
+    margin-bottom: 24px;
+  }
+  .chart-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+  }
+
+  /* Empty / require state */
+  .empty-state {
+    padding: 64px 24px;
+    text-align: center;
+    color: var(--text-secondary);
+  }
+  .empty-state svg { margin-bottom: 16px; opacity: 0.3; }
+  .empty-state h3 { font-size: 18px; color: var(--text-primary); margin-bottom: 8px; }
+  .empty-state p { font-size: 14px; line-height: 1.6; }
+
+  /* Grid helpers */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  @media (max-width: 800px) { .two-col { grid-template-columns: 1fr; } }
+
+  /* ──── BLOCO 6: Historical Comparison ──── */
+  .comparison-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+  }
+  .comp-card {
+    background: var(--surface-2);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+    border: 1px solid var(--border-color);
+  }
+  .comp-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-bottom: 6px;
+  }
+  .comp-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1.2;
+  }
+  .comp-delta {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 16px;
+  }
+  .comp-delta.up { background: rgba(34,197,94,0.12); color: #15803d; }
+  .comp-delta.down { background: rgba(239,68,68,0.12); color: #b91c1c; }
+  .comp-delta.neutral { background: rgba(107,114,128,0.12); color: #4b5563; }
+  .comp-delta.up-bad { background: rgba(239,68,68,0.12); color: #b91c1c; }
+  .comp-delta.down-good { background: rgba(34,197,94,0.12); color: #15803d; }
+  .comp-prev {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+  }
+  .comp-period-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+
+  /* ──── BLOCO 7: Efficiency Matrix ──── */
+  .matrix-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .matrix-table th {
+    padding: 12px 14px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    transition: color 0.2s;
+  }
+  .matrix-table th:hover { color: var(--brand-primary); }
+  .matrix-table th .sort-icon { display: inline-block; margin-left: 4px; opacity: 0.4; font-size: 10px; }
+  .matrix-table th.sorted .sort-icon { opacity: 1; color: var(--brand-primary); }
+  .matrix-table td {
+    padding: 12px 14px;
+    font-size: 13px;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-color);
+  }
+  .matrix-table tr:last-child td { border-bottom: none; }
+  .matrix-table tr:hover { background: var(--surface-2); }
+  .matrix-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .score-pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    min-width: 40px;
+    text-align: center;
+  }
+  .score-pill.high { background: rgba(34,197,94,0.15); color: #15803d; }
+  .score-pill.mid { background: rgba(245,158,11,0.15); color: #b45309; }
+  .score-pill.low { background: rgba(239,68,68,0.15); color: #b91c1c; }
+  .channel-label {
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 12px;
+    letter-spacing: 0.3px;
+  }
+
+  /* ──── BLOCO 8: Simulator ──── */
+  .sim-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  @media (max-width: 800px) { .sim-container { grid-template-columns: 1fr; } }
+  .sim-panel {
+    background: var(--surface-2);
+    border-radius: 14px;
+    padding: 20px;
+    border: 1px solid var(--border-color);
+  }
+  .sim-panel-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sim-slider-group { margin-bottom: 18px; }
+  .sim-slider-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+  }
+  .sim-slider-value {
+    font-weight: 800;
+    color: var(--text-primary);
+    font-size: 14px;
+  }
+  .sim-slider {
+    width: 100%;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    border-radius: 3px;
+    background: var(--border-color);
+    outline: none;
+  }
+  .sim-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--brand-primary);
+    cursor: pointer;
+    border: 3px solid white;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  }
+  .sim-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--brand-primary);
+    cursor: pointer;
+    border: 3px solid white;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  }
+  .sim-result-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .sim-result-card {
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+    border: 1px solid var(--border-color);
+  }
+  .sim-result-value {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1.2;
+  }
+  .sim-result-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-top: 2px;
+  }
+  .sim-result-delta {
+    font-size: 11px;
+    font-weight: 700;
+    margin-top: 4px;
+  }
+  .sim-result-delta.positive { color: #16a34a; }
+  .sim-result-delta.negative { color: #dc2626; }
+  .sim-result-delta.neutral { color: #6b7280; }
+  .sim-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    background: var(--brand-primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s;
+    margin-top: 8px;
+  }
+  .sim-btn:hover { background: #4c2bc2; }
+  .sim-budget-display {
+    text-align: center;
+    padding: 12px;
+    margin-bottom: 16px;
+    background: var(--surface);
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+  }
+  .sim-budget-total {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--text-primary);
+  }
+  .sim-budget-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  @media (max-width: 640px) {
+    .stats-bar { grid-template-columns: repeat(2, 1fr); }
+    .funnel-label { width: 100px; font-size: 12px; }
+    .funnel-value { width: 90px; font-size: 13px; }
+    .funnel-drop { width: 60px; }
+    .insights-grid { grid-template-columns: 1fr; }
+    .comparison-grid { grid-template-columns: repeat(2, 1fr); }
+    .sim-result-grid { grid-template-columns: 1fr; }
+  }
+</style>
+
+<div class="topbar">
+  <h1>{{ page_title }}</h1>
+</div>
+
+<div class="analytics-container">
+  {% if require_cliente %}
+  <div class="analytics-section">
+    <div class="empty-state">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="3" y="7" width="18" height="14" rx="2"></rect>
+        <path d="M16 7V5a2 2 0 0 0-2-2H10a2 2 0 0 0-2 2v2"></path>
+      </svg>
+      <h3>Selecione um cliente</h3>
+      <p>Utilize o seletor de cliente no menu lateral para visualizar a analise de inteligencia.</p>
+    </div>
+  </div>
+
+  {% elif no_data %}
+  <form class="analytics-filters" method="get">
+    <div class="filter-group">
+      <label for="dateFrom">Data inicio</label>
+      <input type="date" id="dateFrom" name="date_from" value="{{ date_from }}">
+    </div>
+    <div class="filter-group">
+      <label for="dateTo">Data fim</label>
+      <input type="date" id="dateTo" name="date_to" value="{{ date_to }}">
+    </div>
+    <button type="submit" class="btn-filter">Filtrar</button>
+  </form>
+  <div class="analytics-section">
+    <div class="empty-state">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M3 3v18h18"></path>
+        <path d="M7 14l3-3 3 3 5-5"></path>
+      </svg>
+      <h3>Sem dados de veiculacao</h3>
+      <p>Nenhum dado de campanhas digitais encontrado para este cliente. Sincronize suas contas na pagina de Integracoes.</p>
+    </div>
+  </div>
+
+  {% else %}
+
+  <!-- Date Filters -->
+  <form class="analytics-filters" method="get">
+    <div class="filter-group">
+      <label for="dateFrom">Data inicio</label>
+      <input type="date" id="dateFrom" name="date_from" value="{{ date_from }}">
+    </div>
+    <div class="filter-group">
+      <label for="dateTo">Data fim</label>
+      <input type="date" id="dateTo" name="date_to" value="{{ date_to }}">
+    </div>
+    <button type="submit" class="btn-filter">Filtrar</button>
+  </form>
+
+  <!-- Stats Bar -->
+  <div class="stats-bar">
+    <div class="stat-mini">
+      <div class="stat-mini-value">{{ total_imp|floatformat:0 }}</div>
+      <div class="stat-mini-label">Impressoes</div>
+    </div>
+    <div class="stat-mini">
+      <div class="stat-mini-value">{{ total_clk|floatformat:0 }}</div>
+      <div class="stat-mini-label">Cliques</div>
+    </div>
+    <div class="stat-mini">
+      <div class="stat-mini-value">{{ global_ctr }}%</div>
+      <div class="stat-mini-label">CTR</div>
+    </div>
+    <div class="stat-mini">
+      <div class="stat-mini-value">R$ {{ total_cost|floatformat:2 }}</div>
+      <div class="stat-mini-label">Investimento</div>
+    </div>
+    <div class="stat-mini">
+      <div class="stat-mini-value">R$ {{ global_cpc|floatformat:2 }}</div>
+      <div class="stat-mini-label">CPC</div>
+    </div>
+    <div class="stat-mini">
+      <div class="stat-mini-value">R$ {{ cpm|floatformat:2 }}</div>
+      <div class="stat-mini-label">CPM</div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- BLOCO 1: DIAGNOSTICO AUTOMATICO                  -->
+  <!-- ════════════════════════════════════════════════ -->
+  <div class="analytics-section">
+    <div class="section-header">
+      <div class="section-icon" style="background: linear-gradient(135deg, #ede9fe, #ddd6fe); color: #7c3aed;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+        </svg>
+      </div>
+      Diagnostico de Performance
+      <span class="section-badge score-class-badge {{ score_class }}">{{ score_label }}</span>
+    </div>
+
+    <div class="score-container">
+      <div class="score-gauge">
+        <div class="score-circle">
+          <svg viewBox="0 0 180 180">
+            <circle class="bg" cx="90" cy="90" r="76" fill="none" stroke-width="12" />
+            <circle class="fg {{ score_class }}" cx="90" cy="90" r="76" fill="none" stroke-width="12"
+              stroke-dasharray="477.5"
+              stroke-dashoffset="{{ score_dash_offset }}"
+              id="scoreArc" />
+          </svg>
+          <div class="score-number">
+            <div class="value {{ score_class }}">{{ perf_score }}</div>
+            <div class="label">de 100</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="score-breakdown">
+        {% for item in score_breakdown %}
+        <div class="breakdown-item">
+          <div class="breakdown-header">
+            <span>{{ item.label }} <small style="opacity:0.6">({{ item.weight }})</small></span>
+            <span class="bk-score">{{ item.score }}/100</span>
+          </div>
+          <div class="breakdown-bar">
+            <div class="fill {% if item.score >= 60 %}high{% elif item.score >= 35 %}mid{% else %}low{% endif %}" style="width: {{ item.score }}%"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- BLOCO 5: ALERTAS AUTOMATICOS                     -->
+  <!-- ════════════════════════════════════════════════ -->
+  {% if alerts %}
+  <div class="analytics-section">
+    <div class="section-header">
+      <div class="section-icon" style="background: linear-gradient(135deg, #fecaca, #fca5a5); color: #b91c1c;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
+      </div>
+      Alertas Automaticos
+      <span class="section-badge" style="background:rgba(239,68,68,0.12);color:#b91c1c;">{{ alerts|length }} alerta{{ alerts|length|pluralize:"s" }}</span>
+    </div>
+    <div class="alerts-list">
+      {% for a in alerts %}
+      <div class="alert-card {{ a.severity }}">
+        <div class="alert-icon">
+          {% if a.icon == "alert-circle" %}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+          {% elif a.icon == "alert-triangle" %}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+          {% elif a.icon == "clock" %}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          {% elif a.icon == "trending-down" %}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
+          {% else %}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+          {% endif %}
+        </div>
+        <div class="alert-content">
+          <div class="alert-title">{{ a.title }}</div>
+          <div class="alert-text">{{ a.text }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- BLOCO 2: INSIGHTS AUTOMATICOS                    -->
+  <!-- ════════════════════════════════════════════════ -->
+  <div class="analytics-section">
+    <div class="section-header">
+      <div class="section-icon" style="background: linear-gradient(135deg, #dbeafe, #bfdbfe); color: #2563eb;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="16" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
+      </div>
+      Insights Automaticos
+    </div>
+    <div class="insights-grid">
+      {% for ins in insights %}
+      <div class="insight-card {{ ins.type }}">
+        <div class="insight-icon">
+          {% if ins.icon == "trending-up" %}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+          {% elif ins.icon == "trending-down" %}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
+          {% elif ins.icon == "bar-chart" %}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+          {% elif ins.icon == "dollar-sign" %}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          {% elif ins.icon == "alert-triangle" %}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+          {% elif ins.icon == "pie-chart" %}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>
+          {% else %}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+          {% endif %}
+        </div>
+        <div class="insight-content">
+          <div class="insight-title">{{ ins.title }}</div>
+          <div class="insight-text">{{ ins.text }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- BLOCO 3: DECISAO RECOMENDADA                     -->
+  <!-- ════════════════════════════════════════════════ -->
+  <div class="analytics-section">
+    <div class="section-header">
+      <div class="section-icon" style="background: linear-gradient(135deg, #dcfce7, #bbf7d0); color: #16a34a;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 18l6-6-6-6"></path>
+        </svg>
+      </div>
+      Decisao Recomendada
+    </div>
+    <div class="recommendations-list">
+      {% for rec in recommendations %}
+      <div class="rec-card priority-{{ rec.priority }}">
+        <div class="rec-icon">
+          {% if rec.icon == "refresh-cw" %}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+          {% elif rec.icon == "pause-circle" %}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="10" y1="15" x2="10" y2="9"></line><line x1="14" y1="15" x2="14" y2="9"></line></svg>
+          {% elif rec.icon == "zap" %}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+          {% elif rec.icon == "image" %}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="9" cy="9" r="2"></circle><path d="M21 15l-5-5L5 21"></path></svg>
+          {% elif rec.icon == "maximize" %}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+          {% else %}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+          {% endif %}
+        </div>
+        <div class="rec-content">
+          <div class="rec-header">
+            <span class="rec-title">{{ rec.title }}</span>
+            <span class="rec-priority {{ rec.priority }}">{{ rec.priority }}</span>
+          </div>
+          <div class="rec-text">{{ rec.text }}</div>
+          <div class="rec-action">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
+            {{ rec.action }}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- BLOCO 4: FUNIL DE PERFORMANCE                    -->
+  <!-- ════════════════════════════════════════════════ -->
+  <div class="analytics-section">
+    <div class="section-header">
+      <div class="section-icon" style="background: linear-gradient(135deg, #fef3c7, #fde68a); color: #d97706;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+        </svg>
+      </div>
+      Funil de Performance
+    </div>
+    <div class="funnel-container">
+      {% for step in funnel_steps %}
+      <div class="funnel-step">
+        <div class="funnel-label">{{ step.label }}</div>
+        <div class="funnel-bar-wrap">
+          <div class="funnel-bar" style="width: {{ step.pct }}%">
+            {{ step.pct }}%
+          </div>
+        </div>
+        <div class="funnel-value">{{ step.formatted }}</div>
+        <div class="funnel-drop">
+          {% if step.drop is not None %}
+            <div class="drop-value">-{{ step.drop }}%</div>
+            <div>perda</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- BLOCO 6: COMPARATIVO HISTORICO                   -->
+  <!-- ════════════════════════════════════════════════ -->
+  {% if historical.has_prev %}
+  <div class="analytics-section">
+    <div class="section-header">
+      <div class="section-icon" style="background: linear-gradient(135deg, #e0e7ff, #c7d2fe); color: #4338ca;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+        </svg>
+      </div>
+      Comparativo vs Periodo Anterior
+    </div>
+    <div class="comp-period-label">
+      Atual: {{ historical.period_label }} &nbsp;|&nbsp; Anterior: {{ historical.prev_label }}
+    </div>
+    <div class="comparison-grid">
+      <div class="comp-card">
+        <div class="comp-label">CTR</div>
+        <div class="comp-value">{{ historical.ctr.value }}%</div>
+        <div class="comp-delta {% if historical.ctr.dir == 'up' %}up{% elif historical.ctr.dir == 'down' %}down{% else %}neutral{% endif %}">
+          {% if historical.ctr.dir == 'up' %}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="18 15 12 9 6 15"></polyline></svg>
+          {% elif historical.ctr.dir == 'down' %}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          {% endif %}
+          {{ historical.ctr.pct }}%
+        </div>
+        <div class="comp-prev">Anterior: {{ historical.ctr.prev }}%</div>
+      </div>
+
+      <div class="comp-card">
+        <div class="comp-label">CPC</div>
+        <div class="comp-value">R$ {{ historical.cpc.value|floatformat:2 }}</div>
+        <div class="comp-delta {% if historical.cpc.dir == 'up' %}up-bad{% elif historical.cpc.dir == 'down' %}down-good{% else %}neutral{% endif %}">
+          {% if historical.cpc.dir == 'up' %}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="18 15 12 9 6 15"></polyline></svg>
+          {% elif historical.cpc.dir == 'down' %}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          {% endif %}
+          {{ historical.cpc.pct }}%
+        </div>
+        <div class="comp-prev">Anterior: R$ {{ historical.cpc.prev|floatformat:2 }}</div>
+      </div>
+
+      <div class="comp-card">
+        <div class="comp-label">Impressoes</div>
+        <div class="comp-value">{{ historical.impressions.value|floatformat:0 }}</div>
+        <div class="comp-delta {% if historical.impressions.dir == 'up' %}up{% elif historical.impressions.dir == 'down' %}down{% else %}neutral{% endif %}">
+          {% if historical.impressions.dir == 'up' %}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="18 15 12 9 6 15"></polyline></svg>
+          {% elif historical.impressions.dir == 'down' %}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          {% endif %}
+          {{ historical.impressions.pct }}%
+        </div>
+        <div class="comp-prev">Anterior: {{ historical.impressions.prev|floatformat:0 }}</div>
+      </div>
+
+      <div class="comp-card">
+        <div class="comp-label">Cliques</div>
+        <div class="comp-value">{{ historical.clicks.value|floatformat:0 }}</div>
+        <div class="comp-delta {% if historical.clicks.dir == 'up' %}up{% elif historical.clicks.dir == 'down' %}down{% else %}neutral{% endif %}">
+          {% if historical.clicks.dir == 'up' %}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="18 15 12 9 6 15"></polyline></svg>
+          {% elif historical.clicks.dir == 'down' %}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          {% endif %}
+          {{ historical.clicks.pct }}%
+        </div>
+        <div class="comp-prev">Anterior: {{ historical.clicks.prev|floatformat:0 }}</div>
+      </div>
+
+      <div class="comp-card">
+        <div class="comp-label">Investimento</div>
+        <div class="comp-value">R$ {{ historical.investment.value|floatformat:2 }}</div>
+        <div class="comp-delta {% if historical.investment.dir == 'up' %}up-bad{% elif historical.investment.dir == 'down' %}down-good{% else %}neutral{% endif %}">
+          {% if historical.investment.dir == 'up' %}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="18 15 12 9 6 15"></polyline></svg>
+          {% elif historical.investment.dir == 'down' %}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          {% endif %}
+          {{ historical.investment.pct }}%
+        </div>
+        <div class="comp-prev">Anterior: R$ {{ historical.investment.prev|floatformat:2 }}</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- BLOCO 7: MATRIZ DE EFICIENCIA                    -->
+  <!-- ════════════════════════════════════════════════ -->
+  {% if efficiency_matrix %}
+  <div class="analytics-section">
+    <div class="section-header">
+      <div class="section-icon" style="background: linear-gradient(135deg, #ccfbf1, #99f6e4); color: #0d9488;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+          <path d="M3 9h18"></path>
+          <path d="M3 15h18"></path>
+          <path d="M9 3v18"></path>
+          <path d="M15 3v18"></path>
+        </svg>
+      </div>
+      Matriz de Eficiencia por Canal
+    </div>
+    <div style="overflow-x: auto;">
+      <table class="matrix-table" id="efficiencyMatrix">
+        <thead>
+          <tr>
+            <th data-col="channel" data-type="text">Canal <span class="sort-icon">&#9650;&#9660;</span></th>
+            <th data-col="impressions" data-type="num" class="num">Impressoes <span class="sort-icon">&#9650;&#9660;</span></th>
+            <th data-col="clicks" data-type="num" class="num">Cliques <span class="sort-icon">&#9650;&#9660;</span></th>
+            <th data-col="ctr" data-type="num" class="num">CTR <span class="sort-icon">&#9650;&#9660;</span></th>
+            <th data-col="cpc" data-type="num" class="num">CPC <span class="sort-icon">&#9650;&#9660;</span></th>
+            <th data-col="cpm" data-type="num" class="num">CPM <span class="sort-icon">&#9650;&#9660;</span></th>
+            <th data-col="roi" data-type="num" class="num">Cliq/R$ <span class="sort-icon">&#9650;&#9660;</span></th>
+            <th data-col="score" data-type="num" class="num">Score <span class="sort-icon">&#9650;&#9660;</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ch in efficiency_matrix %}
+          <tr>
+            <td><span class="channel-label">{{ ch.channel }}</span></td>
+            <td class="num" data-value="{{ ch.impressions }}">{{ ch.impressions|floatformat:0 }}</td>
+            <td class="num" data-value="{{ ch.clicks }}">{{ ch.clicks|floatformat:0 }}</td>
+            <td class="num" data-value="{{ ch.ctr }}">{{ ch.ctr }}%</td>
+            <td class="num" data-value="{{ ch.cpc }}">R$ {{ ch.cpc|floatformat:2 }}</td>
+            <td class="num" data-value="{{ ch.cpm }}">R$ {{ ch.cpm|floatformat:2 }}</td>
+            <td class="num" data-value="{{ ch.roi }}">{{ ch.roi }}</td>
+            <td class="num" data-value="{{ ch.score }}">
+              <span class="score-pill {% if ch.score >= 60 %}high{% elif ch.score >= 35 %}mid{% else %}low{% endif %}">{{ ch.score }}</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- BLOCO 8: SIMULADOR DE OTIMIZACAO                 -->
+  <!-- ════════════════════════════════════════════════ -->
+  <div class="analytics-section" id="simulatorSection">
+    <div class="section-header">
+      <div class="section-icon" style="background: linear-gradient(135deg, #fce7f3, #fbcfe8); color: #db2777;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </div>
+      Simulador de Otimizacao
+    </div>
+
+    <div class="sim-container">
+      <!-- Left: Controls -->
+      <div class="sim-panel">
+        <div class="sim-panel-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
+          Ajustar Alocacao
+        </div>
+
+        <div class="sim-budget-display">
+          <div class="sim-budget-label">Orcamento Total</div>
+          <div class="sim-budget-total" id="simBudgetTotal">R$ {{ total_cost|floatformat:2 }}</div>
+        </div>
+
+        <div class="sim-slider-group">
+          <div class="sim-slider-label">
+            <span>Google Ads</span>
+            <span class="sim-slider-value" id="simGoogleLabel">0%</span>
+          </div>
+          <input type="range" class="sim-slider" id="simGoogleSlider" min="-50" max="100" value="0" step="5">
+        </div>
+
+        <div class="sim-slider-group">
+          <div class="sim-slider-label">
+            <span>Meta Ads</span>
+            <span class="sim-slider-value" id="simMetaLabel">0%</span>
+          </div>
+          <input type="range" class="sim-slider" id="simMetaSlider" min="-50" max="100" value="0" step="5">
+        </div>
+
+        <button class="sim-btn" id="simResetBtn" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+          Resetar
+        </button>
+      </div>
+
+      <!-- Right: Estimated results -->
+      <div class="sim-panel">
+        <div class="sim-panel-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+          Impacto Estimado
+        </div>
+        <div class="sim-result-grid">
+          <div class="sim-result-card">
+            <div class="sim-result-value" id="simImpValue">-</div>
+            <div class="sim-result-label">Impressoes</div>
+            <div class="sim-result-delta neutral" id="simImpDelta">0%</div>
+          </div>
+          <div class="sim-result-card">
+            <div class="sim-result-value" id="simClkValue">-</div>
+            <div class="sim-result-label">Cliques</div>
+            <div class="sim-result-delta neutral" id="simClkDelta">0%</div>
+          </div>
+          <div class="sim-result-card">
+            <div class="sim-result-value" id="simCtrValue">-</div>
+            <div class="sim-result-label">CTR</div>
+            <div class="sim-result-delta neutral" id="simCtrDelta">0%</div>
+          </div>
+          <div class="sim-result-card">
+            <div class="sim-result-value" id="simCpcValue">-</div>
+            <div class="sim-result-label">CPC</div>
+            <div class="sim-result-delta neutral" id="simCpcDelta">0%</div>
+          </div>
+          <div class="sim-result-card">
+            <div class="sim-result-value" id="simCostValue">-</div>
+            <div class="sim-result-label">Investimento</div>
+            <div class="sim-result-delta neutral" id="simCostDelta">0%</div>
+          </div>
+          <div class="sim-result-card">
+            <div class="sim-result-value" id="simCpmValue">-</div>
+            <div class="sim-result-label">CPM</div>
+            <div class="sim-result-delta neutral" id="simCpmDelta">0%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- TENDENCIA (Chart.js)                             -->
+  <!-- ════════════════════════════════════════════════ -->
+  <div class="chart-container">
+    <div class="chart-title">Tendencia: Impressoes & Cliques</div>
+    <canvas id="trendChart" height="260"></canvas>
+  </div>
+
+  {% endif %}
+</div>
+
+{% if not require_cliente and not no_data %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+  /* Score arc animation */
+  var scoreArc = document.getElementById('scoreArc');
+  if (scoreArc) {
+    var score = {{ perf_score }};
+    var circumference = 2 * Math.PI * 76; /* r=76 */
+    var offset = circumference - (score / 100) * circumference;
+    scoreArc.style.strokeDashoffset = circumference;
+    setTimeout(function() { scoreArc.style.strokeDashoffset = offset; }, 100);
+  }
+
+  /* Trend chart */
+  var trendLabels = {{ trend_labels_json|safe }};
+  var trendImp = {{ trend_imp_json|safe }};
+  var trendClk = {{ trend_clk_json|safe }};
+
+  var trendCtx = document.getElementById('trendChart');
+  if (trendCtx && trendLabels.length > 0) {
+    new Chart(trendCtx, {
+      type: 'line',
+      data: {
+        labels: trendLabels,
+        datasets: [
+          {
+            label: 'Impressoes',
+            data: trendImp,
+            borderColor: '#6366f1',
+            backgroundColor: 'rgba(99,102,241,0.1)',
+            fill: true,
+            tension: 0.3,
+            yAxisID: 'y',
+          },
+          {
+            label: 'Cliques',
+            data: trendClk,
+            borderColor: '#22c55e',
+            backgroundColor: 'rgba(34,197,94,0.1)',
+            fill: true,
+            tension: 0.3,
+            yAxisID: 'y1',
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'top', labels: { usePointStyle: true, padding: 16 } }
+        },
+        scales: {
+          y: { type: 'linear', position: 'left', beginAtZero: true, title: { display: true, text: 'Impressoes' } },
+          y1: { type: 'linear', position: 'right', beginAtZero: true, title: { display: true, text: 'Cliques' }, grid: { drawOnChartArea: false } },
+          x: { ticks: { maxTicksLimit: 15 } }
+        }
+      }
+    });
+  }
+  /* ── Sortable Efficiency Matrix ── */
+  var matrix = document.getElementById('efficiencyMatrix');
+  if (matrix) {
+    var headers = matrix.querySelectorAll('th[data-col]');
+    var tbody = matrix.querySelector('tbody');
+    var sortDir = {};
+
+    headers.forEach(function(th) {
+      th.addEventListener('click', function() {
+        var col = th.getAttribute('data-col');
+        var type = th.getAttribute('data-type');
+        sortDir[col] = sortDir[col] === 'asc' ? 'desc' : 'asc';
+        var dir = sortDir[col];
+
+        headers.forEach(function(h) { h.classList.remove('sorted'); });
+        th.classList.add('sorted');
+
+        var rows = Array.from(tbody.querySelectorAll('tr'));
+        var colIndex = Array.from(th.parentNode.children).indexOf(th);
+
+        rows.sort(function(a, b) {
+          var aCell = a.children[colIndex];
+          var bCell = b.children[colIndex];
+          var aVal, bVal;
+          if (type === 'num') {
+            aVal = parseFloat(aCell.getAttribute('data-value') || aCell.textContent.replace(/[^\d.,-]/g, '').replace(',', '.')) || 0;
+            bVal = parseFloat(bCell.getAttribute('data-value') || bCell.textContent.replace(/[^\d.,-]/g, '').replace(',', '.')) || 0;
+          } else {
+            aVal = aCell.textContent.trim().toLowerCase();
+            bVal = bCell.textContent.trim().toLowerCase();
+          }
+          if (aVal < bVal) return dir === 'asc' ? -1 : 1;
+          if (aVal > bVal) return dir === 'asc' ? 1 : -1;
+          return 0;
+        });
+
+        rows.forEach(function(row) { tbody.appendChild(row); });
+      });
+    });
+  }
+
+  /* ── Optimization Simulator ── */
+  var simData = {{ sim_data_json|safe }};
+  var googleSlider = document.getElementById('simGoogleSlider');
+  var metaSlider = document.getElementById('simMetaSlider');
+  var resetBtn = document.getElementById('simResetBtn');
+
+  if (googleSlider && metaSlider && simData) {
+    function fmtNum(n) { return n.toLocaleString('pt-BR', {maximumFractionDigits: 0}); }
+    function fmtMoney(n) { return 'R$ ' + n.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+    function fmtPct(n) { return n.toFixed(2) + '%'; }
+    function deltaClass(v) { return v > 0.5 ? 'positive' : (v < -0.5 ? 'negative' : 'neutral'); }
+    function deltaStr(v) { return (v > 0 ? '+' : '') + v.toFixed(1) + '%'; }
+
+    function updateSim() {
+      var gPct = parseInt(googleSlider.value) / 100;
+      var mPct = parseInt(metaSlider.value) / 100;
+
+      document.getElementById('simGoogleLabel').textContent = (gPct >= 0 ? '+' : '') + (gPct * 100).toFixed(0) + '%';
+      document.getElementById('simMetaLabel').textContent = (mPct >= 0 ? '+' : '') + (mPct * 100).toFixed(0) + '%';
+
+      // Estimate: budget change → proportional change in impressions/clicks (using historical CPM/CPC)
+      var gCost = simData.google.cost * (1 + gPct);
+      var mCost = simData.meta.cost * (1 + mPct);
+      var newTotalCost = gCost + mCost;
+
+      // Impressions estimated from CPM
+      var gImp = simData.google.cpm > 0 ? Math.round(gCost / simData.google.cpm * 1000) : simData.google.impressions;
+      var mImp = simData.meta.cpm > 0 ? Math.round(mCost / simData.meta.cpm * 1000) : simData.meta.impressions;
+      var newImp = gImp + mImp;
+
+      // Clicks estimated from CPC
+      var gClk = simData.google.cpc > 0 ? Math.round(gCost / simData.google.cpc) : simData.google.clicks;
+      var mClk = simData.meta.cpc > 0 ? Math.round(mCost / simData.meta.cpc) : simData.meta.clicks;
+      var newClk = gClk + mClk;
+
+      var newCtr = newImp > 0 ? (newClk / newImp * 100) : 0;
+      var newCpc = newClk > 0 ? (newTotalCost / newClk) : 0;
+      var newCpm = newImp > 0 ? (newTotalCost / newImp * 1000) : 0;
+
+      var origImp = simData.google.impressions + simData.meta.impressions;
+      var origClk = simData.google.clicks + simData.meta.clicks;
+      var origCtr = origImp > 0 ? (origClk / origImp * 100) : 0;
+      var origCpc = origClk > 0 ? (simData.total_budget / origClk) : 0;
+      var origCpm = origImp > 0 ? (simData.total_budget / origImp * 1000) : 0;
+
+      function setResult(id, value, delta) {
+        document.getElementById(id + 'Value').textContent = value;
+        var deltaEl = document.getElementById(id + 'Delta');
+        deltaEl.textContent = deltaStr(delta);
+        deltaEl.className = 'sim-result-delta ' + deltaClass(delta);
+      }
+
+      var impDelta = origImp > 0 ? ((newImp - origImp) / origImp * 100) : 0;
+      var clkDelta = origClk > 0 ? ((newClk - origClk) / origClk * 100) : 0;
+      var ctrDelta = origCtr > 0 ? ((newCtr - origCtr) / origCtr * 100) : 0;
+      var cpcDelta = origCpc > 0 ? ((newCpc - origCpc) / origCpc * 100) : 0;
+      var costDelta = simData.total_budget > 0 ? ((newTotalCost - simData.total_budget) / simData.total_budget * 100) : 0;
+      var cpmDelta = origCpm > 0 ? ((newCpm - origCpm) / origCpm * 100) : 0;
+
+      setResult('simImp', fmtNum(newImp), impDelta);
+      setResult('simClk', fmtNum(newClk), clkDelta);
+      setResult('simCtr', fmtPct(newCtr), ctrDelta);
+      setResult('simCpc', fmtMoney(newCpc), -cpcDelta);  /* lower CPC = positive */
+      setResult('simCost', fmtMoney(newTotalCost), costDelta);
+      setResult('simCpm', fmtMoney(newCpm), -cpmDelta);  /* lower CPM = positive */
+    }
+
+    googleSlider.addEventListener('input', updateSim);
+    metaSlider.addEventListener('input', updateSim);
+    resetBtn.addEventListener('click', function() {
+      googleSlider.value = 0;
+      metaSlider.value = 0;
+      updateSim();
+    });
+    updateSim();
+  }
+})();
+</script>
+{% endif %}
+{% endblock %}

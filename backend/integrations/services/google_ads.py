@@ -32,7 +32,7 @@ from ..models import GoogleAdsAccount, SyncLog
 logger = logging.getLogger(__name__)
 
 SCOPES = ["https://www.googleapis.com/auth/adwords"]
-GOOGLE_ADS_API_VERSION = "v19"
+GOOGLE_ADS_API_VERSION = "v23"
 GOOGLE_ADS_BASE_URL = f"https://googleads.googleapis.com/{GOOGLE_ADS_API_VERSION}"
 
 
@@ -143,8 +143,46 @@ def list_accessible_customers(access_token: str) -> list[str]:
         return []
 
 
-def _ads_rest_search(access_token: str, customer_id: str, query: str) -> list[dict]:
+def list_client_accounts(access_token: str, manager_customer_id: str) -> list[dict]:
+    """List non-manager client accounts under a manager (MCC) account."""
+    cid = manager_customer_id.replace("-", "")
+    query = """
+        SELECT
+            customer_client.id,
+            customer_client.descriptive_name,
+            customer_client.manager,
+            customer_client.status
+        FROM customer_client
+        WHERE customer_client.status = 'ENABLED'
+          AND customer_client.manager = false
+    """
+    try:
+        rows = _ads_rest_search(access_token, cid, query, login_customer_id=cid)
+    except RuntimeError:
+        return []
+    clients = []
+    for row in rows:
+        cc = row.get("customerClient", {})
+        client_id = cc.get("id", "")
+        if client_id:
+            clients.append({
+                "id": str(client_id),
+                "name": cc.get("descriptiveName", ""),
+            })
+    return clients
+
+
+def _ads_rest_search(
+    access_token: str,
+    customer_id: str,
+    query: str,
+    login_customer_id: str | None = None,
+) -> list[dict]:
     """Execute a Google Ads query via REST API (paginated search).
+
+    Args:
+        login_customer_id: Manager account ID used for auth when querying
+            a child account through MCC.
 
     Returns list of result rows as dicts.
     """
@@ -155,12 +193,14 @@ def _ads_rest_search(access_token: str, customer_id: str, query: str) -> list[di
         "developer-token": settings.GOOGLE_ADS_DEVELOPER_TOKEN,
         "Content-Type": "application/json",
     }
+    if login_customer_id:
+        headers["login-customer-id"] = login_customer_id.replace("-", "")
 
     all_rows = []
     page_token = None
 
     while True:
-        payload = {"query": query, "pageSize": 1000}
+        payload = {"query": query}
         if page_token:
             payload["pageToken"] = page_token
 
@@ -219,24 +259,32 @@ def _map_channel_type(channel_type: str) -> str:
     return mapping.get(channel_type, PlacementLine.MediaChannel.GOOGLE)
 
 
-def sync_campaigns(account: GoogleAdsAccount) -> int:
-    """Sync campaigns from Google Ads → PlacementLine. Returns count."""
+def sync_campaigns(
+    account: GoogleAdsAccount,
+    target_customer_id: str | None = None,
+    login_customer_id: str | None = None,
+) -> int:
+    """Sync campaigns from Google Ads → PlacementLine. Returns count.
+
+    Args:
+        target_customer_id: Child account ID to query (for MCC access).
+        login_customer_id: Manager account ID for auth header.
+    """
     access_token = _ensure_fresh_token(account)
+    query_cid = target_customer_id or account.customer_id
 
     query = """
         SELECT
             campaign.id,
             campaign.name,
             campaign.status,
-            campaign.start_date,
-            campaign.end_date,
             campaign.advertising_channel_type
         FROM campaign
         WHERE campaign.status != 'REMOVED'
         ORDER BY campaign.name
     """
 
-    rows = _ads_rest_search(access_token, account.customer_id, query)
+    rows = _ads_rest_search(access_token, query_cid, query, login_customer_id=login_customer_id)
     parent_campaign = _get_or_create_campaign(account)
 
     count = 0
@@ -257,13 +305,6 @@ def sync_campaigns(account: GoogleAdsAccount) -> int:
             "property_text": f"Google Ads Campaign #{campaign_id}",
         }
 
-        start = camp.get("startDate")
-        end = camp.get("endDate")
-        if start and start != "1970-01-01":
-            defaults["start_date"] = start
-        if end and end != "2037-12-30":
-            defaults["end_date"] = end
-
         PlacementLine.objects.update_or_create(
             campaign=parent_campaign,
             external_ref=external_ref,
@@ -274,10 +315,21 @@ def sync_campaigns(account: GoogleAdsAccount) -> int:
     return count
 
 
-def sync_metrics(account: GoogleAdsAccount, days: int = 30) -> int:
-    """Sync daily metrics from Google Ads → PlacementDay. Returns count."""
+def sync_metrics(
+    account: GoogleAdsAccount,
+    days: int = 30,
+    target_customer_id: str | None = None,
+    login_customer_id: str | None = None,
+) -> int:
+    """Sync daily metrics from Google Ads → PlacementDay. Returns count.
+
+    Args:
+        target_customer_id: Child account ID to query (for MCC access).
+        login_customer_id: Manager account ID for auth header.
+    """
     access_token = _ensure_fresh_token(account)
     parent_campaign = _get_or_create_campaign(account)
+    query_cid = target_customer_id or account.customer_id
 
     start_date = (date.today() - timedelta(days=days)).strftime("%Y-%m-%d")
     end_date = date.today().strftime("%Y-%m-%d")
@@ -294,7 +346,7 @@ def sync_metrics(account: GoogleAdsAccount, days: int = 30) -> int:
           AND campaign.status != 'REMOVED'
     """
 
-    rows = _ads_rest_search(access_token, account.customer_id, query)
+    rows = _ads_rest_search(access_token, query_cid, query, login_customer_id=login_customer_id)
 
     count = 0
     for row in rows:
@@ -335,11 +387,51 @@ def sync_metrics(account: GoogleAdsAccount, days: int = 30) -> int:
 
 
 def full_sync(account: GoogleAdsAccount, days: int = 30) -> SyncLog:
-    """Run a full sync: campaigns + metrics. Returns the SyncLog entry."""
+    """Run a full sync: campaigns + metrics. Returns the SyncLog entry.
+
+    Automatically detects manager (MCC) accounts and syncs each child
+    client account through the manager.
+    """
     log = SyncLog.objects.create(account=account)
     try:
-        campaigns_count = sync_campaigns(account)
-        metrics_count = sync_metrics(account, days=days)
+        access_token = _ensure_fresh_token(account)
+        manager_id = account.customer_id
+
+        # Try direct sync first
+        try:
+            campaigns_count = sync_campaigns(account)
+            metrics_count = sync_metrics(account, days=days)
+        except RuntimeError as e:
+            if "REQUESTED_METRICS_FOR_MANAGER" not in str(e):
+                raise
+            # This is a Manager (MCC) account — sync child accounts
+            logger.info(
+                "Account %s is a Manager account. Listing child accounts...",
+                manager_id,
+            )
+            child_accounts = list_client_accounts(access_token, manager_id)
+            if not child_accounts:
+                raise RuntimeError(
+                    "Conta Manager (MCC) sem contas-filhas acessiveis. "
+                    "Verifique as permissoes no Google Ads."
+                ) from e
+
+            campaigns_count = 0
+            metrics_count = 0
+            for child in child_accounts:
+                child_id = child["id"]
+                logger.info("Syncing child account %s (%s)", child_id, child["name"])
+                campaigns_count += sync_campaigns(
+                    account,
+                    target_customer_id=child_id,
+                    login_customer_id=manager_id,
+                )
+                metrics_count += sync_metrics(
+                    account,
+                    days=days,
+                    target_customer_id=child_id,
+                    login_customer_id=manager_id,
+                )
 
         log.status = SyncLog.Status.SUCCESS
         log.campaigns_synced = campaigns_count

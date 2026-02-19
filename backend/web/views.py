@@ -592,6 +592,15 @@ def campanhas_cliente(request: HttpRequest, cliente_id: int) -> HttpResponse:
         )
         on_count = PlacementLine.objects.filter(campaign=c, media_type="online").count()
         off_count = PlacementLine.objects.filter(campaign=c, media_type="offline").count()
+
+        # Determine link: Google/Meta Ads campaigns → veiculação pages
+        if c.name.startswith("Google Ads - "):
+            link_url = reverse("web:veiculacao_google")
+        elif c.name.startswith("Meta Ads - "):
+            link_url = reverse("web:veiculacao_meta")
+        else:
+            link_url = reverse("web:contract_done", args=[c.id])
+
         campaigns_with_stats.append({
             "campaign": c,
             "cliente": c.cliente,
@@ -601,6 +610,7 @@ def campanhas_cliente(request: HttpRequest, cliente_id: int) -> HttpResponse:
             "off_count": off_count,
             "start": totals.get("min_date") or c.start_date,
             "end": totals.get("max_date") or c.end_date,
+            "link_url": link_url,
         })
 
     return render(
@@ -709,10 +719,6 @@ def veiculacao(request: HttpRequest, platform: str = "all") -> HttpResponse:
     from integrations.models import GoogleAdsAccount, MetaAdsAccount
 
     role = effective_role(request)
-    if role == "cliente":
-        allowed = {"dashboard", "timeline_campanhas", "relatorios", "analytics"}
-        if "veiculacao" not in allowed:
-            return redirect("web:dashboard")
 
     # Determine which client to filter by
     cliente_id = effective_cliente_id(request)
@@ -741,6 +747,19 @@ def veiculacao(request: HttpRequest, platform: str = "all") -> HttpResponse:
         active_key = "veiculacao"
         table_title = "Campanhas Digitais"
         empty_msg = "Conecte sua conta do Google Ads ou Meta Ads para visualizar campanhas, impressoes, cliques e investimento."
+
+    # Platform-specific pages require a client to be selected
+    require_cliente = (platform in ("google", "meta")) and not cliente_id
+    if require_cliente:
+        return render(
+            request,
+            "web/veiculacao.html",
+            {
+                "active": active_key,
+                "page_title": page_title,
+                "require_cliente": True,
+            },
+        )
 
     # Check if there are any connected accounts
     gads_qs = GoogleAdsAccount.objects.filter(is_active=True)
@@ -784,6 +803,16 @@ def veiculacao(request: HttpRequest, platform: str = "all") -> HttpResponse:
     ctr = (total_clicks / total_impressions * 100) if total_impressions > 0 else 0
 
     # Campaigns table: per-PlacementLine aggregation
+    # Pre-fetch piece counts per campaign to avoid N+1 queries
+    campaign_ids_in_lines = lines_qs.values_list("campaign_id", flat=True).distinct()
+    from django.db.models import Count as DjCount
+    pieces_by_campaign = dict(
+        Piece.objects.filter(campaign_id__in=campaign_ids_in_lines)
+        .values_list("campaign_id")
+        .annotate(cnt=DjCount("id"))
+        .values_list("campaign_id", "cnt")
+    )
+
     campaigns_data = []
     for line in lines_qs.select_related("campaign", "campaign__cliente"):
         line_days = days_qs.filter(placement_line=line)
@@ -798,6 +827,7 @@ def veiculacao(request: HttpRequest, platform: str = "all") -> HttpResponse:
         line_ctr = (clk / imp * 100) if imp > 0 else 0
         cpc = (cst / clk) if clk > 0 else 0
         plat_label = "Meta Ads" if line.media_channel in meta_channels else "Google Ads"
+        camp_id = line.campaign_id
         campaigns_data.append({
             "id": line.id,
             "name": line.channel or line.property_text or f"Campaign #{line.external_ref}",
@@ -810,6 +840,8 @@ def veiculacao(request: HttpRequest, platform: str = "all") -> HttpResponse:
             "cost": round(cst, 2),
             "cpc": round(cpc, 2),
             "external_ref": line.external_ref,
+            "campaign_id": camp_id,
+            "pieces_count": pieces_by_campaign.get(camp_id, 0),
         })
 
     # Daily metrics for chart
@@ -836,6 +868,19 @@ def veiculacao(request: HttpRequest, platform: str = "all") -> HttpResponse:
     # Show platform column only when viewing all platforms
     show_platform_col = (platform == "all")
 
+    # Find parent campaign for "Peças & Criativos" button
+    parent_campaign_id = None
+    if platform == "google" and cliente_id:
+        pc = Campaign.objects.filter(
+            cliente_id=cliente_id, name__startswith="Google Ads - "
+        ).values_list("id", flat=True).first()
+        parent_campaign_id = pc
+    elif platform == "meta" and cliente_id:
+        pc = Campaign.objects.filter(
+            cliente_id=cliente_id, name__startswith="Meta Ads - "
+        ).values_list("id", flat=True).first()
+        parent_campaign_id = pc
+
     return render(
         request,
         "web/veiculacao.html",
@@ -846,6 +891,8 @@ def veiculacao(request: HttpRequest, platform: str = "all") -> HttpResponse:
             "empty_msg": empty_msg,
             "show_platform_col": show_platform_col,
             "has_accounts": has_accounts,
+            "parent_campaign_id": parent_campaign_id,
+            "user_is_admin": effective_role(request) != "cliente",
             "total_impressions": total_impressions,
             "total_clicks": total_clicks,
             "total_cost": total_cost,
@@ -874,6 +921,18 @@ def dashon(request: HttpRequest) -> HttpResponse:
     if not cliente_id and is_admin(request.user):
         cliente_id = selected_cliente_id(request)
 
+    # Require a client to be selected
+    if not cliente_id:
+        return render(
+            request,
+            "web/dashon.html",
+            {
+                "active": "dashon",
+                "page_title": "DashON",
+                "require_cliente": True,
+            },
+        )
+
     # Check connected accounts
     gads_qs = GoogleAdsAccount.objects.filter(is_active=True)
     mads_qs = MetaAdsAccount.objects.filter(is_active=True)
@@ -893,19 +952,15 @@ def dashon(request: HttpRequest) -> HttpResponse:
 
     line_ids = list(lines_qs.values_list("id", flat=True))
 
-    # Date filter (defaults to last 30 days)
+    # Date filter — no default range so all synced data is shown
     date_from = request.GET.get("date_from", "")
     date_to = request.GET.get("date_to", "")
-    if not date_from:
-        date_from = (timezone.now() - timedelta(days=30)).strftime("%Y-%m-%d")
-    if not date_to:
-        date_to = timezone.now().strftime("%Y-%m-%d")
 
-    days_qs = PlacementDay.objects.filter(
-        placement_line_id__in=line_ids,
-        date__gte=date_from,
-        date__lte=date_to,
-    )
+    days_qs = PlacementDay.objects.filter(placement_line_id__in=line_ids)
+    if date_from:
+        days_qs = days_qs.filter(date__gte=date_from)
+    if date_to:
+        days_qs = days_qs.filter(date__lte=date_to)
 
     # ── Global stats ──
     stats = days_qs.aggregate(
@@ -1104,6 +1159,15 @@ def integracoes(request: HttpRequest) -> HttpResponse:
         Cliente.objects.filter(ativo=True).order_by("nome").values("id", "nome")
     )
 
+    # Count synced data in DB for "clear data" buttons
+    google_channels = ["google", "youtube", "display", "search"]
+    gads_data_count = PlacementLine.objects.filter(
+        media_channel__in=google_channels, external_ref__gt=""
+    ).count()
+    mads_data_count = PlacementLine.objects.filter(
+        media_channel="meta", external_ref__gt=""
+    ).count()
+
     return render(
         request,
         "web/integracoes.html",
@@ -1120,6 +1184,8 @@ def integracoes(request: HttpRequest) -> HttpResponse:
             "mads_error": mads_error,
             "mads_success": mads_success,
             "has_token_error": has_token_error,
+            "gads_data_count": gads_data_count,
+            "mads_data_count": mads_data_count,
         },
     )
 
@@ -1295,7 +1361,648 @@ def logs_auditoria(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def analytics(request: HttpRequest) -> HttpResponse:
-    return _render_module(request, active="analytics", title="Analytics")
+    """Analytics Intelligence – diagnostic scoring, insights, recommendations, funnel & alerts."""
+    from collections import defaultdict
+    from decimal import Decimal
+
+    role = effective_role(request)
+    cliente_id = effective_cliente_id(request)
+    if not cliente_id and is_admin(request.user):
+        cliente_id = selected_cliente_id(request)
+
+    if not cliente_id:
+        return render(request, "web/analytics.html", {
+            "active": "analytics",
+            "page_title": "Analytics Intelligence",
+            "require_cliente": True,
+        })
+
+    # ── Digital channels ──
+    google_channels = ["google", "youtube", "display", "search"]
+    meta_channels = ["meta"]
+    all_channels = google_channels + meta_channels
+
+    lines_qs = PlacementLine.objects.filter(
+        media_channel__in=all_channels,
+        campaign__cliente_id=cliente_id,
+    )
+    line_ids = list(lines_qs.values_list("id", flat=True))
+
+    # Date filter
+    date_from = request.GET.get("date_from", "")
+    date_to = request.GET.get("date_to", "")
+
+    days_qs = PlacementDay.objects.filter(placement_line_id__in=line_ids)
+    if date_from:
+        days_qs = days_qs.filter(date__gte=date_from)
+    if date_to:
+        days_qs = days_qs.filter(date__lte=date_to)
+
+    if not line_ids or not days_qs.exists():
+        return render(request, "web/analytics.html", {
+            "active": "analytics",
+            "page_title": "Analytics Intelligence",
+            "no_data": True,
+            "date_from": date_from,
+            "date_to": date_to,
+        })
+
+    # ── Global aggregates ──
+    stats = days_qs.aggregate(
+        total_imp=Sum("impressions"),
+        total_clk=Sum("clicks"),
+        total_cost=Sum("cost"),
+    )
+    total_imp = stats["total_imp"] or 0
+    total_clk = stats["total_clk"] or 0
+    total_cost = float(stats["total_cost"] or 0)
+    global_ctr = round((total_clk / total_imp * 100), 2) if total_imp > 0 else 0
+    global_cpc = round((total_cost / total_clk), 2) if total_clk > 0 else 0
+
+    # ── Per-platform aggregates ──
+    google_line_ids = list(lines_qs.filter(media_channel__in=google_channels).values_list("id", flat=True))
+    meta_line_ids = list(lines_qs.filter(media_channel__in=meta_channels).values_list("id", flat=True))
+
+    def _agg(ids):
+        qs = days_qs.filter(placement_line_id__in=ids)
+        s = qs.aggregate(imp=Sum("impressions"), clk=Sum("clicks"), cst=Sum("cost"))
+        imp = s["imp"] or 0
+        clk = s["clk"] or 0
+        cst = float(s["cst"] or 0)
+        return {
+            "impressions": imp,
+            "clicks": clk,
+            "cost": round(cst, 2),
+            "ctr": round((clk / imp * 100), 2) if imp > 0 else 0,
+            "cpc": round((cst / clk), 2) if clk > 0 else 0,
+        }
+
+    google_agg = _agg(google_line_ids)
+    meta_agg = _agg(meta_line_ids)
+
+    # ── Per-campaign metrics ──
+    campaign_metrics = []
+    for line in lines_qs.select_related("campaign", "campaign__cliente"):
+        agg = days_qs.filter(placement_line=line).aggregate(
+            imp=Sum("impressions"), clk=Sum("clicks"), cst=Sum("cost"),
+        )
+        imp = agg["imp"] or 0
+        clk = agg["clk"] or 0
+        cst = float(agg["cst"] or 0)
+        if imp == 0 and clk == 0 and cst == 0:
+            continue
+        ctr = round((clk / imp * 100), 2) if imp > 0 else 0
+        cpc = round((cst / clk), 2) if clk > 0 else 0
+        platform = "Meta Ads" if line.media_channel in meta_channels else "Google Ads"
+        name = line.channel or line.property_text or f"Campaign #{line.external_ref}"
+        campaign_metrics.append({
+            "id": line.id,
+            "name": name,
+            "platform": platform,
+            "impressions": imp,
+            "clicks": clk,
+            "ctr": ctr,
+            "cost": round(cst, 2),
+            "cpc": cpc,
+        })
+    campaign_metrics.sort(key=lambda c: c["cost"], reverse=True)
+
+    # ── Daily trend (last 30 unique dates) ──
+    daily_data = list(
+        days_qs.values("date")
+        .annotate(imp=Sum("impressions"), clk=Sum("clicks"), cst=Sum("cost"))
+        .order_by("date")
+    )
+    trend_labels = [str(d["date"]) for d in daily_data]
+    trend_imp = [d["imp"] or 0 for d in daily_data]
+    trend_clk = [d["clk"] or 0 for d in daily_data]
+
+    # ──────────────────────────────────────────────────
+    # BLOCO 1: DIAGNÓSTICO AUTOMÁTICO (Performance Score)
+    # ──────────────────────────────────────────────────
+    # Benchmarks (industry averages for digital ads)
+    BENCH_CTR = 2.0        # 2% CTR benchmark
+    BENCH_CPC = 3.50       # R$ 3.50 CPC benchmark
+    BENCH_CPM = 15.0       # R$ 15 CPM benchmark
+
+    # CTR score (25%) – higher is better, cap at 200% of benchmark
+    ctr_ratio = min(global_ctr / BENCH_CTR, 2.0) if BENCH_CTR > 0 else 0
+    ctr_score = round(ctr_ratio * 50, 1)  # 0-100
+
+    # CPC score (20%) – lower is better
+    if global_cpc > 0:
+        cpc_ratio = min(BENCH_CPC / global_cpc, 2.0)
+        cpc_score = round(cpc_ratio * 50, 1)
+    else:
+        cpc_score = 50  # neutral if no clicks
+
+    # CPM / reach efficiency (25%)
+    cpm = round((total_cost / total_imp * 1000), 2) if total_imp > 0 else 0
+    if cpm > 0:
+        cpm_ratio = min(BENCH_CPM / cpm, 2.0)
+        cpm_score = round(cpm_ratio * 50, 1)
+    else:
+        cpm_score = 50
+
+    # Activity rate (20%) – percentage of campaigns with data
+    total_lines = lines_qs.count()
+    active_lines = days_qs.values("placement_line_id").distinct().count()
+    activity_rate = round((active_lines / total_lines * 100), 1) if total_lines > 0 else 0
+    activity_score = round(min(activity_rate, 100), 1)
+
+    # Consistency (10%) – low daily variation = good
+    if len(trend_imp) > 1:
+        avg_imp = sum(trend_imp) / len(trend_imp) if trend_imp else 1
+        variance = sum((x - avg_imp) ** 2 for x in trend_imp) / len(trend_imp)
+        std_dev = variance ** 0.5
+        cv = std_dev / avg_imp if avg_imp > 0 else 1  # coefficient of variation
+        consistency_score = round(max(0, min(100, (1 - cv) * 100)), 1)
+    else:
+        consistency_score = 50
+
+    # Weighted Performance Score
+    perf_score = round(
+        ctr_score * 0.25 +
+        cpc_score * 0.20 +
+        cpm_score * 0.25 +
+        activity_score * 0.20 +
+        consistency_score * 0.10
+    )
+    perf_score = max(0, min(100, perf_score))
+
+    # Score classification
+    if perf_score >= 80:
+        score_class = "excellent"
+        score_label = "Excelente"
+    elif perf_score >= 60:
+        score_class = "good"
+        score_label = "Bom"
+    elif perf_score >= 40:
+        score_class = "average"
+        score_label = "Regular"
+    else:
+        score_class = "poor"
+        score_label = "Precisa Melhorar"
+
+    score_breakdown = [
+        {"label": "CTR", "weight": "25%", "score": round(ctr_score), "max": 100},
+        {"label": "CPC", "weight": "20%", "score": round(cpc_score), "max": 100},
+        {"label": "CPM / Alcance", "weight": "25%", "score": round(cpm_score), "max": 100},
+        {"label": "Atividade", "weight": "20%", "score": round(activity_score), "max": 100},
+        {"label": "Consistencia", "weight": "10%", "score": round(consistency_score), "max": 100},
+    ]
+
+    # ──────────────────────────────────────────────────
+    # BLOCO 2: INSIGHTS AUTOMÁTICOS
+    # ──────────────────────────────────────────────────
+    insights = []
+
+    # Insight: CTR above/below benchmark
+    if global_ctr >= BENCH_CTR * 1.5:
+        insights.append({
+            "type": "positive",
+            "icon": "trending-up",
+            "title": "CTR acima da media",
+            "text": f"Seu CTR de {global_ctr}% esta {round(global_ctr / BENCH_CTR, 1)}x acima do benchmark de {BENCH_CTR}%. Campanhas estao gerando bom engajamento.",
+        })
+    elif global_ctr < BENCH_CTR * 0.5:
+        insights.append({
+            "type": "negative",
+            "icon": "trending-down",
+            "title": "CTR abaixo do esperado",
+            "text": f"CTR de {global_ctr}% esta abaixo do benchmark de {BENCH_CTR}%. Considere revisar criativos e segmentacao.",
+        })
+
+    # Insight: Platform comparison
+    if google_agg["impressions"] > 0 and meta_agg["impressions"] > 0:
+        if google_agg["ctr"] > meta_agg["ctr"] * 1.3:
+            insights.append({
+                "type": "info",
+                "icon": "bar-chart",
+                "title": "Google Ads com melhor CTR",
+                "text": f"Google Ads ({google_agg['ctr']}%) supera Meta Ads ({meta_agg['ctr']}%) em taxa de cliques. Considere realocar orcamento.",
+            })
+        elif meta_agg["ctr"] > google_agg["ctr"] * 1.3:
+            insights.append({
+                "type": "info",
+                "icon": "bar-chart",
+                "title": "Meta Ads com melhor CTR",
+                "text": f"Meta Ads ({meta_agg['ctr']}%) supera Google Ads ({google_agg['ctr']}%) em taxa de cliques. Considere realocar orcamento.",
+            })
+
+    # Insight: CPC comparison between platforms
+    if google_agg["cpc"] > 0 and meta_agg["cpc"] > 0:
+        cheaper = "Google Ads" if google_agg["cpc"] < meta_agg["cpc"] else "Meta Ads"
+        cheaper_cpc = min(google_agg["cpc"], meta_agg["cpc"])
+        expensive_cpc = max(google_agg["cpc"], meta_agg["cpc"])
+        if expensive_cpc > cheaper_cpc * 1.5:
+            insights.append({
+                "type": "warning",
+                "icon": "dollar-sign",
+                "title": f"CPC mais barato no {cheaper}",
+                "text": f"{cheaper} tem CPC de R$ {cheaper_cpc:.2f} vs R$ {expensive_cpc:.2f}. Diferenca de {round((expensive_cpc / cheaper_cpc - 1) * 100)}%.",
+            })
+
+    # Insight: High CPC campaigns
+    high_cpc_camps = [c for c in campaign_metrics if c["cpc"] > BENCH_CPC * 2 and c["clicks"] > 10]
+    if high_cpc_camps:
+        names = ", ".join(c["name"][:25] for c in high_cpc_camps[:3])
+        insights.append({
+            "type": "negative",
+            "icon": "alert-triangle",
+            "title": f"{len(high_cpc_camps)} campanha(s) com CPC elevado",
+            "text": f"Campanhas com CPC acima de R$ {BENCH_CPC * 2:.2f}: {names}.",
+        })
+
+    # Insight: Budget concentration
+    if len(campaign_metrics) >= 3:
+        top_cost = campaign_metrics[0]["cost"]
+        if top_cost > total_cost * 0.5:
+            insights.append({
+                "type": "warning",
+                "icon": "pie-chart",
+                "title": "Concentracao de orcamento",
+                "text": f"\"{campaign_metrics[0]['name'][:30]}\" consome {round(top_cost / total_cost * 100)}% do investimento total. Diversifique para reduzir riscos.",
+            })
+
+    # Insight: Consistency trend
+    if len(trend_imp) >= 7:
+        last_7 = trend_imp[-7:]
+        prev_7 = trend_imp[-14:-7] if len(trend_imp) >= 14 else trend_imp[:7]
+        avg_last = sum(last_7) / len(last_7)
+        avg_prev = sum(prev_7) / len(prev_7)
+        if avg_prev > 0:
+            change = round((avg_last - avg_prev) / avg_prev * 100, 1)
+            if change > 20:
+                insights.append({
+                    "type": "positive",
+                    "icon": "trending-up",
+                    "title": "Impressoes em alta",
+                    "text": f"Impressoes cresceram {change}% nos ultimos 7 dias comparado ao periodo anterior.",
+                })
+            elif change < -20:
+                insights.append({
+                    "type": "negative",
+                    "icon": "trending-down",
+                    "title": "Queda nas impressoes",
+                    "text": f"Impressoes cairam {abs(change)}% nos ultimos 7 dias comparado ao periodo anterior.",
+                })
+
+    # If no insights, add a default one
+    if not insights:
+        insights.append({
+            "type": "info",
+            "icon": "info",
+            "title": "Dados sendo analisados",
+            "text": "Continue acumulando dados para gerar insights mais precisos sobre suas campanhas.",
+        })
+
+    # ──────────────────────────────────────────────────
+    # BLOCO 3: DECISÃO RECOMENDADA
+    # ──────────────────────────────────────────────────
+    recommendations = []
+
+    # Recommendation: Reallocate budget
+    if google_agg["cpc"] > 0 and meta_agg["cpc"] > 0:
+        if google_agg["cpc"] < meta_agg["cpc"] * 0.7:
+            recommendations.append({
+                "priority": "high",
+                "icon": "refresh-cw",
+                "title": "Realocar orcamento para Google Ads",
+                "text": f"Google Ads oferece CPC {round((1 - google_agg['cpc'] / meta_agg['cpc']) * 100)}% menor. Transfira parte do budget de Meta para Google.",
+                "action": "Ajustar alocacao de budget entre plataformas",
+            })
+        elif meta_agg["cpc"] < google_agg["cpc"] * 0.7:
+            recommendations.append({
+                "priority": "high",
+                "icon": "refresh-cw",
+                "title": "Realocar orcamento para Meta Ads",
+                "text": f"Meta Ads oferece CPC {round((1 - meta_agg['cpc'] / google_agg['cpc']) * 100)}% menor. Transfira parte do budget de Google para Meta.",
+                "action": "Ajustar alocacao de budget entre plataformas",
+            })
+
+    # Recommendation: Pause underperformers
+    low_perf = [c for c in campaign_metrics if c["ctr"] < BENCH_CTR * 0.3 and c["impressions"] > 1000]
+    if low_perf:
+        recommendations.append({
+            "priority": "medium",
+            "icon": "pause-circle",
+            "title": f"Pausar {len(low_perf)} campanha(s) de baixo desempenho",
+            "text": f"Campanhas com CTR abaixo de {round(BENCH_CTR * 0.3, 2)}% e mais de 1.000 impressoes. Revisao de criativos recomendada antes de reativar.",
+            "action": "Pausar e revisar criativos",
+        })
+
+    # Recommendation: Scale top performers
+    top_perf = [c for c in campaign_metrics if c["ctr"] > BENCH_CTR * 1.5 and c["cost"] < total_cost * 0.3]
+    if top_perf:
+        names = ", ".join(c["name"][:20] for c in top_perf[:3])
+        recommendations.append({
+            "priority": "high",
+            "icon": "zap",
+            "title": "Escalar campanhas de alto desempenho",
+            "text": f"Campanhas com CTR acima de {round(BENCH_CTR * 1.5, 1)}% recebem pouca verba: {names}. Aumente o budget para maximizar resultados.",
+            "action": "Aumentar budget das top performers",
+        })
+
+    # Recommendation: Improve creatives for low CTR
+    if global_ctr < BENCH_CTR:
+        recommendations.append({
+            "priority": "medium",
+            "icon": "image",
+            "title": "Revisar criativos",
+            "text": f"CTR geral ({global_ctr}%) abaixo do benchmark ({BENCH_CTR}%). Teste novos formatos de anuncio, titulos e calls-to-action.",
+            "action": "Testar novos criativos A/B",
+        })
+
+    # Recommendation: Expand reach if high CTR but low impressions
+    if global_ctr > BENCH_CTR * 1.5 and total_imp < 10000:
+        recommendations.append({
+            "priority": "medium",
+            "icon": "maximize",
+            "title": "Expandir alcance",
+            "text": f"Excelente CTR ({global_ctr}%) mas volume baixo ({total_imp:,} impressoes). Aumente os lances ou amplie a segmentacao.",
+            "action": "Aumentar lances e audiencia",
+        })
+
+    if not recommendations:
+        recommendations.append({
+            "priority": "low",
+            "icon": "check-circle",
+            "title": "Campanhas em bom estado",
+            "text": "Nenhuma acao urgente identificada. Continue monitorando as metricas.",
+            "action": "Acompanhar metricas semanalmente",
+        })
+
+    # ──────────────────────────────────────────────────
+    # BLOCO 4: FUNIL DE PERFORMANCE
+    # ──────────────────────────────────────────────────
+    funnel_steps = []
+    funnel_steps.append({
+        "label": "Impressoes",
+        "value": total_imp,
+        "formatted": f"{total_imp:,}".replace(",", "."),
+        "pct": 100,
+        "drop": None,
+    })
+    funnel_steps.append({
+        "label": "Cliques",
+        "value": total_clk,
+        "formatted": f"{total_clk:,}".replace(",", "."),
+        "pct": round(total_clk / total_imp * 100, 2) if total_imp > 0 else 0,
+        "drop": round((1 - total_clk / total_imp) * 100, 1) if total_imp > 0 else 0,
+    })
+    # Engagement proxy: clicks with cost > 0 (qualified clicks)
+    qualified_clicks = days_qs.filter(clicks__gt=0, cost__gt=0).aggregate(
+        clk=Sum("clicks")
+    )["clk"] or 0
+    funnel_steps.append({
+        "label": "Cliques Qualificados",
+        "value": qualified_clicks,
+        "formatted": f"{qualified_clicks:,}".replace(",", "."),
+        "pct": round(qualified_clicks / total_imp * 100, 2) if total_imp > 0 else 0,
+        "drop": round((1 - qualified_clicks / total_clk) * 100, 1) if total_clk > 0 else 0,
+    })
+    funnel_steps.append({
+        "label": "Investimento",
+        "value": total_cost,
+        "formatted": f"R$ {total_cost:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+        "pct": round(total_cost / (total_imp * 0.015) * 100, 1) if total_imp > 0 else 0,  # vs benchmark CPM
+        "drop": None,
+    })
+
+    # ──────────────────────────────────────────────────
+    # BLOCO 5: ALERTAS AUTOMÁTICOS
+    # ──────────────────────────────────────────────────
+    alerts = []
+
+    # Alert: Campaigns with 0 clicks (significant impressions)
+    zero_click_camps = [c for c in campaign_metrics if c["clicks"] == 0 and c["impressions"] > 500]
+    if zero_click_camps:
+        alerts.append({
+            "severity": "critical",
+            "icon": "alert-circle",
+            "title": f"{len(zero_click_camps)} campanha(s) sem cliques",
+            "text": f"Campanhas com impressoes mas zero cliques. Revise urgentemente.",
+        })
+
+    # Alert: CPC above limit
+    cpc_limit = BENCH_CPC * 3
+    expensive_camps = [c for c in campaign_metrics if c["cpc"] > cpc_limit and c["clicks"] > 5]
+    if expensive_camps:
+        alerts.append({
+            "severity": "warning",
+            "icon": "alert-triangle",
+            "title": f"CPC acima de R$ {cpc_limit:.2f}",
+            "text": f"{len(expensive_camps)} campanha(s) com custo por clique excessivo. Reavalie segmentacao e lances.",
+        })
+
+    # Alert: No recent data (last 3 days)
+    from datetime import date
+    today = date.today()
+    recent_days = days_qs.filter(date__gte=today - timedelta(days=3))
+    if not recent_days.exists() and days_qs.exists():
+        alerts.append({
+            "severity": "warning",
+            "icon": "clock",
+            "title": "Sem dados recentes",
+            "text": "Nenhum dado de veiculacao nos ultimos 3 dias. Verifique se as campanhas estao ativas e se a sincronizacao esta funcionando.",
+        })
+
+    # Alert: Sudden drop in impressions
+    if len(trend_imp) >= 3:
+        last_3_avg = sum(trend_imp[-3:]) / 3
+        overall_avg = sum(trend_imp) / len(trend_imp)
+        if overall_avg > 0 and last_3_avg < overall_avg * 0.3:
+            alerts.append({
+                "severity": "critical",
+                "icon": "trending-down",
+                "title": "Queda brusca nas impressoes",
+                "text": f"Impressoes dos ultimos 3 dias caiu {round((1 - last_3_avg / overall_avg) * 100)}% em relacao a media. Verifique status das campanhas.",
+            })
+
+    # Alert: Low CTR across all campaigns
+    if global_ctr < BENCH_CTR * 0.3 and total_imp > 5000:
+        alerts.append({
+            "severity": "warning",
+            "icon": "thumbs-down",
+            "title": "CTR critico em todas as campanhas",
+            "text": f"CTR geral de {global_ctr}% esta muito abaixo do aceitavel. Acao imediata de revisao de criativos recomendada.",
+        })
+
+    # ──────────────────────────────────────────────────
+    # BLOCO 6: COMPARATIVO HISTÓRICO (current vs previous period)
+    # ──────────────────────────────────────────────────
+    # Determine the current period span
+    all_dates = days_qs.aggregate(min_d=Min("date"), max_d=Max("date"))
+    period_start = all_dates["min_d"]
+    period_end = all_dates["max_d"]
+
+    if date_from:
+        try:
+            period_start = datetime.strptime(date_from, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            period_end = datetime.strptime(date_to, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+
+    if period_start and period_end:
+        period_days = (period_end - period_start).days + 1
+        prev_end = period_start - timedelta(days=1)
+        prev_start = prev_end - timedelta(days=period_days - 1)
+
+        prev_qs = PlacementDay.objects.filter(
+            placement_line_id__in=line_ids,
+            date__gte=prev_start,
+            date__lte=prev_end,
+        )
+        prev_stats = prev_qs.aggregate(
+            imp=Sum("impressions"), clk=Sum("clicks"), cst=Sum("cost"),
+        )
+        prev_imp = prev_stats["imp"] or 0
+        prev_clk = prev_stats["clk"] or 0
+        prev_cost = float(prev_stats["cst"] or 0)
+        prev_ctr = round((prev_clk / prev_imp * 100), 2) if prev_imp > 0 else 0
+        prev_cpc = round((prev_cost / prev_clk), 2) if prev_clk > 0 else 0
+
+        def _delta(cur, prev_val):
+            if prev_val == 0:
+                return {"value": cur, "delta": 0, "pct": 0, "dir": "neutral"}
+            pct = round((cur - prev_val) / abs(prev_val) * 100, 1)
+            return {
+                "value": cur,
+                "prev": prev_val,
+                "delta": round(cur - prev_val, 2),
+                "pct": pct,
+                "dir": "up" if pct > 0 else ("down" if pct < 0 else "neutral"),
+            }
+
+        historical = {
+            "has_prev": prev_qs.exists(),
+            "period_label": f"{period_start.strftime('%d/%m')} - {period_end.strftime('%d/%m')}",
+            "prev_label": f"{prev_start.strftime('%d/%m')} - {prev_end.strftime('%d/%m')}",
+            "ctr": _delta(global_ctr, prev_ctr),
+            "cpc": _delta(global_cpc, prev_cpc),
+            "impressions": _delta(total_imp, prev_imp),
+            "clicks": _delta(total_clk, prev_clk),
+            "investment": _delta(round(total_cost, 2), round(prev_cost, 2)),
+        }
+    else:
+        historical = {"has_prev": False}
+
+    # ──────────────────────────────────────────────────
+    # BLOCO 7: MATRIZ DE EFICIÊNCIA (per-channel efficiency)
+    # ──────────────────────────────────────────────────
+    channel_map = {}
+    for line in lines_qs:
+        ch = line.media_channel.upper()
+        if ch not in channel_map:
+            channel_map[ch] = {"line_ids": [], "label": ch}
+        channel_map[ch]["line_ids"].append(line.id)
+
+    efficiency_matrix = []
+    for ch_key, ch_info in channel_map.items():
+        ch_agg = days_qs.filter(placement_line_id__in=ch_info["line_ids"]).aggregate(
+            imp=Sum("impressions"), clk=Sum("clicks"), cst=Sum("cost"),
+        )
+        ch_imp = ch_agg["imp"] or 0
+        ch_clk = ch_agg["clk"] or 0
+        ch_cost = float(ch_agg["cst"] or 0)
+        if ch_imp == 0 and ch_clk == 0:
+            continue
+        ch_ctr = round((ch_clk / ch_imp * 100), 2) if ch_imp > 0 else 0
+        ch_cpc = round((ch_cost / ch_clk), 2) if ch_clk > 0 else 0
+        ch_cpm = round((ch_cost / ch_imp * 1000), 2) if ch_imp > 0 else 0
+        # ROI proxy: clicks per R$ spent
+        ch_roi = round((ch_clk / ch_cost), 2) if ch_cost > 0 else 0
+        # Channel score: weighted composite
+        ctr_s = min(ch_ctr / BENCH_CTR, 2.0) * 50 if BENCH_CTR > 0 else 50
+        cpc_s = min(BENCH_CPC / ch_cpc, 2.0) * 50 if ch_cpc > 0 else 50
+        roi_s = min(ch_roi / 0.5, 2.0) * 50  # 0.5 clicks/R$ benchmark
+        ch_score = round(ctr_s * 0.35 + cpc_s * 0.35 + roi_s * 0.30)
+        ch_score = max(0, min(100, ch_score))
+
+        efficiency_matrix.append({
+            "channel": ch_info["label"],
+            "impressions": ch_imp,
+            "clicks": ch_clk,
+            "cost": round(ch_cost, 2),
+            "ctr": ch_ctr,
+            "cpc": ch_cpc,
+            "cpm": ch_cpm,
+            "roi": ch_roi,
+            "score": ch_score,
+        })
+    efficiency_matrix.sort(key=lambda x: x["score"], reverse=True)
+
+    # ──────────────────────────────────────────────────
+    # BLOCO 8: SIMULADOR DE OTIMIZAÇÃO (data for JS)
+    # ──────────────────────────────────────────────────
+    # Provide per-platform averages for the simulator
+    sim_data = {
+        "google": {
+            "cost": google_agg["cost"],
+            "impressions": google_agg["impressions"],
+            "clicks": google_agg["clicks"],
+            "ctr": google_agg["ctr"],
+            "cpc": google_agg["cpc"],
+            "cpm": round((google_agg["cost"] / google_agg["impressions"] * 1000), 2) if google_agg["impressions"] > 0 else 0,
+        },
+        "meta": {
+            "cost": meta_agg["cost"],
+            "impressions": meta_agg["impressions"],
+            "clicks": meta_agg["clicks"],
+            "ctr": meta_agg["ctr"],
+            "cpc": meta_agg["cpc"],
+            "cpm": round((meta_agg["cost"] / meta_agg["impressions"] * 1000), 2) if meta_agg["impressions"] > 0 else 0,
+        },
+        "total_budget": round(total_cost, 2),
+    }
+
+    return render(request, "web/analytics.html", {
+        "active": "analytics",
+        "page_title": "Analytics Intelligence",
+        "date_from": date_from,
+        "date_to": date_to,
+        # Global stats
+        "total_imp": total_imp,
+        "total_clk": total_clk,
+        "total_cost": round(total_cost, 2),
+        "global_ctr": global_ctr,
+        "global_cpc": global_cpc,
+        "cpm": cpm,
+        # Platform stats
+        "google": google_agg,
+        "meta": meta_agg,
+        # Performance Score (Bloco 1)
+        "perf_score": perf_score,
+        "score_class": score_class,
+        "score_label": score_label,
+        "score_dash_offset": round(477.5 - (perf_score / 100) * 477.5, 1),
+        "score_breakdown": score_breakdown,
+        # Insights (Bloco 2)
+        "insights": insights,
+        # Recommendations (Bloco 3)
+        "recommendations": recommendations,
+        # Funnel (Bloco 4)
+        "funnel_steps": funnel_steps,
+        # Alerts (Bloco 5)
+        "alerts": alerts,
+        # Historical comparison (Bloco 6)
+        "historical": historical,
+        # Efficiency matrix (Bloco 7)
+        "efficiency_matrix": efficiency_matrix,
+        # Simulator data (Bloco 8)
+        "sim_data_json": json.dumps(sim_data),
+        # Chart data
+        "trend_labels_json": json.dumps(trend_labels),
+        "trend_imp_json": json.dumps(trend_imp),
+        "trend_clk_json": json.dumps(trend_clk),
+        # Campaign table
+        "campaigns": campaign_metrics,
+    })
 
 
 @login_required
@@ -2510,7 +3217,22 @@ def relatorios_campanhas(request: HttpRequest, cliente_id: int) -> HttpResponse:
     if cliente is None:
         return redirect("web:relatorios_clientes")
 
-    campaigns = Campaign.objects.filter(cliente_id=cliente_id).select_related("cliente").order_by("-created_at")
+    # Exclude campaigns that have digital placement lines (Google/Meta Ads integrations)
+    digital_channels = ["google", "youtube", "display", "search", "meta"]
+    digital_campaign_ids = (
+        PlacementLine.objects.filter(
+            media_channel__in=digital_channels,
+            campaign__cliente_id=cliente_id,
+        )
+        .values_list("campaign_id", flat=True)
+        .distinct()
+    )
+    campaigns = (
+        Campaign.objects.filter(cliente_id=cliente_id)
+        .exclude(id__in=digital_campaign_ids)
+        .select_related("cliente")
+        .order_by("-created_at")
+    )
 
     campaigns_with_stats = []
     for c in campaigns:
@@ -2859,7 +3581,6 @@ def uploads_midia_campanhas(request: HttpRequest, cliente_id: int) -> HttpRespon
 
 
 @login_required
-@require_admin
 def uploads_midia_pecas(request: HttpRequest, campaign_id: int) -> HttpResponse:
     """Exibe peças da campanha para upload de mídia via drag-and-drop."""
     campaign = Campaign.objects.filter(id=campaign_id).select_related("cliente").first()
@@ -2905,6 +3626,7 @@ def uploads_midia_pecas(request: HttpRequest, campaign_id: int) -> HttpResponse:
             "campaign": campaign,
             "cliente": campaign.cliente,
             "pieces_data": pieces_data,
+            "user_is_admin": effective_role(request) != "cliente",
         },
     )
 
@@ -3298,7 +4020,7 @@ def api_piece_update(request: HttpRequest, piece_id: int) -> HttpResponse:
             piece.duration_sec = int(data["duration_sec"])
         except (ValueError, TypeError):
             pass
-    if "type" in data and data["type"] in ["video", "audio", "image"]:
+    if "type" in data and data["type"] in ["video", "audio", "image", "html5"]:
         piece.type = data["type"]
     if "status" in data and data["status"] in ["pending", "approved", "archived"]:
         piece.status = data["status"]
@@ -3317,6 +4039,69 @@ def api_piece_update(request: HttpRequest, piece_id: int) -> HttpResponse:
             "type": piece.type,
             "status": piece.status,
             "notes": piece.notes,
+        }
+    })
+
+
+@login_required
+@require_admin
+def api_piece_create(request: HttpRequest, campaign_id: int) -> HttpResponse:
+    """API para criar uma nova peça na campanha."""
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+
+    campaign = Campaign.objects.filter(id=campaign_id).first()
+    if campaign is None:
+        return JsonResponse({"error": "campaign_not_found"}, status=404)
+
+    import json as _json
+    try:
+        data = _json.loads(request.body)
+    except _json.JSONDecodeError:
+        return JsonResponse({"error": "invalid_json"}, status=400)
+
+    code = (data.get("code") or "").strip()
+    title = (data.get("title") or "").strip()
+    piece_type = data.get("type", "image")
+    duration = 0
+    try:
+        duration = int(data.get("duration_sec", 0))
+    except (ValueError, TypeError):
+        pass
+
+    if not code or not title:
+        return JsonResponse({"error": "code and title are required"}, status=400)
+
+    if piece_type not in ["video", "audio", "image", "html5"]:
+        piece_type = "image"
+
+    if Piece.objects.filter(campaign=campaign, code=code).exists():
+        return JsonResponse({"error": f"Ja existe uma peca com o codigo '{code}' nesta campanha."}, status=400)
+
+    piece = Piece.objects.create(
+        campaign=campaign,
+        code=code,
+        title=title,
+        type=piece_type,
+        duration_sec=duration,
+    )
+
+    AuditLog.log(
+        user=request.user,
+        action="piece_created",
+        details=f"Peca '{code}' criada na campanha '{campaign.name}'",
+        model_name="Piece",
+        object_id=piece.id,
+    )
+
+    return JsonResponse({
+        "ok": True,
+        "piece": {
+            "id": piece.id,
+            "code": piece.code,
+            "title": piece.title,
+            "type": piece.type,
+            "duration_sec": piece.duration_sec,
         }
     })
 
@@ -3516,11 +4301,11 @@ def gads_sync(request: HttpRequest, account_id: int) -> HttpResponse:
     if request.method == "POST":
         account = GoogleAdsAccount.objects.filter(id=account_id, is_active=True).first()
         if account:
-            log = full_sync(account, days=30)
+            log = full_sync(account, days=180)
             if log.status == "success":
                 request.session["gads_success"] = (
                     f"Sync concluido: {log.campaigns_synced} campanhas, "
-                    f"{log.metrics_synced} metricas."
+                    f"{log.metrics_synced} metricas (ultimos 180 dias)."
                 )
             else:
                 request.session["gads_error"] = (
@@ -3657,11 +4442,11 @@ def mads_sync(request: HttpRequest, account_id: int) -> HttpResponse:
     if request.method == "POST":
         account = MetaAdsAccount.objects.filter(id=account_id, is_active=True).first()
         if account:
-            log = full_sync(account, days=30)
+            log = full_sync(account, days=180)
             if log.status == "success":
                 request.session["mads_success"] = (
                     f"Sync concluido: {log.campaigns_synced} campanhas, "
-                    f"{log.metrics_synced} metricas."
+                    f"{log.metrics_synced} metricas (ultimos 180 dias)."
                 )
             else:
                 request.session["mads_error"] = (
@@ -3679,6 +4464,50 @@ def mads_clear_logs(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         count, _ = MetaSyncLog.objects.all().delete()
         request.session["mads_success"] = f"{count} registros de log removidos."
+    return redirect("web:integracoes")
+
+
+@login_required
+@require_admin
+def gads_clear_data(request: HttpRequest) -> HttpResponse:
+    """Delete all synced Google Ads data (PlacementLine + PlacementDay cascade)."""
+    if request.method == "POST":
+        google_channels = ["google", "youtube", "display", "search"]
+        lines = PlacementLine.objects.filter(
+            media_channel__in=google_channels,
+            external_ref__gt="",
+        )
+        count = lines.count()
+        lines.delete()
+        # Remove auto-created parent campaigns (empty after purge)
+        Campaign.objects.filter(
+            name__startswith="Google Ads - ",
+            placement_lines__isnull=True,
+        ).delete()
+        request.session["gads_success"] = (
+            f"Dados Google Ads removidos: {count} linhas de veiculacao e metricas associadas."
+        )
+    return redirect("web:integracoes")
+
+
+@login_required
+@require_admin
+def mads_clear_data(request: HttpRequest) -> HttpResponse:
+    """Delete all synced Meta Ads data (PlacementLine + PlacementDay cascade)."""
+    if request.method == "POST":
+        lines = PlacementLine.objects.filter(
+            media_channel="meta",
+            external_ref__gt="",
+        )
+        count = lines.count()
+        lines.delete()
+        Campaign.objects.filter(
+            name__startswith="Meta Ads - ",
+            placement_lines__isnull=True,
+        ).delete()
+        request.session["mads_success"] = (
+            f"Dados Meta Ads removidos: {count} linhas de veiculacao e metricas associadas."
+        )
     return redirect("web:integracoes")
 
 

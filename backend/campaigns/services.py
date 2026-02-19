@@ -430,6 +430,8 @@ def infer_piece_type_from_filename(filename: str) -> str:
         return Piece.Type.IMAGE
     if n.endswith((".mp3", ".wav", ".aac", ".m4a")):
         return Piece.Type.AUDIO
+    if n.endswith((".zip", ".html", ".htm")):
+        return Piece.Type.HTML5
     return Piece.Type.VIDEO
 
 

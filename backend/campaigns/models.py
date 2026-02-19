@@ -92,6 +92,7 @@ class Piece(models.Model):
         VIDEO = "video", "Video"
         IMAGE = "image", "Image"
         AUDIO = "audio", "Audio"
+        HTML5 = "html5", "HTML5"
 
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
