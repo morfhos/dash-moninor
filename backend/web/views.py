@@ -580,7 +580,11 @@ def campanhas_cliente(request: HttpRequest, cliente_id: int) -> HttpResponse:
     if cliente is None:
         return redirect("web:grupo_campanhas")
 
-    campaigns = Campaign.objects.filter(cliente_id=cliente_id).select_related("cliente").order_by("-created_at")
+    campaigns = (
+        Campaign.objects.filter(cliente_id=cliente_id)
+        .select_related("cliente")
+        .order_by("-created_at")
+    )
 
     campaigns_with_stats = []
     for c in campaigns:
@@ -3228,7 +3232,7 @@ def relatorios_campanhas(request: HttpRequest, cliente_id: int) -> HttpResponse:
         .distinct()
     )
     campaigns = (
-        Campaign.objects.filter(cliente_id=cliente_id)
+        Campaign.objects.filter(cliente_id=cliente_id, media_type=Campaign.MediaType.OFFLINE)
         .exclude(id__in=digital_campaign_ids)
         .select_related("cliente")
         .order_by("-created_at")
