@@ -309,34 +309,7 @@
   }
   .funnel-drop .drop-value { color: #ef4444; font-size: 12px; }
 
-  /* ──── BLOCO 5: Alerts ──── */
-  .alerts-list { display: flex; flex-direction: column; gap: 12px; }
-  .alert-card {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 16px 20px;
-    border-radius: 12px;
-    border: 1px solid;
-  }
-  .alert-card.critical { background: rgba(239,68,68,0.06); border-color: rgba(239,68,68,0.3); }
-  .alert-card.warning { background: rgba(245,158,11,0.06); border-color: rgba(245,158,11,0.3); }
-  .alert-card.info { background: rgba(59,130,246,0.06); border-color: rgba(59,130,246,0.3); }
-  .alert-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-  .alert-card.critical .alert-icon { background: rgba(239,68,68,0.15); color: #ef4444; }
-  .alert-card.warning .alert-icon { background: rgba(245,158,11,0.15); color: #d97706; }
-  .alert-card.info .alert-icon { background: rgba(59,130,246,0.15); color: #3b82f6; }
-  .alert-content { flex: 1; min-width: 0; }
-  .alert-title { font-size: 13px; font-weight: 700; color: var(--text-primary); }
-  .alert-text { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  /* ──── BLOCO 5: Alerts → estilos movidos para bloco al-* abaixo ──── */
 
   /* ──── Stats summary ──── */
   .stats-bar {
@@ -683,6 +656,10 @@
       <input type="date" id="dateTo" name="date_to" value="{{ date_to }}">
     </div>
     <button type="submit" class="btn-filter">Filtrar</button>
+    <a href="{% url 'web:analytics' %}" class="btn-filter" style="background:#e5e7eb;color:#111827;text-decoration:none;display:inline-flex;align-items:center;">Limpar</a>
+    <button type="button" class="btn-filter" onclick="window.print()" style="margin-left:8px;display:flex;align-items:center;gap:6px;">
+      🧠 Gerar Relatório Executivo
+    </button>
   </form>
   <div class="analytics-section">
     <div class="empty-state">
@@ -708,6 +685,7 @@
       <input type="date" id="dateTo" name="date_to" value="{{ date_to }}">
     </div>
     <button type="submit" class="btn-filter">Filtrar</button>
+    <a href="{% url 'web:analytics' %}" id="btnClearDates" class="btn-filter" style="background:#e5e7eb;color:#111827;text-decoration:none;display:inline-flex;align-items:center;margin-left:8px;">Limpar</a>
   </form>
 
   <!-- Stats Bar -->
@@ -779,52 +757,228 @@
           <div class="breakdown-bar">
             <div class="fill {% if item.score >= 60 %}high{% elif item.score >= 35 %}mid{% else %}low{% endif %}" style="width: {{ item.score }}%"></div>
           </div>
+          {% if item.benchmark is not None and item.current is not None %}
+          <div style="display:flex;justify-content:space-between;gap:10px;margin-top:6px;font-size:12px;color:var(--text-secondary);">
+            <div>Benchmark Mercado: 
+              {% if item.unit == '%' %}{{ item.benchmark|floatformat:1 }}%{% elif item.unit == 'R$' %}R$ {{ item.benchmark|floatformat:2 }}{% else %}{{ item.benchmark }}{% endif %}
+            </div>
+            <div>Atual: 
+              {% if item.unit == '%' %}{{ item.current|floatformat:2 }}%{% elif item.unit == 'R$' %}R$ {{ item.current|floatformat:2 }}{% else %}{{ item.current }}{% endif %}
+            </div>
+          </div>
+          {% endif %}
         </div>
         {% endfor %}
       </div>
+
+      <div style="margin-top:10px; background: var(--surface-2); border:1px solid var(--border-color); border-radius:10px; padding:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:13px;font-weight:800;color:var(--text-primary);">Status: {{ score_label }}</div>
+          <div style="font-size:13px;color:var(--text-primary);font-weight:800;">{{ perf_score }}/100</div>
+        </div>
+        <div style="margin-top:8px; font-size:12px; color:var(--text-secondary); display:flex; gap:12px; flex-wrap:wrap;">
+          <span><strong>85+</strong> Excelente</span>
+          <span><strong>70–84</strong> Bom</span>
+          <span><strong>50–69</strong> Regular</span>
+          <span><strong>&lt;50</strong> Crítico</span>
+        </div>
+      </div>
+      {% if score_deficits %}
+      <div style="margin-top:12px;background:#fff1f2;border:1px solid #fecdd3;border-left:4px solid #fb7185;border-radius:10px; padding:12px;">
+        <div style="font-size:12px;font-weight:800;color:#b91c1c;margin-bottom:8px;text-transform:uppercase;letter-spacing:.3px;">Impacto Negativo</div>
+        {% for d in score_deficits %}
+          <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;align-items:center;">
+            <span>- {{ d.label }}</span>
+            <span style="color:#b91c1c;font-weight:900;">-{{ d.points }} pts</span>
+          </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
     </div>
   </div>
 
   <!-- ════════════════════════════════════════════════ -->
   <!-- BLOCO 5: ALERTAS AUTOMATICOS                     -->
   <!-- ════════════════════════════════════════════════ -->
-  {% if alerts %}
-  <div class="analytics-section">
-    <div class="section-header">
-      <div class="section-icon" style="background: linear-gradient(135deg, #fecaca, #fca5a5); color: #b91c1c;">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- ════════════════════════════════════════════════ -->
+<!-- BLOCO: ALERTAS AUTOMÁTICOS (UX melhorado)        -->
+<!-- ════════════════════════════════════════════════ -->
+{% if alerts %}
+<div class="analytics-section">
+
+  <!-- Cabeçalho -->
+  <div class="al-header">
+    <div class="al-header-left">
+      <div class="section-icon" style="background: linear-gradient(135deg, #fee2e2, #fecaca); color: #dc2626;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path>
           <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
         </svg>
       </div>
-      Alertas Automaticos
-      <span class="section-badge" style="background:rgba(239,68,68,0.12);color:#b91c1c;">{{ alerts|length }} alerta{{ alerts|length|pluralize:"s" }}</span>
-    </div>
-    <div class="alerts-list">
-      {% for a in alerts %}
-      <div class="alert-card {{ a.severity }}">
-        <div class="alert-icon">
-          {% if a.icon == "alert-circle" %}
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-          {% elif a.icon == "alert-triangle" %}
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-          {% elif a.icon == "clock" %}
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-          {% elif a.icon == "trending-down" %}
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
-          {% else %}
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-          {% endif %}
-        </div>
-        <div class="alert-content">
-          <div class="alert-title">{{ a.title }}</div>
-          <div class="alert-text">{{ a.text }}</div>
-        </div>
+      <div>
+        <div class="al-title">Alertas Automáticos</div>
+        <div class="al-subtitle">Priorize riscos e aja rápido com ações recomendadas.</div>
       </div>
-      {% endfor %}
+    </div>
+    <div class="al-pills">
+      <span class="al-pill active" data-filter="all">
+        <span class="al-dot"></span> Todos <b>{{ alert_counts.all }}</b>
+      </span>
+      <span class="al-pill al-pill-critical" data-filter="critical">
+        <span class="al-dot al-dot-critical"></span> Crítico <b>{{ alert_counts.critical }}</b>
+      </span>
+      <span class="al-pill al-pill-warning" data-filter="warning">
+        <span class="al-dot al-dot-warning"></span> Atenção <b>{{ alert_counts.warning }}</b>
+      </span>
+      <span class="al-pill al-pill-info" data-filter="info">
+        <span class="al-dot al-dot-info"></span> Informativo <b>{{ alert_counts.info }}</b>
+      </span>
     </div>
   </div>
-  {% endif %}
+
+  <div class="al-wrap">
+
+    <!-- CRÍTICO -->
+    {% if alerts_grouped.critical %}
+    <div class="al-group" data-group="critical">
+      <div class="al-group-header">
+        <div class="al-group-label critical"><span class="al-dot al-dot-critical"></span> CRÍTICO</div>
+        <div class="al-group-count">{{ alerts_grouped.critical|length }} alerta{{ alerts_grouped.critical|length|pluralize:"s" }}</div>
+      </div>
+      <div class="al-list">
+        {% for a in alerts_grouped.critical %}
+        <div class="al-card critical" data-severity="critical">
+          <div class="al-icon critical">
+            {% if a.icon == "trending-down" %}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>
+                <polyline points="17 18 23 18 23 12"></polyline>
+              </svg>
+            {% else %}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+            {% endif %}
+          </div>
+          <div class="al-body">
+            <div class="al-head">
+              <span class="al-card-title">{{ a.title }}</span>
+              <span class="al-badge critical">CRÍTICO</span>
+            </div>
+            <p class="al-text">{{ a.text }}</p>
+            {% if a.impact_pct %}
+            <div class="al-impact">
+              <span class="al-impact-label">Impacto estimado</span>
+              <span class="al-impact-value">-{{ a.impact_pct }}% em {{ a.impact_window|default:"7" }} dias</span>
+            </div>
+            {% endif %}
+            <div class="al-actions">
+              {% if a.action_url %}<a href="{{ a.action_url }}" class="al-btn al-btn-primary">Ver detalhes</a>
+              {% else %}<button class="al-btn al-btn-primary" type="button">Ver detalhes</button>{% endif %}
+              {% if a.sync_url %}<a href="{{ a.sync_url }}" class="al-btn">Sincronizar</a>
+              {% else %}<button class="al-btn" type="button">Sincronizar</button>{% endif %}
+              {% if a.resolve_url %}<a href="{{ a.resolve_url }}" class="al-btn">Marcar resolvido</a>
+              {% else %}<button class="al-btn" type="button">Marcar resolvido</button>{% endif %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- ATENÇÃO -->
+    {% if alerts_grouped.warning %}
+    <div class="al-group" data-group="warning">
+      <div class="al-group-header">
+        <div class="al-group-label warning"><span class="al-dot al-dot-warning"></span> ATENÇÃO</div>
+        <div class="al-group-count">{{ alerts_grouped.warning|length }} alerta{{ alerts_grouped.warning|length|pluralize:"s" }}</div>
+      </div>
+      <div class="al-list">
+        {% for a in alerts_grouped.warning %}
+        <div class="al-card warning" data-severity="warning">
+          <div class="al-icon warning">
+            {% if a.icon == "clock" %}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+            {% else %}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+            {% endif %}
+          </div>
+          <div class="al-body">
+            <div class="al-head">
+              <span class="al-card-title">{{ a.title }}</span>
+              <span class="al-badge warning">ATENÇÃO</span>
+            </div>
+            <p class="al-text">{{ a.text }}</p>
+            {% if a.impact_pct %}
+            <div class="al-impact">
+              <span class="al-impact-label">Impacto estimado</span>
+              <span class="al-impact-value">-{{ a.impact_pct }}% em {{ a.impact_window|default:"7" }} dias</span>
+            </div>
+            {% endif %}
+            <div class="al-actions">
+              {% if a.action_url %}<a href="{{ a.action_url }}" class="al-btn al-btn-primary">Ver detalhes</a>
+              {% else %}<button class="al-btn al-btn-primary" type="button">Ver detalhes</button>{% endif %}
+              {% if a.resolve_url %}<a href="{{ a.resolve_url }}" class="al-btn">Marcar resolvido</a>
+              {% else %}<button class="al-btn" type="button">Marcar resolvido</button>{% endif %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- INFORMATIVO -->
+    {% if alerts_grouped.info %}
+    <div class="al-group" data-group="info">
+      <div class="al-group-header">
+        <div class="al-group-label info"><span class="al-dot al-dot-info"></span> INFORMATIVO</div>
+        <div class="al-group-count">{{ alerts_grouped.info|length }} alerta{{ alerts_grouped.info|length|pluralize:"s" }}</div>
+      </div>
+      <div class="al-list">
+        {% for a in alerts_grouped.info %}
+        <div class="al-card info" data-severity="info">
+          <div class="al-icon info">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+          </div>
+          <div class="al-body">
+            <div class="al-head">
+              <span class="al-card-title">{{ a.title }}</span>
+              <span class="al-badge info">INFO</span>
+            </div>
+            <p class="al-text">{{ a.text }}</p>
+            <div class="al-actions">
+              {% if a.action_url %}<a href="{{ a.action_url }}" class="al-btn al-btn-primary">Ver detalhes</a>
+              {% else %}<button class="al-btn al-btn-primary" type="button">Ver detalhes</button>{% endif %}
+              {% if a.resolve_url %}<a href="{{ a.resolve_url }}" class="al-btn">Marcar resolvido</a>
+              {% else %}<button class="al-btn" type="button">Marcar resolvido</button>{% endif %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endif %}
+
 
   <!-- ════════════════════════════════════════════════ -->
   <!-- BLOCO 2: INSIGHTS AUTOMATICOS                    -->
@@ -905,6 +1059,12 @@
             <span class="rec-priority {{ rec.priority }}">{{ rec.priority }}</span>
           </div>
           <div class="rec-text">{{ rec.text }}</div>
+          {% if rec.impact is not None %}
+          <div class="rec-text" style="color:#065f46;">Impacto estimado: +{{ rec.impact }}% conversões</div>
+          {% endif %}
+          {% if rec.confidence is not None %}
+          <div class="rec-text" style="color:#334155;">Confiança do modelo: {{ rec.confidence }}%</div>
+          {% endif %}
           <div class="rec-action">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
             {{ rec.action }}
@@ -943,6 +1103,9 @@
             <div>perda</div>
           {% endif %}
         </div>
+        {% if step.cost_label %}
+        <div class="funnel-cost" style="width:140px;text-align:right;color:var(--text-secondary);font-size:12px;font-weight:700;">{{ step.cost_label }}</div>
+        {% endif %}
       </div>
       {% endfor %}
     </div>
@@ -1035,6 +1198,23 @@
         <div class="comp-prev">Anterior: R$ {{ historical.investment.prev|floatformat:2 }}</div>
       </div>
     </div>
+    <div style="margin-top:12px; display:grid; grid-template-columns: repeat(auto-fill,minmax(220px,1fr)); gap:10px;">
+      <div class="comp-card">
+        <div class="comp-label">CTR vs Meta</div>
+        <div class="comp-value">{{ global_ctr }}% / {{ targets.ctr }}%</div>
+        <div class="comp-prev">Benchmark: {{ benchmarks.ctr }}%</div>
+      </div>
+      <div class="comp-card">
+        <div class="comp-label">CPC vs Meta</div>
+        <div class="comp-value">R$ {{ global_cpc|floatformat:2 }} / R$ {{ targets.cpc|floatformat:2 }}</div>
+        <div class="comp-prev">Benchmark: R$ {{ benchmarks.cpc|floatformat:2 }}</div>
+      </div>
+      <div class="comp-card">
+        <div class="comp-label">CPM vs Meta</div>
+        <div class="comp-value">R$ {{ cpm|floatformat:2 }} / R$ {{ targets.cpm|floatformat:2 }}</div>
+        <div class="comp-prev">Benchmark: R$ {{ benchmarks.cpm|floatformat:2 }}</div>
+      </div>
+    </div>
   </div>
   {% endif %}
 
@@ -1067,6 +1247,7 @@
             <th data-col="cpm" data-type="num" class="num">CPM <span class="sort-icon">&#9650;&#9660;</span></th>
             <th data-col="roi" data-type="num" class="num">Cliq/R$ <span class="sort-icon">&#9650;&#9660;</span></th>
             <th data-col="score" data-type="num" class="num">Score <span class="sort-icon">&#9650;&#9660;</span></th>
+            <th data-col="recommendation" data-type="text">Recomendação Automática</th>
           </tr>
         </thead>
         <tbody>
@@ -1081,7 +1262,12 @@
             <td class="num" data-value="{{ ch.roi }}">{{ ch.roi }}</td>
             <td class="num" data-value="{{ ch.score }}">
               <span class="score-pill {% if ch.score >= 60 %}high{% elif ch.score >= 35 %}mid{% else %}low{% endif %}">{{ ch.score }}</span>
+              {% if ch.score >= 60 %}<span style="margin-left:8px">🟢 Excelente</span>
+              {% elif ch.score >= 35 %}<span style="margin-left:8px">🟡 Regular</span>
+              {% else %}<span style="margin-left:8px">🔴 Ineficiente</span>
+              {% endif %}
             </td>
+            <td>{{ ch.recommendation }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -1131,6 +1317,22 @@
             <span class="sim-slider-value" id="simMetaLabel">0%</span>
           </div>
           <input type="range" class="sim-slider" id="simMetaSlider" min="-50" max="100" value="0" step="5">
+        </div>
+
+        <div class="sim-slider-group">
+          <div class="sim-slider-label">
+            <span>Redução de CPM</span>
+            <span class="sim-slider-value" id="simCpmLabel">0%</span>
+          </div>
+          <input type="range" class="sim-slider" id="simCpmSlider" min="-50" max="0" value="0" step="5">
+        </div>
+
+        <div class="sim-slider-group">
+          <div class="sim-slider-label">
+            <span>Aumento de CTR</span>
+            <span class="sim-slider-value" id="simCtrIncLabel">0%</span>
+          </div>
+          <input type="range" class="sim-slider" id="simCtrIncSlider" min="0" max="50" value="0" step="5">
         </div>
 
         <button class="sim-btn" id="simResetBtn" type="button">
@@ -1185,12 +1387,36 @@
   <!-- TENDENCIA (Chart.js)                             -->
   <!-- ════════════════════════════════════════════════ -->
   <div class="chart-container">
-    <div class="chart-title">Tendencia: Impressoes & Cliques</div>
+    <div class="chart-title">Tendencia: Impressoes & Cliques
+      {% if trend_signal == 'up' %}
+        <span style="margin-left:12px;color:#16a34a;font-weight:800;">↗ Tendência de alta</span>
+      {% elif trend_signal == 'down' %}
+        <span style="margin-left:12px;color:#b91c1c;font-weight:800;">↘ Tendência de queda</span>
+      {% else %}
+        <span style="margin-left:12px;color:#64748b;font-weight:700;">↔ Estável</span>
+      {% endif %}
+    </div>
     <canvas id="trendChart" height="260"></canvas>
   </div>
 
   {% endif %}
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var btn = document.getElementById('btnClearDates');
+  if (btn) {
+    btn.addEventListener('click', function() {
+      var f = document.getElementById('dateFrom');
+      var t = document.getElementById('dateTo');
+      if (f) f.value = '';
+      if (t) t.value = '';
+      var form = this.closest('form');
+      if (form) form.submit();
+    });
+  }
+});
+</script>
 
 {% if not require_cliente and not no_data %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
@@ -1235,6 +1461,16 @@
             fill: true,
             tension: 0.3,
             yAxisID: 'y1',
+          },
+          {
+            label: 'MM7 Impressoes',
+            data: {{ trend_ma7_json|safe }},
+            borderColor: '#0ea5e9',
+            borderDash: [6,4],
+            backgroundColor: 'rgba(14,165,233,0.05)',
+            fill: false,
+            tension: 0.2,
+            yAxisID: 'y',
           }
         ]
       },
@@ -1298,6 +1534,8 @@
   var simData = {{ sim_data_json|safe }};
   var googleSlider = document.getElementById('simGoogleSlider');
   var metaSlider = document.getElementById('simMetaSlider');
+  var cpmSlider = document.getElementById('simCpmSlider');
+  var ctrIncSlider = document.getElementById('simCtrIncSlider');
   var resetBtn = document.getElementById('simResetBtn');
 
   if (googleSlider && metaSlider && simData) {
@@ -1310,9 +1548,13 @@
     function updateSim() {
       var gPct = parseInt(googleSlider.value) / 100;
       var mPct = parseInt(metaSlider.value) / 100;
+      var cpmPct = parseInt(cpmSlider ? cpmSlider.value : 0) / 100; // negative
+      var ctrIncPct = parseInt(ctrIncSlider ? ctrIncSlider.value : 0) / 100; // positive
 
       document.getElementById('simGoogleLabel').textContent = (gPct >= 0 ? '+' : '') + (gPct * 100).toFixed(0) + '%';
       document.getElementById('simMetaLabel').textContent = (mPct >= 0 ? '+' : '') + (mPct * 100).toFixed(0) + '%';
+      if (cpmSlider) document.getElementById('simCpmLabel').textContent = (cpmPct * 100).toFixed(0) + '%';
+      if (ctrIncSlider) document.getElementById('simCtrIncLabel').textContent = '+' + (ctrIncPct * 100).toFixed(0) + '%';
 
       // Estimate: budget change → proportional change in impressions/clicks (using historical CPM/CPC)
       var gCost = simData.google.cost * (1 + gPct);
@@ -1320,13 +1562,17 @@
       var newTotalCost = gCost + mCost;
 
       // Impressions estimated from CPM
-      var gImp = simData.google.cpm > 0 ? Math.round(gCost / simData.google.cpm * 1000) : simData.google.impressions;
-      var mImp = simData.meta.cpm > 0 ? Math.round(mCost / simData.meta.cpm * 1000) : simData.meta.impressions;
+      var gCpmEff = simData.google.cpm * (1 + cpmPct);
+      var mCpmEff = simData.meta.cpm * (1 + cpmPct);
+      var gImp = gCpmEff > 0 ? Math.round(gCost / gCpmEff * 1000) : simData.google.impressions;
+      var mImp = mCpmEff > 0 ? Math.round(mCost / mCpmEff * 1000) : simData.meta.impressions;
       var newImp = gImp + mImp;
 
       // Clicks estimated from CPC
-      var gClk = simData.google.cpc > 0 ? Math.round(gCost / simData.google.cpc) : simData.google.clicks;
-      var mClk = simData.meta.cpc > 0 ? Math.round(mCost / simData.meta.cpc) : simData.meta.clicks;
+      var gClkBase = simData.google.cpc > 0 ? Math.round(gCost / simData.google.cpc) : simData.google.clicks;
+      var mClkBase = simData.meta.cpc > 0 ? Math.round(mCost / simData.meta.cpc) : simData.meta.clicks;
+      var gClk = Math.round(gClkBase * (1 + ctrIncPct));
+      var mClk = Math.round(mClkBase * (1 + ctrIncPct));
       var newClk = gClk + mClk;
 
       var newCtr = newImp > 0 ? (newClk / newImp * 100) : 0;
@@ -1363,14 +1609,274 @@
 
     googleSlider.addEventListener('input', updateSim);
     metaSlider.addEventListener('input', updateSim);
+    if (cpmSlider) cpmSlider.addEventListener('input', updateSim);
+    if (ctrIncSlider) ctrIncSlider.addEventListener('input', updateSim);
     resetBtn.addEventListener('click', function() {
       googleSlider.value = 0;
       metaSlider.value = 0;
+      if (cpmSlider) cpmSlider.value = 0;
+      if (ctrIncSlider) ctrIncSlider.value = 0;
       updateSim();
     });
     updateSim();
   }
 })();
+(function(){
+  const pills  = document.querySelectorAll('.al-pill');
+  const groups = document.querySelectorAll('.al-group');
+
+  function setActive(filter){
+    pills.forEach(p => p.classList.toggle('active', p.dataset.filter === filter));
+    if(filter === 'all'){
+      groups.forEach(g => g.style.display = '');
+      return;
+    }
+    groups.forEach(g => g.style.display = (g.dataset.group === filter ? '' : 'none'));
+  }
+
+  pills.forEach(p => p.addEventListener('click', () => setActive(p.dataset.filter)));
+  setActive('all');
+})();
 </script>
+<style>
+/* ═══════════════════════════════════════════════════
+   ALERTAS — padrão da plataforma (prefixo al-*)
+   ═══════════════════════════════════════════════════ */
+
+/* Header do bloco */
+.al-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.al-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.al-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+.al-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  font-weight: 500;
+}
+
+/* Ponto colorido */
+.al-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--text-secondary);
+  flex-shrink: 0;
+}
+.al-dot-critical { background: #dc2626; }
+.al-dot-warning  { background: #d97706; }
+.al-dot-info     { background: #2563eb; }
+
+/* Pills de filtro */
+.al-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.al-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s;
+}
+.al-pill b {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.al-pill:hover,
+.al-pill.active {
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+  background: rgba(93, 59, 227, 0.06);
+}
+.al-pill.active b { color: var(--brand-primary); }
+
+/* Grupos */
+.al-wrap { display: flex; flex-direction: column; gap: 14px; }
+
+.al-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 8px;
+}
+.al-group-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+}
+.al-group-label.critical { color: #dc2626; }
+.al-group-label.warning  { color: #d97706; }
+.al-group-label.info     { color: #2563eb; }
+.al-group-count {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+/* Cards */
+.al-list { display: flex; flex-direction: column; gap: 8px; }
+
+.al-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+}
+.al-card::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+}
+.al-card.critical::before { background: #dc2626; }
+.al-card.warning::before  { background: #d97706; }
+.al-card.info::before     { background: #2563eb; }
+
+/* Ícone */
+.al-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+  margin-left: 4px;
+}
+.al-icon.critical { background: rgba(220, 38, 38, 0.10); color: #dc2626; }
+.al-icon.warning  { background: rgba(217, 119, 6, 0.10);  color: #d97706; }
+.al-icon.info     { background: rgba(37, 99, 235, 0.10);   color: #2563eb; }
+
+/* Corpo */
+.al-body { flex: 1; min-width: 0; }
+
+.al-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.al-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+.al-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.al-badge.critical { background: rgba(220, 38, 38, 0.10); color: #dc2626; }
+.al-badge.warning  { background: rgba(217, 119, 6, 0.10);  color: #d97706; }
+.al-badge.info     { background: rgba(37, 99, 235, 0.10);   color: #2563eb; }
+
+.al-text {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+/* Impacto */
+.al-impact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: var(--surface-2);
+  border-radius: 8px;
+  font-size: 12px;
+  gap: 12px;
+}
+.al-impact-label { color: var(--text-secondary); font-weight: 600; }
+.al-impact-value { color: var(--text-primary); font-weight: 700; }
+
+/* Ações */
+.al-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.al-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.15s;
+  border: 1px solid var(--border-color);
+  background: var(--surface);
+  color: var(--text-secondary);
+}
+.al-btn:hover {
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+  background: rgba(93, 59, 227, 0.04);
+}
+.al-btn-primary {
+  background: var(--brand-primary);
+  color: white;
+  border-color: var(--brand-primary);
+  box-shadow: 0 2px 8px rgba(93, 59, 227, 0.25);
+}
+.al-btn-primary:hover {
+  background: #4c2bc2;
+  border-color: #4c2bc2;
+  color: white;
+}
+</style>
 {% endif %}
 {% endblock %}

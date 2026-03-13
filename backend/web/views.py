@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.contrib.auth.decorators import login_required
 from django.db import models
+from django.db.models.functions import TruncMonth
 from django.db.models import Count, Max, Min, Sum
 from django.db.models.functions import TruncDate, TruncHour
 from django.http import HttpRequest, HttpResponse, JsonResponse
@@ -384,20 +385,128 @@ def dashboard(request: HttpRequest) -> HttpResponse:
 
     # ========== DADOS PARA GRÁFICOS ==========
 
-    # 1. Evolução de Inserções por Dia (últimos 30 dias)
-    thirty_days_ago = today - timedelta(days=30)
-    insertions_by_day = list(
+    # 1. Evolução de Inserções por Dia (seleção customizada ou últimos 30 dias)
+    from datetime import datetime as _dt
+    cmp_from_param = request.GET.get("cmp_from", "")
+    cmp_to_param = request.GET.get("cmp_to", "")
+    try:
+        cmp_from = _dt.strptime(cmp_from_param, "%Y-%m-%d").date() if cmp_from_param else None
+    except ValueError:
+        cmp_from = None
+    try:
+        cmp_to = _dt.strptime(cmp_to_param, "%Y-%m-%d").date() if cmp_to_param else None
+    except ValueError:
+        cmp_to = None
+
+    if not cmp_from or not cmp_to or cmp_from > cmp_to:
+        cmp_to = today
+        cmp_from = today - timedelta(days=30)
+
+    # Current period series
+    cur_days = []
+    d = cmp_from
+    while d <= cmp_to:
+        cur_days.append(d)
+        d += timedelta(days=1)
+    cur_qs = (
         PlacementDay.objects.filter(
             placement_line__campaign__in=campaigns_qs,
-            date__gte=thirty_days_ago,
-            date__lte=today,
+            date__gte=cmp_from,
+            date__lte=cmp_to,
         )
         .values("date")
         .annotate(total=Sum("insertions"))
-        .order_by("date")
     )
-    days_labels = [item["date"].strftime("%d/%m") for item in insertions_by_day]
-    days_insertions = [item["total"] for item in insertions_by_day]
+    cur_map = {row["date"]: int(row["total"] or 0) for row in cur_qs}
+    days_labels = [d.strftime("%d/%m") for d in cur_days]
+    days_insertions = [cur_map.get(d, 0) for d in cur_days]
+
+    # Previous period series (mesmo tamanho imediatamente anterior)
+    period_len = (cmp_to - cmp_from).days + 1
+    prev_to = cmp_from - timedelta(days=1)
+    prev_from = prev_to - timedelta(days=period_len - 1)
+    prev_days = []
+    d2 = prev_from
+    while d2 <= prev_to:
+        prev_days.append(d2)
+        d2 += timedelta(days=1)
+    prev_qs = (
+        PlacementDay.objects.filter(
+            placement_line__campaign__in=campaigns_qs,
+            date__gte=prev_from,
+            date__lte=prev_to,
+        )
+        .values("date")
+        .annotate(total=Sum("insertions"))
+    )
+    prev_map = {row["date"]: int(row["total"] or 0) for row in prev_qs}
+    cmp_previous = [prev_map.get(d, 0) for d in prev_days]
+
+    # Resumo de comparação
+    cur_total = sum(days_insertions)
+    prev_total = sum(cmp_previous)
+    if prev_total > 0:
+        cmp_pct = round(((cur_total - prev_total) / prev_total) * 100, 1)
+    else:
+        cmp_pct = 0
+    cmp_summary = {
+        "from": cmp_from.strftime("%Y-%m-%d"),
+        "to": cmp_to.strftime("%Y-%m-%d"),
+        "cur_total": cur_total,
+        "prev_total": prev_total,
+        "pct": cmp_pct,
+        "dir": "up" if cmp_pct > 0 else ("down" if cmp_pct < 0 else "neutral"),
+    }
+
+    # 1b. Evolução Mensal de Inserções (últimos 12 meses)
+    from datetime import date
+    def _month_shift(base: date, months: int) -> date:
+        y = base.year + (base.month - 1 + months) // 12
+        m = (base.month - 1 + months) % 12 + 1
+        return date(y, m, 1)
+
+    start_month = _month_shift(today.replace(day=1), -11)
+    months_qs = (
+        PlacementDay.objects.filter(
+            placement_line__campaign__in=campaigns_qs,
+            date__gte=start_month,
+            date__lte=today,
+        )
+        .annotate(month=TruncMonth("date"))
+        .values("month")
+        .annotate(total=Sum("insertions"))
+        .order_by("month")
+    )
+    months_map = {row["month"].strftime("%m/%y"): int(row["total"] or 0) for row in months_qs}
+    months_labels = []
+    months_insertions = []
+    for i in range(12):
+        m_date = _month_shift(start_month, i)
+        label = m_date.strftime("%m/%y")
+        months_labels.append(label)
+        months_insertions.append(months_map.get(label, 0))
+
+    # Comparativo mês atual vs anterior
+    months_compare = {
+        "cur_label": months_labels[-1] if months_labels else "",
+        "prev_label": months_labels[-2] if len(months_labels) >= 2 else "",
+        "cur": months_insertions[-1] if months_insertions else 0,
+        "prev": months_insertions[-2] if len(months_insertions) >= 2 else 0,
+        "delta": 0,
+        "pct": 0,
+        "dir": "neutral",
+    }
+    try:
+        months_compare["delta"] = months_compare["cur"] - months_compare["prev"]
+        if months_compare["prev"] > 0:
+            pct = (months_compare["delta"] / months_compare["prev"]) * 100
+            months_compare["pct"] = round(pct, 1)
+            months_compare["dir"] = "up" if pct > 0 else ("down" if pct < 0 else "neutral")
+        else:
+            months_compare["pct"] = 0
+            months_compare["dir"] = "neutral"
+    except Exception:
+        pass
 
     # 2. Investimento por Região (donut)
     region_investments = list(
@@ -485,6 +594,13 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             # Dados para gráficos
             "days_labels": json.dumps(days_labels),
             "days_insertions": json.dumps(days_insertions),
+            "cmp_previous": json.dumps(cmp_previous),
+            "cmp_summary": cmp_summary,
+            "cmp_from": cmp_from.strftime("%Y-%m-%d"),
+            "cmp_to": cmp_to.strftime("%Y-%m-%d"),
+            "months_labels": json.dumps(months_labels),
+            "months_insertions": json.dumps(months_insertions),
+            "months_compare": months_compare,
             "region_labels": json.dumps(region_labels),
             "region_values": json.dumps(region_values),
             "pracas_labels": json.dumps(pracas_labels),
@@ -1481,6 +1597,27 @@ def analytics(request: HttpRequest) -> HttpResponse:
     trend_imp = [d["imp"] or 0 for d in daily_data]
     trend_clk = [d["clk"] or 0 for d in daily_data]
 
+    # Moving average 7d and trend signal
+    def _ma7(series):
+        out = []
+        for i in range(len(series)):
+            window = series[max(0, i - 6): i + 1]
+            avg = sum(window) / len(window) if window else 0
+            out.append(round(avg, 2))
+        return out
+
+    trend_ma7 = _ma7(trend_imp)
+    trend_signal = "estavel"
+    if len(trend_ma7) >= 14:
+        recent_avg = sum(trend_ma7[-7:]) / 7
+        prev_avg = sum(trend_ma7[-14:-7]) / 7
+        if prev_avg > 0:
+            change = (recent_avg - prev_avg) / prev_avg * 100
+            if change > 5:
+                trend_signal = "up"
+            elif change < -5:
+                trend_signal = "down"
+
     # ──────────────────────────────────────────────────
     # BLOCO 1: DIAGNÓSTICO AUTOMÁTICO (Performance Score)
     # ──────────────────────────────────────────────────
@@ -1549,17 +1686,40 @@ def analytics(request: HttpRequest) -> HttpResponse:
         score_label = "Precisa Melhorar"
 
     score_breakdown = [
-        {"label": "CTR", "weight": "25%", "score": round(ctr_score), "max": 100},
-        {"label": "CPC", "weight": "20%", "score": round(cpc_score), "max": 100},
-        {"label": "CPM / Alcance", "weight": "25%", "score": round(cpm_score), "max": 100},
-        {"label": "Atividade", "weight": "20%", "score": round(activity_score), "max": 100},
-        {"label": "Consistencia", "weight": "10%", "score": round(consistency_score), "max": 100},
+        {"key": "ctr", "label": "CTR", "weight": "25%", "score": round(ctr_score), "max": 100, "benchmark": BENCH_CTR, "current": global_ctr, "unit": "%"},
+        {"key": "cpc", "label": "CPC", "weight": "20%", "score": round(cpc_score), "max": 100, "benchmark": BENCH_CPC, "current": global_cpc, "unit": "R$"},
+        {"key": "cpm", "label": "CPM / Alcance", "weight": "25%", "score": round(cpm_score), "max": 100, "benchmark": BENCH_CPM, "current": cpm, "unit": "R$"},
+        {"key": "activity", "label": "Atividade", "weight": "20%", "score": round(activity_score), "max": 100},
+        {"key": "consistency", "label": "Consistencia", "weight": "10%", "score": round(consistency_score), "max": 100},
     ]
+
+    # Explainable negative impacts (deductions in points out of 100)
+    def _deduction(weight_pct: float, score_val: float) -> int:
+        max_pts = int(weight_pct * 100)
+        contrib = int(round(score_val * weight_pct))
+        return max(0, max_pts - contrib)
+
+    negative_impacts: list[dict] = []
+    d_cpm = _deduction(0.25, cpm_score)
+    if d_cpm >= 5:
+        negative_impacts.append({"label": "CPM elevado", "points": d_cpm})
+    d_cpc = _deduction(0.20, cpc_score)
+    if d_cpc >= 5:
+        negative_impacts.append({"label": "CPC elevado", "points": d_cpc})
+    d_ctr = _deduction(0.25, ctr_score)
+    if d_ctr >= 5:
+        negative_impacts.append({"label": "CTR abaixo do benchmark", "points": d_ctr})
+    d_act = _deduction(0.20, activity_score)
+    if d_act >= 5:
+        negative_impacts.append({"label": "Baixa atividade", "points": d_act})
+    d_cons = _deduction(0.10, consistency_score)
+    if d_cons >= 5:
+        negative_impacts.append({"label": "Falta de consistencia", "points": d_cons})
 
     # ──────────────────────────────────────────────────
     # BLOCO 2: INSIGHTS AUTOMÁTICOS
     # ──────────────────────────────────────────────────
-    insights = []
+    insights: list[dict] = []
 
     # Insight: CTR above/below benchmark
     if global_ctr >= BENCH_CTR * 1.5:
@@ -1630,6 +1790,7 @@ def analytics(request: HttpRequest) -> HttpResponse:
             })
 
     # Insight: Consistency trend
+    recent_drop_points = 0
     if len(trend_imp) >= 7:
         last_7 = trend_imp[-7:]
         prev_7 = trend_imp[-14:-7] if len(trend_imp) >= 14 else trend_imp[:7]
@@ -1651,38 +1812,91 @@ def analytics(request: HttpRequest) -> HttpResponse:
                     "title": "Queda nas impressoes",
                     "text": f"Impressoes cairam {abs(change)}% nos ultimos 7 dias comparado ao periodo anterior.",
                 })
+                # Map drop percentage to a points penalty up to 20
+                recent_drop_points = min(20, int(round(abs(change) * 0.6)))
+                if recent_drop_points >= 5:
+                    negative_impacts.append({"label": "Queda recente de impressoes", "points": recent_drop_points})
 
-    # If no insights, add a default one
-    if not insights:
+    # Positivos adicionais
+    if global_ctr >= BENCH_CTR * 1.1:
+        insights.append({
+            "type": "positive",
+            "icon": "trending-up",
+            "title": "CTR acima da media",
+            "text": f"CTR geral {global_ctr}% supera benchmark de {BENCH_CTR}%.",
+        })
+    if global_cpc > 0 and global_cpc <= BENCH_CPC * 0.8:
+        insights.append({
+            "type": "positive",
+            "icon": "dollar-sign",
+            "title": "CPC eficiente",
+            "text": f"CPC de R$ {global_cpc:.2f}, abaixo do benchmark de R$ {BENCH_CPC:.2f}.",
+        })
+
+    # Negativos adicionais
+    if cpm > BENCH_CPM * 1.2:
+        insights.append({
+            "type": "negative",
+            "icon": "alert-triangle",
+            "title": "CPM elevado",
+            "text": f"CPM em R$ {cpm:.2f} excede benchmark de R$ {BENCH_CPM:.2f}.",
+        })
+    # Concentração já pode ter sido adicionada; manter se não existir similar
+    if total_cost > 0 and len(campaign_metrics) >= 2:
+        share_top2 = (campaign_metrics[0]["cost"] + campaign_metrics[1]["cost"]) / total_cost
+        if share_top2 > 0.75:
+            insights.append({
+                "type": "warning",
+                "icon": "pie-chart",
+                "title": "Concentracao excessiva",
+                "text": f"Top 2 campanhas concentram {round(share_top2*100)}% do investimento.",
+            })
+    # 'Frequencia' proxy: muito volume com baixo CTR
+    if total_imp > 10000 and global_ctr < BENCH_CTR * 0.6:
+        insights.append({
+            "type": "negative",
+            "icon": "info",
+            "title": "Frequencia elevada (proxy)",
+            "text": "Impressoes altas com CTR baixo indicam desgaste/alta frequencia. Revise capping e criativos.",
+        })
+
+    # Balancear 3–6 insights (positivos e negativos)
+    if len(insights) < 3:
         insights.append({
             "type": "info",
             "icon": "info",
             "title": "Dados sendo analisados",
-            "text": "Continue acumulando dados para gerar insights mais precisos sobre suas campanhas.",
+            "text": "Continue acumulando dados para gerar insights mais precisos.",
         })
+    # Limitar a 6 para foco executivo
+    insights = insights[:6]
 
     # ──────────────────────────────────────────────────
     # BLOCO 3: DECISÃO RECOMENDADA
     # ──────────────────────────────────────────────────
-    recommendations = []
+    recommendations: list[dict] = []
 
     # Recommendation: Reallocate budget
     if google_agg["cpc"] > 0 and meta_agg["cpc"] > 0:
         if google_agg["cpc"] < meta_agg["cpc"] * 0.7:
             recommendations.append({
-                "priority": "high",
+            "priority": "high",
                 "icon": "refresh-cw",
                 "title": "Realocar orcamento para Google Ads",
                 "text": f"Google Ads oferece CPC {round((1 - google_agg['cpc'] / meta_agg['cpc']) * 100)}% menor. Transfira parte do budget de Meta para Google.",
                 "action": "Ajustar alocacao de budget entre plataformas",
+            "impact": 18,
+            "confidence": 82,
             })
         elif meta_agg["cpc"] < google_agg["cpc"] * 0.7:
             recommendations.append({
-                "priority": "high",
+            "priority": "high",
                 "icon": "refresh-cw",
                 "title": "Realocar orcamento para Meta Ads",
                 "text": f"Meta Ads oferece CPC {round((1 - meta_agg['cpc'] / google_agg['cpc']) * 100)}% menor. Transfira parte do budget de Google para Meta.",
                 "action": "Ajustar alocacao de budget entre plataformas",
+            "impact": 18,
+            "confidence": 82,
             })
 
     # Recommendation: Pause underperformers
@@ -1694,6 +1908,8 @@ def analytics(request: HttpRequest) -> HttpResponse:
             "title": f"Pausar {len(low_perf)} campanha(s) de baixo desempenho",
             "text": f"Campanhas com CTR abaixo de {round(BENCH_CTR * 0.3, 2)}% e mais de 1.000 impressoes. Revisao de criativos recomendada antes de reativar.",
             "action": "Pausar e revisar criativos",
+            "impact": 8,
+            "confidence": 70,
         })
 
     # Recommendation: Scale top performers
@@ -1706,6 +1922,8 @@ def analytics(request: HttpRequest) -> HttpResponse:
             "title": "Escalar campanhas de alto desempenho",
             "text": f"Campanhas com CTR acima de {round(BENCH_CTR * 1.5, 1)}% recebem pouca verba: {names}. Aumente o budget para maximizar resultados.",
             "action": "Aumentar budget das top performers",
+            "impact": 12,
+            "confidence": 75,
         })
 
     # Recommendation: Improve creatives for low CTR
@@ -1716,6 +1934,8 @@ def analytics(request: HttpRequest) -> HttpResponse:
             "title": "Revisar criativos",
             "text": f"CTR geral ({global_ctr}%) abaixo do benchmark ({BENCH_CTR}%). Teste novos formatos de anuncio, titulos e calls-to-action.",
             "action": "Testar novos criativos A/B",
+            "impact": 10,
+            "confidence": 65,
         })
 
     # Recommendation: Expand reach if high CTR but low impressions
@@ -1726,6 +1946,8 @@ def analytics(request: HttpRequest) -> HttpResponse:
             "title": "Expandir alcance",
             "text": f"Excelente CTR ({global_ctr}%) mas volume baixo ({total_imp:,} impressoes). Aumente os lances ou amplie a segmentacao.",
             "action": "Aumentar lances e audiencia",
+            "impact": 9,
+            "confidence": 60,
         })
 
     if not recommendations:
@@ -1735,6 +1957,8 @@ def analytics(request: HttpRequest) -> HttpResponse:
             "title": "Campanhas em bom estado",
             "text": "Nenhuma acao urgente identificada. Continue monitorando as metricas.",
             "action": "Acompanhar metricas semanalmente",
+            "impact": 0,
+            "confidence": 90,
         })
 
     # ──────────────────────────────────────────────────
@@ -1747,6 +1971,7 @@ def analytics(request: HttpRequest) -> HttpResponse:
         "formatted": f"{total_imp:,}".replace(",", "."),
         "pct": 100,
         "drop": None,
+        "cost_label": f"CPM: R$ {cpm:.2f}",
     })
     funnel_steps.append({
         "label": "Cliques",
@@ -1754,6 +1979,7 @@ def analytics(request: HttpRequest) -> HttpResponse:
         "formatted": f"{total_clk:,}".replace(",", "."),
         "pct": round(total_clk / total_imp * 100, 2) if total_imp > 0 else 0,
         "drop": round((1 - total_clk / total_imp) * 100, 1) if total_imp > 0 else 0,
+        "cost_label": f"CPC: R$ {global_cpc:.2f}",
     })
     # Engagement proxy: clicks with cost > 0 (qualified clicks)
     qualified_clicks = days_qs.filter(clicks__gt=0, cost__gt=0).aggregate(
@@ -1765,6 +1991,7 @@ def analytics(request: HttpRequest) -> HttpResponse:
         "formatted": f"{qualified_clicks:,}".replace(",", "."),
         "pct": round(qualified_clicks / total_imp * 100, 2) if total_imp > 0 else 0,
         "drop": round((1 - qualified_clicks / total_clk) * 100, 1) if total_clk > 0 else 0,
+        "cost_label": f"Custo/QC: R$ { (total_cost/qualified_clicks):.2f}" if qualified_clicks>0 else "Custo/QC: -",
     })
     funnel_steps.append({
         "label": "Investimento",
@@ -1787,6 +2014,8 @@ def analytics(request: HttpRequest) -> HttpResponse:
             "icon": "alert-circle",
             "title": f"{len(zero_click_camps)} campanha(s) sem cliques",
             "text": f"Campanhas com impressoes mas zero cliques. Revise urgentemente.",
+            "impact_pct": 25,
+            "impact_window": 7,
         })
 
     # Alert: CPC above limit
@@ -1798,6 +2027,8 @@ def analytics(request: HttpRequest) -> HttpResponse:
             "icon": "alert-triangle",
             "title": f"CPC acima de R$ {cpc_limit:.2f}",
             "text": f"{len(expensive_camps)} campanha(s) com custo por clique excessivo. Reavalie segmentacao e lances.",
+            "impact_pct": 10,
+            "impact_window": 14,
         })
 
     # Alert: No recent data (last 3 days)
@@ -1810,6 +2041,8 @@ def analytics(request: HttpRequest) -> HttpResponse:
             "icon": "clock",
             "title": "Sem dados recentes",
             "text": "Nenhum dado de veiculacao nos ultimos 3 dias. Verifique se as campanhas estao ativas e se a sincronizacao esta funcionando.",
+            "impact_pct": 20,
+            "impact_window": 7,
         })
 
     # Alert: Sudden drop in impressions
@@ -1822,6 +2055,8 @@ def analytics(request: HttpRequest) -> HttpResponse:
                 "icon": "trending-down",
                 "title": "Queda brusca nas impressoes",
                 "text": f"Impressoes dos ultimos 3 dias caiu {round((1 - last_3_avg / overall_avg) * 100)}% em relacao a media. Verifique status das campanhas.",
+                "impact_pct": 15,
+                "impact_window": 7,
             })
 
     # Alert: Low CTR across all campaigns
@@ -1831,6 +2066,8 @@ def analytics(request: HttpRequest) -> HttpResponse:
             "icon": "thumbs-down",
             "title": "CTR critico em todas as campanhas",
             "text": f"CTR geral de {global_ctr}% esta muito abaixo do aceitavel. Acao imediata de revisao de criativos recomendada.",
+            "impact_pct": 12,
+            "impact_window": 14,
         })
 
     # ──────────────────────────────────────────────────
@@ -1928,6 +2165,14 @@ def analytics(request: HttpRequest) -> HttpResponse:
         ch_score = round(ctr_s * 0.35 + cpc_s * 0.35 + roi_s * 0.30)
         ch_score = max(0, min(100, ch_score))
 
+        # Simple recommendation per channel
+        if ch_score >= 60 and ch_ctr >= BENCH_CTR:
+            rec_text = "Escalar investimento"
+        elif ch_cpc > BENCH_CPC * 1.3 or ch_cpm > BENCH_CPM * 1.3:
+            rec_text = "Reduzir lances / ajustar segmentacao"
+        else:
+            rec_text = "Testar novos criativos"
+
         efficiency_matrix.append({
             "channel": ch_info["label"],
             "impressions": ch_imp,
@@ -1938,13 +2183,42 @@ def analytics(request: HttpRequest) -> HttpResponse:
             "cpm": ch_cpm,
             "roi": ch_roi,
             "score": ch_score,
+            "recommendation": rec_text,
         })
     efficiency_matrix.sort(key=lambda x: x["score"], reverse=True)
+
+    # Grouped alerts and counts for UI filters
+    alerts_grouped = {
+        "critical": [a for a in alerts if a.get("severity") == "critical"],
+        "warning": [a for a in alerts if a.get("severity") == "warning"],
+        "info": [a for a in alerts if a.get("severity") == "info"],
+    }
+    alert_counts = {
+        "all": len(alerts),
+        "critical": len(alerts_grouped["critical"]),
+        "warning": len(alerts_grouped["warning"]),
+        "info": len(alerts_grouped["info"]),
+    }
 
     # ──────────────────────────────────────────────────
     # BLOCO 8: SIMULADOR DE OTIMIZAÇÃO (data for JS)
     # ──────────────────────────────────────────────────
     # Provide per-platform averages for the simulator
+    # Markets (regions) shares for optional redistribution UI
+    markets_qs = (
+        PlacementDay.objects.filter(placement_line_id__in=line_ids)
+        .values("placement_line__market")
+        .annotate(total_cost=Sum("cost"))
+        .order_by("-total_cost")
+    )
+    _tot_market_cost = sum(float(m.get("total_cost") or 0) for m in markets_qs)
+    markets_data = []
+    if _tot_market_cost > 0:
+        for m in markets_qs[:5]:
+            name = (m.get("placement_line__market") or "Outros").strip() or "Outros"
+            share = float(m.get("total_cost") or 0) / _tot_market_cost * 100
+            markets_data.append({"name": name, "share": round(share, 2)})
+
     sim_data = {
         "google": {
             "cost": google_agg["cost"],
@@ -1963,6 +2237,7 @@ def analytics(request: HttpRequest) -> HttpResponse:
             "cpm": round((meta_agg["cost"] / meta_agg["impressions"] * 1000), 2) if meta_agg["impressions"] > 0 else 0,
         },
         "total_budget": round(total_cost, 2),
+        "markets": markets_data,
     }
 
     return render(request, "web/analytics.html", {
@@ -1986,6 +2261,7 @@ def analytics(request: HttpRequest) -> HttpResponse:
         "score_label": score_label,
         "score_dash_offset": round(477.5 - (perf_score / 100) * 477.5, 1),
         "score_breakdown": score_breakdown,
+        "score_deficits": negative_impacts,
         # Insights (Bloco 2)
         "insights": insights,
         # Recommendations (Bloco 3)
@@ -1998,12 +2274,23 @@ def analytics(request: HttpRequest) -> HttpResponse:
         "historical": historical,
         # Efficiency matrix (Bloco 7)
         "efficiency_matrix": efficiency_matrix,
+        "alerts_grouped": alerts_grouped,
+        "alert_counts": alert_counts,
         # Simulator data (Bloco 8)
         "sim_data_json": json.dumps(sim_data),
         # Chart data
         "trend_labels_json": json.dumps(trend_labels),
         "trend_imp_json": json.dumps(trend_imp),
         "trend_clk_json": json.dumps(trend_clk),
+        "trend_ma7_json": json.dumps(trend_ma7),
+        "trend_signal": trend_signal,
+        # Explicit comparisons
+        "benchmarks": {"ctr": BENCH_CTR, "cpc": BENCH_CPC, "cpm": BENCH_CPM},
+        "targets": {
+            "ctr": float(request.GET.get("meta_ctr") or 0) or round(BENCH_CTR * 1.2, 2),
+            "cpc": float(request.GET.get("meta_cpc") or 0) or round(BENCH_CPC * 0.9, 2),
+            "cpm": float(request.GET.get("meta_cpm") or 0) or round(BENCH_CPM * 0.9, 2),
+        },
         # Campaign table
         "campaigns": campaign_metrics,
     })
@@ -3888,12 +4175,19 @@ def peca_detalhe(request: HttpRequest, piece_id: int) -> HttpResponse:
     if primary_asset:
         meta = primary_asset.metadata or {}
         content_type = meta.get("content_type", "")
+        file_name = meta.get("original_name", "") or (primary_asset.file.name if primary_asset.file else "")
         if "video" in content_type:
             media_type = "video"
         elif "audio" in content_type:
             media_type = "audio"
         elif "image" in content_type:
             media_type = "image"
+        elif piece.type == "html5" or "html" in content_type:
+            # ZIP HTML5 banners cannot be rendered inline — show download prompt
+            if "zip" in content_type or file_name.lower().endswith(".zip"):
+                media_type = "html5_zip"
+            else:
+                media_type = "html5"
         if primary_asset.file:
             media_url = primary_asset.file.url
 

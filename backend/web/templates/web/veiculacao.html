@@ -290,6 +290,7 @@
       <input type="date" id="dateTo" name="date_to" value="{{ date_to }}">
     </div>
     <button type="submit" class="btn-filter">Filtrar</button>
+    <a href="{{ request.path }}" class="btn-filter" style="background:#e5e7eb;color:#111827;text-decoration:none;display:inline-flex;align-items:center;">Limpar</a>
     {% if parent_campaign_id %}
     <a href="{% url 'web:uploads_midia_pecas' parent_campaign_id %}" class="btn-pecas">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

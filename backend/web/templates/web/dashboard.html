@@ -129,9 +129,43 @@
   <!-- Row 1: Linha grande (full) -->
   <section class="charts-grid one-col">
     <div class="chart-card chart-lg">
-      <h3>Evolucao de Insercoes (Ultimos 30 dias)</h3>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+        <h3 style="margin:0;">Evolucao de Insercoes (Periodo selecionado)</h3>
+        <form method="get" style="display:flex;gap:8px;align-items:center;">
+          <input type="date" name="cmp_from" value="{{ cmp_from }}" style="padding:6px 8px;border:1px solid var(--border-color);border-radius:8px;font-size:12px;">
+          <span style="color:var(--text-secondary);font-size:12px;">a</span>
+          <input type="date" name="cmp_to" value="{{ cmp_to }}" style="padding:6px 8px;border:1px solid var(--border-color);border-radius:8px;font-size:12px;">
+          {% if selected_cliente_id %}<input type="hidden" name="cliente_id" value="{{ selected_cliente_id }}">{% endif %}
+          <button type="submit" class="btn-filter" style="padding:6px 10px;font-size:12px;border-radius:8px;">Comparar</button>
+          <a href="{% if selected_cliente_id %}{% url 'web:dashboard' %}?cliente_id={{ selected_cliente_id }}{% else %}{% url 'web:dashboard' %}{% endif %}" class="btn-filter" style="padding:6px 10px;font-size:12px;border-radius:8px;">Limpar</a>
+          {% if cmp_summary %}
+          <span style="padding:6px 10px;border-radius:999px; font-size:12px; font-weight:800; {% if cmp_summary.dir == 'up' %}background:rgba(34,197,94,.12);color:#166534;{% elif cmp_summary.dir == 'down' %}background:rgba(239,68,68,.12);color:#b91c1c;{% else %}background:#e5e7eb;color:#374151;{% endif %}">
+            {{ cmp_summary.pct }}%
+          </span>
+          {% endif %}
+        </form>
+      </div>
       <div class="chart-canvas">
         <canvas id="insertionsChart"></canvas>
+      </div>
+    </div>
+    <div class="chart-card chart-lg">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+        <h3 style="margin:0;">Evolucao Mensal de Insercoes (Ultimos 12 meses)</h3>
+        {% if months_compare.cur_label %}
+        <div style="display:flex;align-items:center;gap:10px;font-size:12px;font-weight:800;color:var(--text-primary);">
+          <span>Atual {{ months_compare.cur_label }}: {{ months_compare.cur|floatformat:0 }}</span>
+          <span style="color:#64748b;">|</span>
+          <span>Anterior {{ months_compare.prev_label }}: {{ months_compare.prev|floatformat:0 }}</span>
+          <span style="padding:4px 8px;border-radius:999px; {% if months_compare.dir == 'up' %}background:rgba(34,197,94,.12);color:#166534;{% elif months_compare.dir == 'down' %}background:rgba(239,68,68,.12);color:#b91c1c;{% else %}background:#e5e7eb;color:#374151;{% endif %}">
+            {% if months_compare.dir == 'up' %}▲{% elif months_compare.dir == 'down' %}▼{% else %}■{% endif %}
+            {{ months_compare.pct }}%
+          </span>
+        </div>
+        {% endif %}
+      </div>
+      <div class="chart-canvas">
+        <canvas id="insertionsMonthlyChart"></canvas>
       </div>
     </div>
   </section>
@@ -187,6 +221,9 @@ const channelValues = {{ channel_values|safe }};
 const piecesLabels = {{ pieces_labels|safe }};
 const piecesValues = {{ pieces_values|safe }};
 const heatmapWeeks = {{ heatmap_weeks|safe }};
+const cmpPrevious = {{ cmp_previous|safe }};
+const monthsLabels = {{ months_labels|safe }};
+const monthsInsertions = {{ months_insertions|safe }};
 
 // Cores
 const chartColors = [
@@ -211,13 +248,26 @@ if (daysLabels.length > 0) {
         pointBorderColor: '#fff',
         pointBorderWidth: 2,
         pointRadius: 4,
+      },
+      {
+        label: 'Periodo anterior',
+        data: cmpPrevious,
+        borderColor: '#94a3b8',
+        backgroundColor: 'rgba(148,163,184,0.08)',
+        fill: false,
+        tension: 0.3,
+        pointBackgroundColor: '#94a3b8',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        pointRadius: 3,
+        borderDash: [6,4],
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: false }
+        legend: { display: true, position: 'top' }
       },
       scales: {
         y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
@@ -227,6 +277,39 @@ if (daysLabels.length > 0) {
   });
 } else {
   document.getElementById('insertionsChart').parentElement.innerHTML += '<div class="empty-chart">Sem dados de insercoes no periodo</div>';
+}
+
+// 1b. Grafico de Evolucao Mensal de Insercoes (Linha)
+if (monthsLabels.length > 0) {
+  new Chart(document.getElementById('insertionsMonthlyChart'), {
+    type: 'line',
+    data: {
+      labels: monthsLabels,
+      datasets: [{
+        label: 'Insercoes por mes',
+        data: monthsInsertions,
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59,130,246,0.1)',
+        fill: true,
+        tension: 0.3,
+        pointBackgroundColor: '#3b82f6',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        pointRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+} else {
+  document.getElementById('insertionsMonthlyChart').parentElement.innerHTML += '<div class="empty-chart">Sem dados nos ultimos 12 meses</div>';
 }
 
 // 2. Grafico de Investimento por Regiao (Donut)

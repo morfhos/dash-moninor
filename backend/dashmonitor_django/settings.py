@@ -49,6 +49,9 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
+# Permite iframes do mesmo domínio (necessário para preview de peças HTML5)
+X_FRAME_OPTIONS = "SAMEORIGIN"
+
 ROOT_URLCONF = "dashmonitor_django.urls"
 
 TEMPLATES = [
