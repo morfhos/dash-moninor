@@ -134,3 +134,20 @@ META_ADS_REDIRECT_URI = os.environ.get(
     "META_ADS_REDIRECT_URI",
     "http://localhost:8000/integracoes/meta-ads/callback/",
 )
+
+# --- E-mail ---
+# Em produção, configure as variáveis abaixo para usar SMTP.
+# Em desenvolvimento, os e-mails são exibidos no console.
+EMAIL_BACKEND = os.environ.get(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend",
+)
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "true").lower() in {"1", "true", "yes"}
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "DashMonitor <noreply@dashmonitor.com.br>")
+
+# Token de recuperação de senha expira em 24 horas
+PASSWORD_RESET_TIMEOUT = 86400

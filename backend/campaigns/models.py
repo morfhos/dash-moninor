@@ -46,6 +46,10 @@ class Campaign(models.Model):
     class Meta:
         verbose_name = "Campanha"
         verbose_name_plural = "Campanhas"
+        indexes = [
+            models.Index(fields=["cliente", "status"], name="campaign_cliente_status_idx"),
+            models.Index(fields=["cliente", "start_date", "end_date"], name="campaign_cliente_dates_idx"),
+        ]
 
     def __str__(self) -> str:
         return self.name
@@ -145,7 +149,7 @@ class PlacementLine(models.Model):
     property_text = models.CharField(max_length=250, blank=True, default="")
     format_text = models.CharField(max_length=250, blank=True, default="")
     duration_sec = models.PositiveIntegerField(null=True, blank=True)
-    external_ref = models.CharField(max_length=120, blank=True, default="")
+    external_ref = models.CharField(max_length=120, blank=True, default="", db_index=True)
     start_date = models.DateTimeField(null=True, blank=True)
     end_date = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -153,6 +157,9 @@ class PlacementLine(models.Model):
     class Meta:
         verbose_name = "Linha de mídia"
         verbose_name_plural = "Linhas de mídia"
+        indexes = [
+            models.Index(fields=["campaign", "media_channel"], name="placement_campaign_channel_idx"),
+        ]
 
     def __str__(self) -> str:
         return f"{self.market} - {self.channel}"
@@ -170,6 +177,9 @@ class PlacementDay(models.Model):
         verbose_name = "Dia de veiculação"
         verbose_name_plural = "Dias de veiculação"
         unique_together = ("placement_line", "date")
+        indexes = [
+            models.Index(fields=["date"], name="placementday_date_idx"),
+        ]
 
     def __str__(self) -> str:
         return f"{self.placement_line_id} {self.date}"

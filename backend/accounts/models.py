@@ -69,8 +69,11 @@ class AuditLog(models.Model):
         USER_DELETED = "user_deleted", "Usuario Deletado"
         CLIENTE_CREATED = "cliente_created", "Cliente Criado"
         CLIENTE_UPDATED = "cliente_updated", "Cliente Atualizado"
+        CLIENTE_DELETED = "cliente_deleted", "Cliente Deletado"
         MEDIA_PLAN_UPLOADED = "media_plan_uploaded", "Plano de Midia Enviado"
         CONTRACT_UPLOADED = "contract_uploaded", "Contrato Enviado"
+        PASSWORD_RESET_REQUESTED = "password_reset_requested", "Recuperacao de Senha Solicitada"
+        PASSWORD_RESET_COMPLETED = "password_reset_completed", "Senha Redefinida"
 
     event_type = models.CharField(max_length=30, choices=EventType.choices, db_index=True)
     user = models.ForeignKey(
@@ -171,6 +174,9 @@ class Alert(models.Model):
         verbose_name = "Alerta"
         verbose_name_plural = "Alertas"
         ordering = ["-criado_em"]
+        indexes = [
+            models.Index(fields=["cliente", "lido", "-criado_em"], name="alert_cliente_lido_idx"),
+        ]
 
     def __str__(self) -> str:
         return f"{self.titulo} - {self.cliente.nome}"

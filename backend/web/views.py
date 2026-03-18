@@ -6,14 +6,19 @@ from datetime import datetime, timedelta
 from django.contrib.auth import get_user_model
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.tokens import default_token_generator
+from django.core.mail import send_mail
 from django.db import models
 from django.db.models.functions import TruncMonth
 from django.db.models import Count, Max, Min, Sum
 from django.db.models.functions import TruncDate, TruncHour
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.views.decorators.csrf import csrf_exempt
 import json
 
@@ -187,6 +192,166 @@ def logout_view(request: HttpRequest) -> HttpResponse:
     if cliente_slug:
         return redirect("web:login_cliente", cliente_slug=cliente_slug)
     return redirect("web:login")
+
+
+# ---------------------------------------------------------------------------
+# Recuperação de senha
+# ---------------------------------------------------------------------------
+
+def _send_password_reset_email(request: HttpRequest, user, cliente=None) -> None:
+    """Gera token e envia e-mail de recuperação de senha."""
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+    token = default_token_generator.make_token(user)
+    reset_url = request.build_absolute_uri(
+        reverse("web:password_reset_confirm", kwargs={"uidb64": uid, "token": token})
+    )
+    context = {
+        "user": user,
+        "reset_url": reset_url,
+        "cliente": cliente,
+        "expiry_hours": 24,
+    }
+    subject = render_to_string("web/email/password_reset_subject.txt", context).strip()
+    body_html = render_to_string("web/email/password_reset_body.html", context)
+    send_mail(
+        subject=subject,
+        message="",
+        from_email=None,  # usa DEFAULT_FROM_EMAIL
+        recipient_list=[user.email],
+        html_message=body_html,
+        fail_silently=False,
+    )
+
+
+def password_reset_request(request: HttpRequest) -> HttpResponse:
+    """Solicitar recuperação de senha (página geral)."""
+    if request.user.is_authenticated:
+        return redirect("web:root")
+
+    sent = False
+    error = ""
+
+    if request.method == "POST":
+        email = request.POST.get("email", "").strip()
+        if not email:
+            error = "Informe um endereço de e-mail."
+        else:
+            User = get_user_model()
+            user = User.objects.filter(email__iexact=email, is_active=True).first()
+            if user and user.email:
+                try:
+                    _send_password_reset_email(request, user)
+                    AuditLog.log(
+                        AuditLog.EventType.PASSWORD_RESET_REQUESTED,
+                        request=request,
+                        user=user,
+                        cliente=getattr(user, "cliente", None),
+                        details={"email": email},
+                    )
+                except Exception:
+                    pass  # Não revelar falhas de envio
+            # Sempre mostrar mensagem de sucesso (não revelar se e-mail existe)
+            sent = True
+
+    return render(request, "web/password_reset_request.html", {
+        "page_title": "Recuperar Senha",
+        "sent": sent,
+        "error": error,
+    })
+
+
+def password_reset_request_cliente(request: HttpRequest, cliente_slug: str) -> HttpResponse:
+    """Solicitar recuperação de senha com identidade visual do cliente."""
+    if request.user.is_authenticated:
+        return redirect("web:root")
+
+    cliente = Cliente.objects.filter(slug__iexact=cliente_slug, ativo=True).first()
+    if cliente is None:
+        return redirect("web:password_reset_request")
+
+    sent = False
+    error = ""
+
+    if request.method == "POST":
+        email = request.POST.get("email", "").strip()
+        if not email:
+            error = "Informe um endereço de e-mail."
+        else:
+            User = get_user_model()
+            user = User.objects.filter(email__iexact=email, is_active=True).first()
+            if user and user.email:
+                try:
+                    _send_password_reset_email(request, user, cliente=cliente)
+                    AuditLog.log(
+                        AuditLog.EventType.PASSWORD_RESET_REQUESTED,
+                        request=request,
+                        user=user,
+                        cliente=getattr(user, "cliente", None) or cliente,
+                        details={"email": email, "cliente_slug": cliente_slug},
+                    )
+                except Exception:
+                    pass
+            sent = True
+
+    return render(request, "web/password_reset_request_cliente.html", {
+        "page_title": f"Recuperar Senha — {cliente.nome}",
+        "sent": sent,
+        "error": error,
+        "cliente": cliente,
+    })
+
+
+def password_reset_confirm(request: HttpRequest, uidb64: str, token: str) -> HttpResponse:
+    """Validar token e permitir nova senha."""
+    if request.user.is_authenticated:
+        return redirect("web:root")
+
+    User = get_user_model()
+    user = None
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        user = User.objects.get(pk=uid)
+    except (User.DoesNotExist, ValueError, TypeError, OverflowError):
+        pass
+
+    token_valid = user is not None and default_token_generator.check_token(user, token)
+
+    error = ""
+    if request.method == "POST" and token_valid:
+        senha1 = request.POST.get("password1", "")
+        senha2 = request.POST.get("password2", "")
+        if not senha1:
+            error = "Informe a nova senha."
+        elif len(senha1) < 8:
+            error = "A senha deve ter pelo menos 8 caracteres."
+        elif senha1 != senha2:
+            error = "As senhas não coincidem."
+        else:
+            user.set_password(senha1)
+            user.save()
+            AuditLog.log(
+                AuditLog.EventType.PASSWORD_RESET_COMPLETED,
+                request=request,
+                user=user,
+                cliente=getattr(user, "cliente", None),
+                details={"method": "email_token"},
+            )
+            return redirect("web:password_reset_complete")
+
+    return render(request, "web/password_reset_confirm.html", {
+        "page_title": "Redefinir Senha",
+        "token_valid": token_valid,
+        "error": error,
+        "uidb64": uidb64,
+        "token": token,
+    })
+
+
+def password_reset_complete(request: HttpRequest) -> HttpResponse:
+    """Confirmação de senha redefinida com sucesso."""
+    return render(request, "web/password_reset_complete.html", {
+        "page_title": "Senha Redefinida",
+    })
 
 
 def _render_module(request: HttpRequest, *, active: str, title: str) -> HttpResponse:
@@ -2412,6 +2577,56 @@ def clientes_detail(request: HttpRequest, cliente_id: int) -> HttpResponse:
             "user_form_errors": user_form_errors,
         },
     )
+
+
+@login_required
+@require_true_admin
+def cliente_delete(request: HttpRequest, cliente_id: int) -> HttpResponse:
+    if request.method != "POST":
+        return redirect("web:clientes_detail", cliente_id=cliente_id)
+
+    cliente = Cliente.objects.get(id=cliente_id)
+    confirm_name = request.POST.get("confirm_name", "").strip()
+    delete_mode = request.POST.get("delete_mode", "deactivate")
+
+    if confirm_name != cliente.nome:
+        return redirect("web:clientes_detail", cliente_id=cliente_id)
+
+    nome_log = cliente.nome
+
+    if delete_mode == "all":
+        User = get_user_model()
+        campaigns_qs = Campaign.objects.filter(cliente_id=cliente.id)
+        for campaign in campaigns_qs:
+            placements = PlacementLine.objects.filter(campaign=campaign)
+            for placement in placements:
+                PlacementDay.objects.filter(placement_line=placement).delete()
+                PlacementCreative.objects.filter(placement_line=placement).delete()
+            placements.delete()
+            for piece in Piece.objects.filter(campaign=campaign):
+                CreativeAsset.objects.filter(piece=piece).delete()
+            Piece.objects.filter(campaign=campaign).delete()
+            RegionInvestment.objects.filter(campaign=campaign).delete()
+            ContractUpload.objects.filter(campaign=campaign).delete()
+            MediaPlanUpload.objects.filter(campaign=campaign).delete()
+        campaigns_qs.delete()
+        User.objects.filter(cliente_id=cliente.id).delete()
+        AuditLog.log(
+            AuditLog.EventType.CLIENTE_DELETED,
+            request=request,
+            details={"nome": nome_log, "modo": "completo"},
+        )
+        cliente.delete()
+        return redirect("web:clientes")
+    else:
+        cliente.ativo = False
+        cliente.save()
+        AuditLog.log(
+            AuditLog.EventType.CLIENTE_DELETED,
+            request=request,
+            details={"nome": nome_log, "modo": "desativado"},
+        )
+        return redirect("web:clientes")
 
 
 @login_required

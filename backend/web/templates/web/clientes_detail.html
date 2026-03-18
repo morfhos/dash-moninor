@@ -13,9 +13,133 @@
       <a class="btn-outline" href="{% url 'web:clientes_edit' cliente.id %}">Editar</a>
       <a class="btn-outline" href="{% url 'web:clientes_upload' cliente.id %}" style="text-decoration:none;">Upload</a>
       <a class="btn-outline" href="{% url 'web:cliente_campaigns' cliente.id %}" style="text-decoration:none;">Campanhas</a>
+      <button class="btn-outline" onclick="abrirModalDeletar()" style="color:#dc2626; border-color:#dc2626;">Deletar</button>
       <a class="btn" href="{% url 'web:clientes_enter' cliente.id %}" style="text-decoration:none;">Entrar</a>
     </div>
   </div>
+
+  <!-- Modal de confirmação de deleção -->
+  <div id="modal-deletar" style="display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.55); align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:16px; padding:32px; max-width:480px; width:calc(100% - 32px); box-shadow:0 8px 40px rgba(0,0,0,0.18);">
+
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+        <div style="width:40px; height:40px; border-radius:50%; background:#fee2e2; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div>
+          <div style="font-weight:900; font-size:17px; color:#111;">Deletar cliente</div>
+          <div style="font-size:13px; color:#64748b; font-weight:600; margin-top:2px;">Esta ação não pode ser desfeita.</div>
+        </div>
+      </div>
+
+      <form method="post" action="{% url 'web:cliente_delete' cliente.id %}" id="form-deletar">
+        {% csrf_token %}
+
+        <!-- Escolha do modo -->
+        <div style="margin:20px 0 16px; display:flex; flex-direction:column; gap:10px;">
+          <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer; padding:12px 14px; border-radius:10px; border:2px solid #e5e7eb; transition:border-color .15s;" id="label-desativar">
+            <input type="radio" name="delete_mode" value="deactivate" checked onchange="atualizarModo()"
+              style="margin-top:3px; accent-color:#6366f1; cursor:pointer; flex-shrink:0;">
+            <div>
+              <div style="font-weight:800; font-size:14px;">Apenas desativar</div>
+              <div style="font-size:12px; color:#64748b; font-weight:600; margin-top:2px;">
+                O cliente é desativado. Todos os dados (campanhas, peças, usuários) são mantidos no sistema.
+              </div>
+            </div>
+          </label>
+          <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer; padding:12px 14px; border-radius:10px; border:2px solid #e5e7eb; transition:border-color .15s;" id="label-deletar-tudo">
+            <input type="radio" name="delete_mode" value="all" onchange="atualizarModo()"
+              style="margin-top:3px; accent-color:#dc2626; cursor:pointer; flex-shrink:0;">
+            <div>
+              <div style="font-weight:800; font-size:14px; color:#dc2626;">Deletar tudo</div>
+              <div style="font-size:12px; color:#64748b; font-weight:600; margin-top:2px;">
+                Remove permanentemente o cliente, todos os usuários, campanhas, peças, veiculações e arquivos.
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <!-- Confirmação por nome -->
+        <div style="margin-bottom:18px;">
+          <div style="font-size:13px; font-weight:700; color:#374151; margin-bottom:6px;">
+            Digite <strong style="color:#111;">{{ cliente.nome }}</strong> para confirmar:
+          </div>
+          <input
+            type="text"
+            id="input-confirmar-nome"
+            name="confirm_name"
+            autocomplete="off"
+            placeholder="{{ cliente.nome }}"
+            oninput="validarNome()"
+            style="width:100%; box-sizing:border-box; padding:10px 12px; border:2px solid #e5e7eb; border-radius:8px; font-size:14px; font-weight:700; outline:none; transition:border-color .15s;"
+          />
+        </div>
+
+        <div style="display:flex; gap:10px; justify-content:flex-end;">
+          <button type="button" onclick="fecharModalDeletar()" class="btn-outline" style="padding: 10px 20px;">Cancelar</button>
+          <button type="submit" id="btn-confirmar-deletar" disabled
+            style="padding:10px 20px; border-radius:8px; font-weight:800; font-size:14px; cursor:not-allowed; background:#e5e7eb; color:#9ca3af; border:none; transition:all .15s;"
+            id="btn-confirmar-deletar">
+            Confirmar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const NOME_CLIENTE = "{{ cliente.nome|escapejs }}";
+
+    function abrirModalDeletar() {
+      document.getElementById("modal-deletar").style.display = "flex";
+      document.getElementById("input-confirmar-nome").value = "";
+      validarNome();
+      atualizarModo();
+      setTimeout(() => document.getElementById("input-confirmar-nome").focus(), 50);
+    }
+
+    function fecharModalDeletar() {
+      document.getElementById("modal-deletar").style.display = "none";
+    }
+
+    function validarNome() {
+      const input = document.getElementById("input-confirmar-nome");
+      const btn = document.getElementById("btn-confirmar-deletar");
+      const modoAll = document.querySelector('input[name="delete_mode"][value="all"]').checked;
+      const ok = input.value.trim() === NOME_CLIENTE;
+
+      input.style.borderColor = input.value === "" ? "#e5e7eb" : (ok ? "#22c55e" : "#ef4444");
+
+      if (ok) {
+        btn.disabled = false;
+        btn.style.background = modoAll ? "#dc2626" : "#6366f1";
+        btn.style.color = "#fff";
+        btn.style.cursor = "pointer";
+      } else {
+        btn.disabled = true;
+        btn.style.background = "#e5e7eb";
+        btn.style.color = "#9ca3af";
+        btn.style.cursor = "not-allowed";
+      }
+    }
+
+    function atualizarModo() {
+      const modoAll = document.querySelector('input[name="delete_mode"][value="all"]').checked;
+      document.getElementById("label-desativar").style.borderColor = !modoAll ? "#6366f1" : "#e5e7eb";
+      document.getElementById("label-deletar-tudo").style.borderColor = modoAll ? "#dc2626" : "#e5e7eb";
+      validarNome();
+    }
+
+    // Fecha ao clicar fora do modal
+    document.getElementById("modal-deletar").addEventListener("click", function(e) {
+      if (e.target === this) fecharModalDeletar();
+    });
+
+    // Fecha com ESC
+    document.addEventListener("keydown", function(e) {
+      if (e.key === "Escape") fecharModalDeletar();
+    });
+  </script>
 
   <div class="grid" style="grid-template-columns: minmax(0, 1fr) 360px;">
     <section class="main-panel">

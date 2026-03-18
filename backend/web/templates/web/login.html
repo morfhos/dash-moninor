@@ -30,7 +30,7 @@
             <input type="checkbox" name="remember" {% if remember %}checked{% endif %} />
             Lembrar de mim
           </label>
-          <a href="#" style="text-decoration:none; color:var(--brand-primary);" onclick="event.preventDefault()">Esqueceu a senha?</a>
+          <a href="{% url 'web:password_reset_request' %}" style="text-decoration:none; color:var(--brand-primary);">Esqueceu a senha?</a>
         </div>
         <button class="btn" style="width:100%" type="submit">
           Entrar
