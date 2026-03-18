@@ -5,7 +5,7 @@
     <div>
       <h1>Upload Plano de Mídia</h1>
       <div style="margin-top:6px; color: var(--text-secondary); font-weight: 800; font-size: 13px;">
-        Campanha: {{ campaign.name }} • Cliente: {{ cliente.nome }}
+        Campanha: {{ campaign.name }} &bull; Cliente: {{ cliente.nome }}
       </div>
     </div>
     <a class="btn-outline" href="{% url 'web:clientes_detail' cliente.id %}" style="text-decoration:none;">Voltar</a>
@@ -13,111 +13,401 @@
 
   <section class="main-panel">
     {% if form_errors %}
-      <div style="margin-bottom: 12px; font-size: 13px; color: #b91c1c; font-weight: 800;">
-        {{ form_errors }}
-      </div>
+      <div style="margin-bottom: 12px; font-size: 13px; color: #b91c1c; font-weight: 800;">{{ form_errors }}</div>
     {% endif %}
 
-    <div style="display:flex; gap: 16px; flex-wrap: wrap; align-items:flex-start;">
-      <div style="flex: 1; min-width: 360px;">
-        <div style="font-weight: 900; margin-bottom: 10px;">1) Enviar .xlsx</div>
-        <div class="card" style="padding: 16px; border-radius: 16px;">
-          <form method="post" enctype="multipart/form-data" style="display:grid; gap: 12px;">
+    <div style="display:flex; gap: 20px; flex-wrap: wrap; align-items:flex-start;">
+
+      <!-- ── Passo 1: Upload ────────────────────────────────────────── -->
+      <div style="flex: 0 0 340px;">
+        <div style="font-weight: 900; margin-bottom: 10px; font-size: 13px; color: var(--text-secondary);">
+          1 &mdash; ENVIAR PLANILHA
+        </div>
+        <div class="card" style="padding: 20px; border-radius: 16px;">
+          <form method="post" enctype="multipart/form-data" id="upload-form" style="display:grid; gap: 14px;">
             {% csrf_token %}
             <input type="hidden" name="_action" value="validate" />
-            <div>
-              <div style="font-size: 12px; font-weight: 900; color: var(--text-secondary); margin-bottom: 6px;">Arquivo (.xlsx)</div>
-              <input class="input" type="file" name="xlsx_file" accept=".xlsx" required />
+
+            <!-- Drop zone -->
+            <div id="drop-zone"
+              onclick="document.getElementById('xlsx-input').click()"
+              style="border:2px dashed #c7d2fe; border-radius:12px; padding:28px 16px;
+                     text-align:center; cursor:pointer; background:#f8f9ff; transition:.2s;">
+              <div style="display:flex; justify-content:center; margin-bottom:10px;">
+                <div id="dz-icon" style="width:44px;height:44px;border-radius:12px;background:#e0e7ff;
+                  display:flex;align-items:center;justify-content:center;transition:.2s;">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6366f1"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                </div>
+              </div>
+              <div id="dz-title" style="font-weight:900;font-size:14px;color:#1e1b4b;margin-bottom:4px;">
+                Arraste o .xlsx aqui
+              </div>
+              <div id="dz-sub" style="font-size:12px;color:var(--text-secondary);font-weight:600;">
+                ou clique para selecionar
+              </div>
+              <input id="xlsx-input" type="file" name="xlsx_file" accept=".xlsx" required
+                style="display:none;" onchange="handleFile(this.files)" />
             </div>
-            <div style="display:flex; gap: 10px; align-items:center;">
-              <input type="checkbox" name="replace_existing" checked />
-              <div style="color: var(--text-secondary); font-weight: 800; font-size: 13px;">Substituir linhas existentes desta campanha</div>
+
+            <!-- Preview do arquivo -->
+            <div id="file-preview" style="display:none;align-items:center;gap:10px;
+              background:#f1f5f9;border-radius:10px;padding:10px 12px;">
+              <div style="width:32px;height:32px;border-radius:8px;background:#e0e7ff;flex-shrink:0;
+                display:flex;align-items:center;justify-content:center;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366f1"
+                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                </svg>
+              </div>
+              <div style="flex:1;min-width:0;">
+                <div id="file-name" style="font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+                <div id="file-size" style="font-size:11px;color:var(--text-secondary);font-weight:600;margin-top:1px;"></div>
+              </div>
+              <button type="button" onclick="clearFile()"
+                style="background:none;border:none;cursor:pointer;color:#94a3b8;padding:4px;border-radius:6px;"
+                onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#94a3b8'">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
             </div>
-            <button class="btn" type="submit" style="width: fit-content;">Validar</button>
+
+            <button class="btn" type="submit" id="validate-btn" disabled
+              style="width:100%;opacity:.45;cursor:not-allowed;transition:opacity .2s;">
+              Analisar abas
+            </button>
           </form>
         </div>
       </div>
 
-      <div style="width: 420px; flex-shrink: 0;">
-        <div style="font-weight: 900; margin-bottom: 10px;">2) Validação</div>
-        <div class="card" style="padding: 16px; border-radius: 16px;">
-          {% if result %}
-            {% if result.created %}
-              <div style="display:grid; gap: 10px;">
-                <div style="font-weight: 900;">Importação concluída</div>
-                <div style="display:flex; justify-content:space-between; gap: 12px;">
-                  <div style="color: var(--text-secondary); font-weight: 800;">PlacementLine</div>
-                  <div style="font-weight: 900;">{{ result.created.placement_lines }}</div>
-                </div>
-                <div style="display:flex; justify-content:space-between; gap: 12px;">
-                  <div style="color: var(--text-secondary); font-weight: 800;">PlacementDay</div>
-                  <div style="font-weight: 900;">{{ result.created.placement_days }}</div>
-                </div>
-                <div style="display:flex; justify-content:space-between; gap: 12px;">
-                  <div style="color: var(--text-secondary); font-weight: 800;">Pieces criadas (auto)</div>
-                  <div style="font-weight: 900;">{{ result.created.pieces }}</div>
-                </div>
-                <div style="display:flex; justify-content:space-between; gap: 12px;">
-                  <div style="color: var(--text-secondary); font-weight: 800;">Vínculos PlacementCreative</div>
-                  <div style="font-weight: 900;">{{ result.created.placement_creatives }}</div>
-                </div>
-                <a class="btn" href="{% url 'web:campaign_link_matrix' campaign.id %}" style="text-decoration:none; width: fit-content;">Ir para vinculação</a>
-              </div>
-            {% else %}
-              <div style="display:grid; gap: 10px;">
-                <div style="display:flex; justify-content:space-between; gap: 12px;">
-                  <div style="color: var(--text-secondary); font-weight: 800;">Sheets detectadas</div>
-                  <div style="font-weight: 900;">{{ result.sheets|length }}</div>
-                </div>
-                <div style="display:flex; justify-content:space-between; gap: 12px;">
-                  <div style="color: var(--text-secondary); font-weight: 800;">Linhas lidas (bruto)</div>
-                  <div style="font-weight: 900;">{{ result.total_rows }}</div>
-                </div>
-                <div style="display:flex; justify-content:space-between; gap: 12px;">
-                  <div style="color: var(--text-secondary); font-weight: 800;">Linhas válidas detectadas</div>
-                  <div style="font-weight: 900;">{{ result.valid_rows|default:"0" }}</div>
-                </div>
+      <!-- ── Passo 2: Seleção de abas ─────────────────────────────── -->
+      <div style="flex: 1; min-width: 360px;">
+        <div style="font-weight: 900; margin-bottom: 10px; font-size: 13px; color: var(--text-secondary);">
+          2 &mdash; SELECIONAR ABAS
+        </div>
+        <div class="card" style="padding: 20px; border-radius: 16px;">
 
-                {% if result.detected.sheets %}
-                  <div style="margin-top: 6px; font-weight: 900;">Mapeamento por aba</div>
-                  <div style="display:grid; gap: 8px;">
-                    {% for sheet_name, info in result.detected.sheets.items %}
-                      <div style="display:flex; justify-content:space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 12px; background: #ffffff;">
-                        <div style="font-weight: 900;">{{ sheet_name }}</div>
-                        <div style="color: var(--text-secondary); font-weight: 800;">
-                          {{ info.media_type|upper }} • {{ info.media_channel }}
-                        </div>
-                      </div>
-                    {% endfor %}
-                  </div>
-                {% endif %}
-
-                {% if result.errors and result.errors|length %}
-                  <div style="margin-top: 6px; color:#b91c1c; font-weight: 900;">Erros</div>
-                  <div style="display:grid; gap: 6px;">
-                    {% for e in result.errors %}
-                      <div style="color:#b91c1c; font-weight: 800; font-size: 13px;">{{ e }}</div>
-                    {% endfor %}
-                  </div>
-                {% else %}
-                  <form method="post" style="margin-top: 8px; display:flex; gap: 10px; align-items:center; flex-wrap: wrap;">
-                    {% csrf_token %}
-                    <input type="hidden" name="_action" value="import" />
-                    <input type="hidden" name="upload_id" value="{{ result.upload_id }}" />
-                    <input type="checkbox" name="replace_existing" checked />
-                    <div style="color: var(--text-secondary); font-weight: 800; font-size: 13px;">Substituir linhas existentes</div>
-                    <button class="btn" type="submit" style="width: fit-content;">Importar</button>
-                  </form>
-                {% endif %}
+          {% if result and result.created %}
+            <!-- ── Sucesso ── -->
+            <div style="display:grid;gap:12px;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:36px;height:36px;border-radius:50%;background:#dcfce7;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                </div>
+                <div style="font-weight:900;font-size:15px;">Importação concluída</div>
               </div>
-            {% endif %}
+              <div style="display:grid;gap:8px;border-top:1px solid var(--border-color);padding-top:12px;">
+                <div style="display:flex;justify-content:space-between;gap:12px;">
+                  <div style="color:var(--text-secondary);font-weight:800;">Linhas de veiculação</div>
+                  <div style="font-weight:900;">{{ result.created.placement_lines }}</div>
+                </div>
+                <div style="display:flex;justify-content:space-between;gap:12px;">
+                  <div style="color:var(--text-secondary);font-weight:800;">Registros diários</div>
+                  <div style="font-weight:900;">{{ result.created.placement_days }}</div>
+                </div>
+                <div style="display:flex;justify-content:space-between;gap:12px;">
+                  <div style="color:var(--text-secondary);font-weight:800;">Peças criadas</div>
+                  <div style="font-weight:900;">{{ result.created.pieces }}</div>
+                </div>
+                <div style="display:flex;justify-content:space-between;gap:12px;">
+                  <div style="color:var(--text-secondary);font-weight:800;">Vínculos peça/veiculação</div>
+                  <div style="font-weight:900;">{{ result.created.placement_creatives }}</div>
+                </div>
+              </div>
+              <a class="btn" href="{% url 'web:campaign_link_matrix' campaign.id %}"
+                style="text-decoration:none;width:fit-content;">Ir para vinculação &rarr;</a>
+            </div>
+
+          {% elif result and result.detected and result.detected.sheets %}
+            <!-- ── Seletor de abas ── -->
+            {% with sheets=result.detected.sheets %}
+
+            <!-- Cabeçalho / contadores -->
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+              <div>
+                <span id="sel-count" style="font-weight:900;font-size:15px;">0</span>
+                <span style="font-size:13px;color:var(--text-secondary);font-weight:700;"> abas selecionadas</span>
+                <span style="font-size:12px;color:var(--text-secondary);font-weight:600;margin-left:8px;" id="sel-lines-label"></span>
+              </div>
+              <div style="display:flex;gap:8px;">
+                <button type="button" onclick="selectAll()" class="btn-outline"
+                  style="font-size:12px;padding:5px 12px;">Selecionar todas</button>
+                <button type="button" onclick="clearAll()" class="btn-outline"
+                  style="font-size:12px;padding:5px 12px;">Limpar</button>
+              </div>
+            </div>
+
+            <!-- Lista de abas -->
+            <div style="display:grid;gap:6px;max-height:400px;overflow-y:auto;padding-right:2px;">
+              {% for sheet_name, info in sheets.items %}
+                {% with has_data=info.valid_rows|default:0 has_error=info.error %}
+                <label
+                  data-rows="{{ info.valid_rows|default:0 }}"
+                  style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:10px;
+                    border:2px solid {% if has_data %}#e2e8f0{% else %}#f1f5f9{% endif %};
+                    cursor:{% if has_data %}pointer{% else %}default{% endif %};
+                    background:{% if has_data %}#fff{% else %}#fafafa{% endif %};
+                    transition:border-color .15s;user-select:none;"
+                  {% if has_data %}
+                    onmouseover="this.style.borderColor='#c7d2fe'"
+                    onmouseout="if(!this.querySelector('input').checked) this.style.borderColor='#e2e8f0'; else this.style.borderColor='#818cf8';"
+                  {% endif %}
+                >
+                  <input
+                    type="checkbox"
+                    class="sheet-cb"
+                    name="_sheet_cb"
+                    value="{{ sheet_name }}"
+                    data-rows="{{ info.valid_rows|default:0 }}"
+                    {% if not has_data %}disabled{% endif %}
+                    onchange="updateCount(this)"
+                    style="margin-top:3px;accent-color:#6366f1;cursor:{% if has_data %}pointer{% else %}default{% endif %};flex-shrink:0;"
+                  />
+                  <div style="flex:1;min-width:0;">
+                    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                      <span style="font-weight:900;font-size:13px;{% if not has_data %}color:#94a3b8;{% endif %}">
+                        {{ sheet_name }}
+                      </span>
+                      {% if has_data %}
+                        <!-- Badge canal -->
+                        <span style="font-size:10px;font-weight:800;padding:2px 7px;border-radius:20px;
+                          background:{{ info.media_channel|lower|slice:':2' }}{% if info.media_channel == 'tv_aberta' %}#dbeafe;color:#1d4ed8{% elif info.media_channel == 'paytv' %}#ede9fe;color:#6d28d9{% elif info.media_channel == 'radio' %}#fef3c7;color:#92400e{% elif info.media_channel == 'jornal' %}#fee2e2;color:#b91c1c{% elif info.media_channel == 'ooh' %}#fef9c3;color:#854d0e{% elif info.media_channel == 'meta' %}#dbeafe;color:#1e40af{% elif info.media_channel == 'google' %}#dcfce7;color:#166534{% elif info.media_channel == 'social' %}#ede9fe;color:#5b21b6{% elif info.media_channel == 'display' %}#e0f2fe;color:#0369a1{% else %}#f1f5f9;color:#475569{% endif %}">
+                          {% if info.media_channel == 'tv_aberta' %}TV ABERTA
+                          {% elif info.media_channel == 'paytv' %}PAY TV
+                          {% elif info.media_channel == 'radio' %}RÁDIO
+                          {% elif info.media_channel == 'jornal' %}JORNAL
+                          {% elif info.media_channel == 'ooh' %}OOH
+                          {% elif info.media_channel == 'meta' %}META
+                          {% elif info.media_channel == 'google' %}GOOGLE
+                          {% elif info.media_channel == 'social' %}SOCIAL
+                          {% elif info.media_channel == 'display' %}DISPLAY
+                          {% elif info.media_channel == 'youtube' %}YOUTUBE
+                          {% elif info.media_channel == 'search' %}SEARCH
+                          {% else %}OUTRO{% endif %}
+                        </span>
+                        <!-- Badge tipo -->
+                        <span style="font-size:10px;font-weight:800;padding:2px 7px;border-radius:20px;
+                          background:{% if info.media_type == 'offline' %}#f1f5f9;color:#475569{% else %}#e0f2fe;color:#0369a1{% endif %}">
+                          {{ info.media_type|upper }}
+                        </span>
+                      {% endif %}
+                    </div>
+                    <div style="margin-top:3px;font-size:12px;font-weight:700;
+                      {% if has_data %}color:var(--text-secondary){% else %}color:#cbd5e1{% endif %}">
+                      {% if has_data %}
+                        {{ info.valid_rows }} linha{{ info.valid_rows|pluralize:",s" }} válida{{ info.valid_rows|pluralize:"s" }}
+                      {% elif has_error %}
+                        <span style="color:#f87171;">&#9888; Sem tabela detectada</span>
+                      {% else %}
+                        Sem dados
+                      {% endif %}
+                    </div>
+                  </div>
+                </label>
+                {% endwith %}
+              {% endfor %}
+            </div>
+
+            <!-- Formulário de importação -->
+            <form method="post" id="import-form"
+              style="margin-top:16px;display:grid;gap:10px;border-top:1px solid var(--border-color);padding-top:16px;">
+              {% csrf_token %}
+              <input type="hidden" name="_action" value="import" />
+              <input type="hidden" name="upload_id" value="{{ result.upload_id }}" />
+              <!-- Checkboxes das abas selecionadas são injetados via JS antes do submit -->
+
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+                <input type="checkbox" name="replace_existing" checked style="accent-color:#6366f1;" />
+                <span style="font-size:13px;color:var(--text-secondary);font-weight:800;">
+                  Substituir linhas existentes desta campanha
+                </span>
+              </label>
+
+              <button class="btn" type="button" id="import-btn" onclick="submitImport()" disabled
+                style="width:100%;opacity:.4;cursor:not-allowed;transition:opacity .2s;">
+                Importar
+              </button>
+            </form>
+
+            {% endwith %}
+
+          {% elif result and result.errors %}
+            <!-- ── Erros de parse ── -->
+            <div style="display:grid;gap:8px;">
+              <div style="font-weight:900;color:#b91c1c;">Erros ao ler a planilha</div>
+              {% for e in result.errors %}
+                <div style="font-size:13px;color:#b91c1c;font-weight:700;">{{ e }}</div>
+              {% endfor %}
+            </div>
+
           {% else %}
-            <div style="color: var(--text-secondary); font-weight: 800;">
-              Envie a planilha para visualizar colunas detectadas, erros e contagem.
+            <!-- ── Estado vazio ── -->
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+              padding:40px 20px;text-align:center;gap:12px;">
+              <div style="width:48px;height:48px;border-radius:12px;background:#f1f5f9;
+                display:flex;align-items:center;justify-content:center;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#94a3b8"
+                  stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/>
+                  <line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/>
+                </svg>
+              </div>
+              <div style="color:var(--text-secondary);font-weight:800;font-size:13px;">
+                Envie a planilha para ver as abas disponíveis
+              </div>
             </div>
           {% endif %}
+
         </div>
       </div>
     </div>
   </section>
+
+  <script>
+    // ── Drop zone ────────────────────────────────────────────────────────
+    const dz  = document.getElementById('drop-zone');
+    const inp = document.getElementById('xlsx-input');
+    const btn = document.getElementById('validate-btn');
+
+    if (dz) {
+      dz.addEventListener('dragover', e => {
+        e.preventDefault();
+        dz.style.borderColor = '#6366f1';
+        dz.style.background  = '#eef2ff';
+        document.getElementById('dz-icon').style.background = '#c7d2fe';
+      });
+      ['dragleave','dragend'].forEach(ev => dz.addEventListener(ev, resetDZ));
+      dz.addEventListener('drop', e => {
+        e.preventDefault(); resetDZ();
+        const f = e.dataTransfer?.files;
+        if (f && f.length) {
+          const dt = new DataTransfer(); dt.items.add(f[0]); inp.files = dt.files;
+          handleFile(f);
+        }
+      });
+    }
+
+    function resetDZ() {
+      if (!dz) return;
+      dz.style.borderColor = '#c7d2fe';
+      dz.style.background  = '#f8f9ff';
+      const ic = document.getElementById('dz-icon');
+      if (ic) ic.style.background = '#e0e7ff';
+    }
+
+    function handleFile(files) {
+      if (!files || !files.length) return;
+      const f = files[0];
+      const pv = document.getElementById('file-preview');
+      document.getElementById('file-name').textContent = f.name;
+      document.getElementById('file-size').textContent = fmtBytes(f.size);
+      if (pv) pv.style.display = 'flex';
+
+      if (dz) {
+        dz.style.borderColor = '#22c55e';
+        dz.style.background  = '#f0fdf4';
+        const ic = document.getElementById('dz-icon');
+        if (ic) ic.style.background = '#dcfce7';
+      }
+      document.getElementById('dz-title').textContent = f.name;
+      document.getElementById('dz-sub').textContent   = fmtBytes(f.size);
+
+      if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; }
+    }
+
+    function clearFile() {
+      if (inp) inp.value = '';
+      const pv = document.getElementById('file-preview');
+      if (pv) pv.style.display = 'none';
+      resetDZ();
+      document.getElementById('dz-title').textContent = 'Arraste o .xlsx aqui';
+      document.getElementById('dz-sub').textContent   = 'ou clique para selecionar';
+      if (btn) { btn.disabled = true; btn.style.opacity = '.45'; btn.style.cursor = 'not-allowed'; }
+    }
+
+    function fmtBytes(b) {
+      if (!b) return '0 B';
+      const k = 1024, s = ['B','KB','MB','GB'], i = Math.floor(Math.log(b)/Math.log(k));
+      return (b/Math.pow(k,i)).toFixed(1) + ' ' + s[i];
+    }
+
+    // ── Seleção de abas ──────────────────────────────────────────────────
+    function updateCount(cb) {
+      const label = cb.closest('label');
+      if (cb.checked) {
+        label.style.borderColor = '#818cf8';
+        label.style.background  = '#f5f3ff';
+      } else {
+        label.style.borderColor = '#e2e8f0';
+        label.style.background  = '#fff';
+      }
+      refreshSummary();
+    }
+
+    function refreshSummary() {
+      const checked  = document.querySelectorAll('.sheet-cb:checked');
+      const count    = checked.length;
+      const totalLines = [...checked].reduce((s, c) => s + parseInt(c.dataset.rows || 0), 0);
+
+      const countEl = document.getElementById('sel-count');
+      const linesEl = document.getElementById('sel-lines-label');
+      const ibtn    = document.getElementById('import-btn');
+
+      if (countEl) countEl.textContent = count;
+      if (linesEl) linesEl.textContent = count > 0 ? `&bull; ${totalLines.toLocaleString('pt-BR')} linhas` : '';
+      if (linesEl) linesEl.innerHTML   = count > 0 ? `&bull; ${totalLines.toLocaleString('pt-BR')} linhas` : '';
+
+      if (ibtn) {
+        const disabled = count === 0;
+        ibtn.disabled      = disabled;
+        ibtn.style.opacity = disabled ? '.4' : '1';
+        ibtn.style.cursor  = disabled ? 'not-allowed' : 'pointer';
+        ibtn.textContent   = disabled
+          ? 'Importar'
+          : `Importar ${count} aba${count > 1 ? 's' : ''} → ${totalLines.toLocaleString('pt-BR')} linhas`;
+      }
+    }
+
+    function selectAll() {
+      document.querySelectorAll('.sheet-cb:not(:disabled)').forEach(cb => {
+        cb.checked = true; updateCount(cb);
+      });
+    }
+
+    function clearAll() {
+      document.querySelectorAll('.sheet-cb').forEach(cb => {
+        cb.checked = false; updateCount(cb);
+      });
+    }
+
+    // Injeta os hidden inputs das abas antes de submeter o form
+    function submitImport() {
+      const form = document.getElementById('import-form');
+      if (!form) return;
+
+      // Remove inputs antigos
+      form.querySelectorAll('input[name="selected_sheets"]').forEach(el => el.remove());
+
+      // Adiciona um input por aba selecionada
+      document.querySelectorAll('.sheet-cb:checked').forEach(cb => {
+        const hi = document.createElement('input');
+        hi.type  = 'hidden';
+        hi.name  = 'selected_sheets';
+        hi.value = cb.value;
+        form.appendChild(hi);
+      });
+
+      form.submit();
+    }
+
+    // Inicializa contagem se houver abas pré-selecionadas
+    document.addEventListener('DOMContentLoaded', refreshSummary);
+  </script>
 {% endblock %}

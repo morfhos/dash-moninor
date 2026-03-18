@@ -260,12 +260,24 @@ def parse_media_plan_xlsx(uploaded_file: UploadedFile) -> dict[str, Any]:
                 pass
 
 
-def import_media_plan_xlsx(*, campaign: Campaign, uploaded_file: UploadedFile, replace_existing: bool) -> dict[str, Any]:
+def import_media_plan_xlsx(*, campaign: Campaign, uploaded_file: UploadedFile, replace_existing: bool, selected_sheets: list[str] | None = None) -> dict[str, Any]:
     parsed = parse_media_plan_xlsx(uploaded_file)
+
+    # Auto-detecção: se nenhuma linha tática foi encontrada, tenta formato de patrocínio
+    if not parsed.get("parsed_rows"):
+        uploaded_file.seek(0)
+        return import_sponsorship_xlsx(campaign=campaign, uploaded_file=uploaded_file, replace_existing=replace_existing, selected_sheets=selected_sheets)
+
     if not parsed.get("ok"):
         return {"ok": False, "errors": parsed.get("errors", ["Falha ao ler planilha."])}
 
     parsed_rows: list[ParsedPlacementRow] = parsed.get("parsed_rows", [])
+
+    # Filtra apenas as abas selecionadas pelo usuário
+    if selected_sheets is not None:
+        parsed_rows = [r for r in parsed_rows if r.sheet in selected_sheets]
+        if not parsed_rows:
+            return {"ok": False, "errors": ["Nenhuma linha válida nas abas selecionadas."]}
     pieces_table: list[dict[str, Any]] = parsed.get("pieces", [])
 
     created_lines = 0
@@ -401,6 +413,153 @@ def import_media_plan_xlsx(*, campaign: Campaign, uploaded_file: UploadedFile, r
             "placement_days": created_days,
             "pieces": created_pieces,
             "placement_creatives": created_links,
+        },
+    }
+
+
+def parse_sponsorship_xlsx(uploaded_file: UploadedFile) -> dict[str, Any]:
+    """Roda o sponsorship_xlsx_worker e retorna parsed_rows com custo/impressões."""
+    errors: list[str] = []
+    parsed_rows: list[ParsedPlacementRow] = []
+
+    temp_path = None
+    source_path = getattr(uploaded_file, "path", None)
+    if source_path:
+        temp_path = source_path
+    else:
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+        temp_path = tmp.name
+        for chunk in uploaded_file.chunks():
+            tmp.write(chunk)
+        tmp.close()
+
+    try:
+        backend_dir = getattr(settings, "BASE_DIR", None)
+        backend_dir = str(backend_dir) if backend_dir else os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+        proc = subprocess.run(
+            [sys.executable, "-m", "campaigns.sponsorship_xlsx_worker", temp_path],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=backend_dir,
+        )
+        if proc.returncode != 0 or not proc.stdout:
+            detail = (proc.stderr or "").strip()
+            if detail:
+                detail = detail.splitlines()[-1][:300]
+            errors.append(f"Falha ao ler planilha de patrocínio. Detalhe: {detail}")
+            return {"ok": False, "errors": errors, "sheets": [], "total_rows": 0, "detected": {}, "parsed_rows": []}
+
+        data = json.loads(proc.stdout)
+        for r in data.get("rows") or []:
+            start_dt = _try_parse_datetime(r.get("data", {}).get("start_date"))
+            end_dt = _try_parse_datetime(r.get("data", {}).get("end_date"))
+            days: list[tuple[date, int]] = []
+            for entry in r.get("days", []):
+                d_iso, ins = entry[0], entry[1]
+                d = _try_parse_date(d_iso)
+                ins_i = _parse_int(ins) or 0
+                if d is not None and ins_i > 0:
+                    days.append((d, ins_i))
+            row_data = {**(r.get("data") or {}), "start_date": start_dt, "end_date": end_dt}
+            parsed_rows.append(
+                ParsedPlacementRow(
+                    sheet=str(r.get("sheet") or ""),
+                    media_type=str(r.get("media_type") or ""),
+                    media_channel=str(r.get("media_channel") or ""),
+                    data=row_data,
+                    days=days,
+                    piece_codes=list(r.get("piece_codes") or []),
+                )
+            )
+
+        if not parsed_rows:
+            errors.append("Nenhuma entrega de patrocínio detectada no arquivo.")
+
+        return {
+            "ok": len(errors) == 0,
+            "errors": errors,
+            "sheets": data.get("sheets", []),
+            "total_rows": int(data.get("total_rows") or 0),
+            "detected": data.get("detected") or {},
+            "parsed_rows": parsed_rows,
+            "pieces": [],
+            "format": "sponsorship",
+        }
+    finally:
+        if source_path is None and temp_path:
+            try:
+                os.unlink(temp_path)
+            except Exception:
+                pass
+
+
+def import_sponsorship_xlsx(*, campaign: Campaign, uploaded_file: UploadedFile, replace_existing: bool, selected_sheets: list[str] | None = None) -> dict[str, Any]:
+    """
+    Importa planilha de patrocínio/proposta comercial.
+    Mesma lógica de import_media_plan_xlsx, com suporte a cost e impressions por dia.
+    """
+    parsed = parse_sponsorship_xlsx(uploaded_file)
+    if not parsed.get("ok"):
+        return {"ok": False, "errors": parsed.get("errors", ["Falha ao ler planilha de patrocínio."])}
+
+    parsed_rows: list[ParsedPlacementRow] = parsed.get("parsed_rows", [])
+
+    if selected_sheets is not None:
+        parsed_rows = [r for r in parsed_rows if r.sheet in selected_sheets]
+        if not parsed_rows:
+            return {"ok": False, "errors": ["Nenhuma linha válida nas abas selecionadas."]}
+
+    created_lines = 0
+    created_days = 0
+
+    with transaction.atomic():
+        if replace_existing:
+            PlacementCreative.objects.filter(placement_line__campaign=campaign).delete()
+            PlacementDay.objects.filter(placement_line__campaign=campaign).delete()
+            PlacementLine.objects.filter(campaign=campaign).delete()
+
+        for row in parsed_rows:
+            line = PlacementLine.objects.create(
+                campaign=campaign,
+                media_type=row.media_type,
+                media_channel=row.media_channel,
+                market=str(row.data.get("market") or "")[:100],
+                channel=str(row.data.get("channel") or "")[:100],
+                program=str(row.data.get("program") or "")[:150],
+                property_text=str(row.data.get("property_text") or "")[:250],
+                format_text=str(row.data.get("format_text") or "")[:250],
+                duration_sec=row.data.get("duration_sec") or None,
+                external_ref=str(row.data.get("external_ref") or "")[:120],
+                start_date=row.data.get("start_date"),
+                end_date=row.data.get("end_date"),
+            )
+            created_lines += 1
+
+            day_costs = row.data.get("day_costs") or []
+            day_impressions = row.data.get("day_impressions") or []
+
+            for i, (d, ins) in enumerate(row.days):
+                cost = day_costs[i] if i < len(day_costs) else None
+                impressions = day_impressions[i] if i < len(day_impressions) else None
+                PlacementDay.objects.create(
+                    placement_line=line,
+                    date=d,
+                    insertions=ins,
+                    cost=cost if cost is not None else None,
+                    impressions=impressions if impressions else None,
+                )
+                created_days += 1
+
+    return {
+        "ok": True,
+        "format": "sponsorship",
+        "created": {
+            "placement_lines": created_lines,
+            "placement_days": created_days,
+            "pieces": 0,
+            "placement_creatives": 0,
         },
     }
 

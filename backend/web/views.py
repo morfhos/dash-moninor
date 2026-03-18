@@ -28,7 +28,6 @@ from .forms import (
     CampaignWizardForm,
     ClienteForm,
     ClienteUserCreateForm,
-    ContractUploadForm,
     LoginForm,
     MediaPlanUploadForm,
 )
@@ -2811,15 +2810,71 @@ def contract_wizard_step2(request: HttpRequest, campaign_id: int) -> HttpRespons
         return redirect("web:clientes")
 
     form_errors = ""
+    result = None
+    form = MediaPlanUploadForm()
+
     if request.method == "POST":
-        form = ContractUploadForm(request.POST, request.FILES)
-        if form.is_valid():
-            contract_file = form.cleaned_data["contract_file"]
-            ContractUpload.objects.create(campaign=campaign, file=contract_file)
-            return redirect("web:contract_done", campaign_id=campaign.id)
-        form_errors = "Selecione um arquivo para upload."
-    else:
-        form = ContractUploadForm()
+        action = request.POST.get("_action") or "validate"
+
+        if action == "import":
+            upload_id = request.POST.get("upload_id")
+            replace = bool(request.POST.get("replace_existing"))
+            selected_sheets = request.POST.getlist("selected_sheets") or None
+            upload = MediaPlanUpload.objects.filter(id=upload_id, campaign=campaign).first()
+            if upload is None:
+                form_errors = "Upload não encontrado."
+            else:
+                parsed = import_media_plan_xlsx(
+                    campaign=campaign,
+                    uploaded_file=upload.file,
+                    replace_existing=replace,
+                    selected_sheets=selected_sheets,
+                )
+                if parsed.get("ok"):
+                    upload.summary = parsed
+                    upload.save(update_fields=["summary"])
+                    # Salva também como ContractUpload para registro
+                    ContractUpload.objects.get_or_create(
+                        campaign=campaign,
+                        defaults={"file": upload.file.name},
+                    )
+                    AuditLog.log(
+                        AuditLog.EventType.MEDIA_PLAN_UPLOADED,
+                        request=request,
+                        cliente=campaign.cliente,
+                        details={"campaign_id": campaign.id, "campaign_name": campaign.name},
+                    )
+                    return redirect("web:contract_done", campaign_id=campaign.id)
+                else:
+                    form_errors = "; ".join(parsed.get("errors", ["Falha ao importar."]))
+                    result = {"upload_id": upload_id}
+        else:
+            form = MediaPlanUploadForm(request.POST, request.FILES)
+            if form.is_valid():
+                xlsx = form.cleaned_data["xlsx_file"]
+                upload = MediaPlanUpload.objects.create(campaign=campaign, file=xlsx, summary={})
+                parsed = parse_media_plan_xlsx(upload.file)
+
+                rows_per_sheet: dict[str, int] = {}
+                for row in (parsed.get("parsed_rows") or []):
+                    rows_per_sheet[row.sheet] = rows_per_sheet.get(row.sheet, 0) + 1
+                detected = parsed.get("detected") or {}
+                for sheet_name, info in (detected.get("sheets") or {}).items():
+                    info["valid_rows"] = rows_per_sheet.get(sheet_name, 0)
+
+                upload.summary = {
+                    "ok": bool(parsed.get("ok")),
+                    "errors": parsed.get("errors", []),
+                    "sheets": parsed.get("sheets", []),
+                    "total_rows": parsed.get("total_rows", 0),
+                    "valid_rows": len(parsed.get("parsed_rows", []) or []),
+                    "detected": detected,
+                }
+                upload.save(update_fields=["summary"])
+                result = dict(upload.summary)
+                result["upload_id"] = upload.id
+            else:
+                form_errors = "Selecione um arquivo .xlsx válido."
 
     return render(
         request,
@@ -2831,6 +2886,7 @@ def contract_wizard_step2(request: HttpRequest, campaign_id: int) -> HttpRespons
             "campaign": campaign,
             "form": form,
             "form_errors": form_errors,
+            "result": result,
         },
     )
 
@@ -3037,7 +3093,6 @@ def contract_done(request: HttpRequest, campaign_id: int) -> HttpResponse:
 
     # Gerar lista de meses do período
     from datetime import date
-    from dateutil.relativedelta import relativedelta
 
     months_list = []
     month_names_pt = {
@@ -3072,7 +3127,8 @@ def contract_done(request: HttpRequest, campaign_id: int) -> HttpResponse:
                 "abbrev": month_abbrev_pt[current.month],
                 "key": f"{current.year}-{current.month:02d}",
             })
-            current = current + relativedelta(months=1)
+            y, m = current.year, current.month
+            current = date(y + 1, 1, 1) if m == 12 else date(y, m + 1, 1)
 
     return render(
         request,
@@ -3122,11 +3178,12 @@ def campaign_media_plan_upload(request: HttpRequest, campaign_id: int) -> HttpRe
         if action == "import":
             upload_id = request.POST.get("upload_id")
             replace = bool(request.POST.get("replace_existing"))
+            selected_sheets = request.POST.getlist("selected_sheets") or None
             upload = MediaPlanUpload.objects.filter(id=upload_id, campaign=campaign).first()
             if upload is None:
                 form_errors = "Upload não encontrado."
             else:
-                parsed = import_media_plan_xlsx(campaign=campaign, uploaded_file=upload.file, replace_existing=replace)
+                parsed = import_media_plan_xlsx(campaign=campaign, uploaded_file=upload.file, replace_existing=replace, selected_sheets=selected_sheets)
                 if parsed.get("ok"):
                     upload.summary = parsed
                     upload.save(update_fields=["summary"])
@@ -3146,13 +3203,22 @@ def campaign_media_plan_upload(request: HttpRequest, campaign_id: int) -> HttpRe
                 xlsx = form.cleaned_data["xlsx_file"]
                 upload = MediaPlanUpload.objects.create(campaign=campaign, file=xlsx, summary={})
                 parsed = parse_media_plan_xlsx(upload.file)
+
+                # Conta linhas válidas por aba e injeta no detected.sheets
+                rows_per_sheet: dict[str, int] = {}
+                for row in (parsed.get("parsed_rows") or []):
+                    rows_per_sheet[row.sheet] = rows_per_sheet.get(row.sheet, 0) + 1
+                detected = parsed.get("detected") or {}
+                for sheet_name, info in (detected.get("sheets") or {}).items():
+                    info["valid_rows"] = rows_per_sheet.get(sheet_name, 0)
+
                 upload.summary = {
                     "ok": bool(parsed.get("ok")),
                     "errors": parsed.get("errors", []),
                     "sheets": parsed.get("sheets", []),
                     "total_rows": parsed.get("total_rows", 0),
                     "valid_rows": len(parsed.get("parsed_rows", []) or []),
-                    "detected": parsed.get("detected", {}),
+                    "detected": detected,
                 }
                 upload.save(update_fields=["summary"])
                 result = dict(upload.summary)
@@ -3960,7 +4026,6 @@ def relatorios_consolidado(request: HttpRequest) -> HttpResponse:
 
     # Gerar lista de meses
     from datetime import date as date_type
-    from dateutil.relativedelta import relativedelta
 
     months_list = []
     month_names_pt = {
@@ -3983,7 +4048,8 @@ def relatorios_consolidado(request: HttpRequest) -> HttpResponse:
                 "name": month_names_pt[current.month],
                 "key": f"{current.year}-{current.month:02d}",
             })
-            current = current + relativedelta(months=1)
+            y, m = current.year, current.month
+            current = date_type(y + 1, 1, 1) if m == 12 else date_type(y, m + 1, 1)
 
     return render(
         request,
