@@ -76,6 +76,7 @@ class RegionInvestment(models.Model):
     campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name="region_investments")
     region_name = models.CharField(max_length=200)
     percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    valor = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
     order = models.PositiveIntegerField(default=0)
     color = models.CharField(max_length=20, default="#6366f1")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -242,3 +243,115 @@ class PlacementCreative(models.Model):
 
     def __str__(self) -> str:
         return f"{self.placement_line_id} {self.piece_id}"
+
+
+# ── Financial models ──────────────────────────────────────────────────────────
+
+class FinancialUpload(models.Model):
+    campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name="financial_uploads")
+    file = models.FileField(upload_to="campaigns/financeiro/")
+    summary = models.JSONField(blank=True, default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Upload Financeiro"
+        verbose_name_plural = "Uploads Financeiros"
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"FinancialUpload #{self.id} campaign={self.campaign_id}"
+
+
+class FinancialSummary(models.Model):
+    campaign = models.OneToOneField(Campaign, on_delete=models.CASCADE, related_name="financial_summary")
+    # Dict keyed by meio (TV Aberta, Pay TV, Rádio, Jornal, Digital, OOH)
+    # Each value: {valor_bruto, valor_liquido, desconto_pct, insercoes}
+    data_by_channel = models.JSONField(blank=True, default=dict)
+    # List of {month: 'YYYY-MM', valor: float}
+    monthly_investment = models.JSONField(blank=True, default=list)
+    total_valor_tabela = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
+    total_valor_negociado = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
+    total_desembolso = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
+    desconto_pct = models.DecimalField(max_digits=7, decimal_places=4, null=True, blank=True)
+    grp_pct = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
+    cobertura_pct = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
+    frequencia_eficaz = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Resumo Financeiro"
+        verbose_name_plural = "Resumos Financeiros"
+
+    def __str__(self) -> str:
+        return f"FinancialSummary campaign={self.campaign_id}"
+
+
+class MediaEfficiency(models.Model):
+    class ChannelType(models.TextChoices):
+        TV_ABERTA = "tv_aberta", "TV Aberta"
+        PAYTV = "paytv", "Pay TV"
+        RADIO = "radio", "Rádio"
+        JORNAL = "jornal", "Jornal"
+
+    campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name="media_efficiencies")
+    channel_type = models.CharField(max_length=20, choices=ChannelType.choices)
+    veiculo = models.CharField(max_length=200)
+    programa = models.CharField(max_length=200, blank=True, default="")
+    praca = models.CharField(max_length=100, blank=True, default="")
+    insercoes = models.PositiveIntegerField(default=0)
+    trp = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
+    cpp = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    custo_tabela = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    custo_negociado = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    impactos = models.PositiveIntegerField(null=True, blank=True)
+    cpm = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    ia_pct = models.DecimalField(max_digits=7, decimal_places=4, null=True, blank=True)
+    formato = models.CharField(max_length=100, blank=True, default="")
+    circulacao = models.PositiveIntegerField(null=True, blank=True)
+    valor = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Eficiência de Mídia"
+        verbose_name_plural = "Eficiências de Mídia"
+        indexes = [
+            models.Index(fields=["campaign", "channel_type"], name="mediaeff_campaign_channel_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.channel_type} | {self.veiculo} | {self.praca}"
+
+
+class PIControl(models.Model):
+    class PIType(models.TextChoices):
+        TV_ABERTA = "tv_aberta", "TV Aberta"
+        TV_FECHADA = "tv_fechada", "TV Fechada"
+
+    class Status(models.TextChoices):
+        PENDENTE = "pendente", "Pendente"
+        PAGO = "pago", "Pago"
+        VENCIDO = "vencido", "Vencido"
+        CANCELADO = "cancelado", "Cancelado"
+
+    campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name="pi_controls")
+    pi_type = models.CharField(max_length=20, choices=PIType.choices)
+    pi_numero = models.CharField(max_length=50, blank=True, default="")
+    produto = models.CharField(max_length=200, blank=True, default="")
+    rede = models.CharField(max_length=200, blank=True, default="")
+    praca = models.CharField(max_length=100, blank=True, default="")
+    veiculacao_start = models.DateField(null=True, blank=True)
+    veiculacao_end = models.DateField(null=True, blank=True)
+    vencimento = models.DateField(null=True, blank=True, db_index=True)
+    insercoes = models.PositiveIntegerField(default=0)
+    valor_liquido = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDENTE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Controle de PI"
+        verbose_name_plural = "Controle de PIs"
+        indexes = [
+            models.Index(fields=["campaign", "vencimento"], name="picontrol_campaign_venc_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"PI {self.pi_numero} | {self.rede} | {self.praca}"

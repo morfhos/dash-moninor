@@ -16,7 +16,11 @@ from django.core.files.uploadedfile import UploadedFile
 from django.db import transaction
 from django.utils import timezone
 
-from .models import Campaign, CreativeAsset, Piece, PlacementCreative, PlacementDay, PlacementLine
+from .models import (
+    Campaign, CreativeAsset, FinancialSummary, FinancialUpload,
+    MediaEfficiency, PIControl, Piece, PlacementCreative, PlacementDay,
+    PlacementLine, RegionInvestment,
+)
 
 
 def _norm(s: str) -> str:
@@ -679,3 +683,158 @@ def attach_assets_to_campaign(*, campaign: Campaign, files: Iterable[UploadedFil
                 asset.save(update_fields=["metadata"])
 
     return {"ok": True, "created_pieces": created_pieces, "created_assets": created_assets, "skipped_duplicates": skipped_duplicates}
+
+
+# ── Financial integration ──────────────────────────────────────────────────────
+
+def parse_financial_xlsx(uploaded_file) -> dict:
+    """
+    Run financial_xlsx_worker as subprocess, return parsed JSON dict.
+    Works with FieldFile (from model) or UploadedFile (from form).
+    """
+    import tempfile, os
+
+    # Write to temp file
+    if hasattr(uploaded_file, "path"):
+        path = uploaded_file.path
+        tmp = None
+    else:
+        suffix = ".xlsx"
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+        try:
+            for chunk in uploaded_file.chunks():
+                tmp.write(chunk)
+        except AttributeError:
+            uploaded_file.seek(0)
+            tmp.write(uploaded_file.read())
+        tmp.close()
+        path = tmp.name
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "campaigns.financial_xlsx_worker", path],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if result.returncode != 0:
+            return {"ok": False, "errors": [result.stderr or "Worker exited with error"]}
+        return json.loads(result.stdout)
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "errors": ["Timeout ao processar arquivo"]}
+    except json.JSONDecodeError as e:
+        return {"ok": False, "errors": [f"JSON inválido do worker: {e}"]}
+    finally:
+        if tmp:
+            os.unlink(path)
+
+
+@transaction.atomic
+def import_financial_data(campaign: "Campaign", parsed: dict) -> dict:
+    """
+    Persist parsed financial data into DB:
+      - FinancialSummary (upsert)
+      - MediaEfficiency rows (replace all for campaign)
+      - PIControl rows (replace all for campaign)
+      - RegionInvestment.valor (update from resumo_meios)
+    """
+    from decimal import Decimal, InvalidOperation
+
+    def _dec(v):
+        if v is None:
+            return None
+        try:
+            return Decimal(str(v))
+        except InvalidOperation:
+            return None
+
+    summary_data = parsed.get("summary") or {}
+    resumo_meios = parsed.get("resumo_meios") or {}
+    pi_rows = parsed.get("pi_controls") or []
+    eff_rows = parsed.get("media_efficiencies") or []
+
+    # FinancialSummary upsert
+    fs, _ = FinancialSummary.objects.get_or_create(campaign=campaign)
+    fs.data_by_channel = resumo_meios
+    fs.monthly_investment = summary_data.get("monthly_investment") or []
+    fs.total_valor_tabela = _dec(summary_data.get("total_valor_tabela"))
+    fs.total_valor_negociado = _dec(summary_data.get("total_valor_negociado"))
+    fs.total_desembolso = _dec(summary_data.get("total_desembolso"))
+    fs.desconto_pct = _dec(summary_data.get("desconto_pct"))
+    fs.grp_pct = _dec(summary_data.get("grp_pct"))
+    fs.cobertura_pct = _dec(summary_data.get("cobertura_pct"))
+    fs.frequencia_eficaz = _dec(summary_data.get("frequencia_eficaz"))
+    fs.save()
+
+    # MediaEfficiency — replace all
+    MediaEfficiency.objects.filter(campaign=campaign).delete()
+    eff_objs = []
+    for row in eff_rows:
+        eff_objs.append(MediaEfficiency(
+            campaign=campaign,
+            channel_type=row.get("channel_type", ""),
+            veiculo=row.get("veiculo") or "",
+            programa=row.get("programa") or "",
+            praca=row.get("praca") or "",
+            insercoes=row.get("insercoes") or 0,
+            trp=_dec(row.get("trp")),
+            cpp=_dec(row.get("cpp")),
+            custo_tabela=_dec(row.get("custo_tabela")),
+            custo_negociado=_dec(row.get("custo_negociado")),
+            impactos=row.get("impactos"),
+            cpm=_dec(row.get("cpm")),
+            ia_pct=_dec(row.get("ia_pct")),
+            formato=row.get("formato") or "",
+            circulacao=row.get("circulacao"),
+            valor=_dec(row.get("valor")),
+        ))
+    MediaEfficiency.objects.bulk_create(eff_objs)
+
+    # PIControl — replace all
+    PIControl.objects.filter(campaign=campaign).delete()
+    pi_objs = []
+    for row in pi_rows:
+        pi_objs.append(PIControl(
+            campaign=campaign,
+            pi_type=row.get("pi_type", "tv_aberta"),
+            pi_numero=row.get("pi_numero") or "",
+            produto=row.get("produto") or "",
+            rede=row.get("rede") or "",
+            praca=row.get("praca") or "",
+            veiculacao_start=row.get("veiculacao_start"),
+            veiculacao_end=row.get("veiculacao_end"),
+            vencimento=row.get("vencimento"),
+            insercoes=row.get("insercoes") or 0,
+            valor_liquido=_dec(row.get("valor_liquido")),
+            status=PIControl.Status.PENDENTE,
+        ))
+    PIControl.objects.bulk_create(pi_objs)
+
+    # RegionInvestment — create/update from praça-aggregated data
+    REGION_COLORS = [
+        "#6366f1", "#f59e0b", "#22c55e", "#ef4444", "#3b82f6",
+        "#a855f7", "#14b8a6", "#ec4899", "#84cc16", "#f97316",
+    ]
+    region_rows = parsed.get("region_investments") or []
+    if region_rows:
+        # Delete existing and recreate with real data
+        RegionInvestment.objects.filter(campaign=campaign).delete()
+        for idx, rdata in enumerate(region_rows):
+            rname = rdata.get("region_name") or ""
+            if not rname:
+                continue
+            RegionInvestment.objects.create(
+                campaign=campaign,
+                region_name=rname,
+                valor=_dec(rdata.get("valor")),
+                percentage=_dec(rdata.get("percentage")) or 0,
+                order=idx,
+                color=REGION_COLORS[idx % len(REGION_COLORS)],
+            )
+
+    return {
+        "ok": True,
+        "efficiencies_imported": len(eff_objs),
+        "pi_controls_imported": len(pi_objs),
+        "regions_imported": len(region_rows),
+    }

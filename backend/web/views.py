@@ -1,7 +1,7 @@
 from accounts.models import AuditLog, Cliente
 
-from campaigns.models import Campaign, ContractUpload, CreativeAsset, MediaPlanUpload, Piece, PlacementCreative, PlacementDay, PlacementLine, RegionInvestment
-from campaigns.services import import_media_plan_xlsx, attach_assets_to_campaign, parse_media_plan_xlsx
+from campaigns.models import Campaign, ContractUpload, CreativeAsset, FinancialUpload, MediaPlanUpload, Piece, PlacementCreative, PlacementDay, PlacementLine, RegionInvestment
+from campaigns.services import import_financial_data, import_media_plan_xlsx, attach_assets_to_campaign, parse_financial_xlsx, parse_media_plan_xlsx
 from datetime import datetime, timedelta
 from django.contrib.auth import get_user_model
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
@@ -2631,8 +2631,30 @@ def cliente_delete(request: HttpRequest, cliente_id: int) -> HttpResponse:
 @login_required
 @require_admin
 def cliente_campaigns(request: HttpRequest, cliente_id: int) -> HttpResponse:
+    from django.core.paginator import Paginator
+
     cliente = Cliente.objects.get(id=cliente_id)
-    campaigns = Campaign.objects.filter(cliente_id=cliente.id).order_by("-created_at")
+    campaigns_qs = Campaign.objects.filter(cliente_id=cliente.id).order_by("-created_at")
+
+    # Search filter
+    q = request.GET.get("q", "").strip()
+    if q:
+        campaigns_qs = campaigns_qs.filter(name__icontains=q)
+
+    # Status filter
+    status_filter = request.GET.get("status", "")
+    if status_filter:
+        campaigns_qs = campaigns_qs.filter(status=status_filter)
+
+    # Meio filter
+    meio_filter = request.GET.get("meio", "")
+    if meio_filter:
+        campaigns_qs = campaigns_qs.filter(media_type=meio_filter)
+
+    paginator = Paginator(campaigns_qs, 10)
+    page_number = request.GET.get("page", 1)
+    page_obj = paginator.get_page(page_number)
+
     return render(
         request,
         "web/cliente_campaigns.html",
@@ -2640,7 +2662,11 @@ def cliente_campaigns(request: HttpRequest, cliente_id: int) -> HttpResponse:
             "active": "clientes",
             "page_title": "Campanhas",
             "cliente": cliente,
-            "campaigns": campaigns,
+            "campaigns": page_obj,
+            "page_obj": page_obj,
+            "q": q,
+            "status_filter": status_filter,
+            "meio_filter": meio_filter,
         },
     )
 
@@ -3160,6 +3186,7 @@ def contract_done(request: HttpRequest, campaign_id: int) -> HttpResponse:
             "filter_channels": sorted(unique_channels),
             "filter_markets": sorted(unique_markets),
             "role": role,
+            "has_financial": campaign.financial_uploads.exists(),
         },
     )
 
@@ -5137,3 +5164,143 @@ def api_veiculacao_data(request: HttpRequest) -> JsonResponse:
         d["clicks"] = d["clicks"] or 0
 
     return JsonResponse({"daily": daily})
+
+
+# ── Financial integration views ───────────────────────────────────────────────
+
+@login_required
+@require_admin
+def campaign_financeiro(request: HttpRequest, campaign_id: int) -> HttpResponse:
+    """Exibe o dashboard financeiro da campanha (6 módulos)."""
+    from django.db.models import Sum
+
+    campaign = Campaign.objects.filter(id=campaign_id).select_related("cliente").first()
+    if campaign is None:
+        return redirect("web:campanhas")
+
+    try:
+        fs = campaign.financial_summary
+    except Exception:
+        fs = None
+
+    efficiencies = list(campaign.media_efficiencies.order_by("channel_type", "veiculo"))
+    pi_controls = list(campaign.pi_controls.order_by("vencimento"))
+    region_investments = list(campaign.region_investments.order_by("order"))
+
+    # Build chart data for split by channel
+    channel_labels = []
+    channel_values = []
+    if fs and fs.data_by_channel:
+        for ch, data in fs.data_by_channel.items():
+            label_map = {
+                "tv_aberta": "TV Aberta", "paytv": "Pay TV", "radio": "Rádio",
+                "jornal": "Jornal", "digital": "Digital", "ooh": "OOH",
+            }
+            v = data.get("valor_liquido") or data.get("valor_bruto")
+            if v:
+                channel_labels.append(label_map.get(ch, ch))
+                channel_values.append(float(v))
+
+    # Monthly investment chart data
+    monthly_labels = []
+    monthly_values = []
+    if fs and fs.monthly_investment:
+        for item in fs.monthly_investment:
+            monthly_labels.append(item.get("month", ""))
+            monthly_values.append(float(item.get("valor") or 0))
+
+    # PI alerts: count overdue / due soon
+    from datetime import date
+    today = date.today()
+    pi_overdue = sum(1 for pi in pi_controls if pi.vencimento and pi.vencimento < today and pi.status == "pendente")
+    pi_due_soon = sum(1 for pi in pi_controls if pi.vencimento and today <= pi.vencimento <= date(today.year, today.month + 1 if today.month < 12 else 1, today.day) and pi.status == "pendente")
+
+    # Distinct values for table filters
+    meio_options = sorted(set(e.channel_type for e in efficiencies if e.channel_type))
+    veiculo_options = sorted(set(e.veiculo for e in efficiencies if e.veiculo))
+
+    import json as _json
+    return render(request, "web/campaign_financial.html", {
+        "active": "dashboard",
+        "page_title": f"Financeiro — {campaign.name}",
+        "cliente": campaign.cliente,
+        "campaign": campaign,
+        "fs": fs,
+        "efficiencies": efficiencies,
+        "pi_controls": pi_controls,
+        "region_investments": region_investments,
+        "channel_labels_json": _json.dumps(channel_labels),
+        "channel_values_json": _json.dumps(channel_values),
+        "monthly_labels_json": _json.dumps(monthly_labels),
+        "monthly_values_json": _json.dumps(monthly_values),
+        "pi_overdue": pi_overdue,
+        "pi_due_soon": pi_due_soon,
+        "meio_options": meio_options,
+        "veiculo_options": veiculo_options,
+    })
+
+
+@login_required
+@require_admin
+def campaign_financial_upload(request: HttpRequest, campaign_id: int) -> HttpResponse:
+    """Upload e importação de planilha financeira."""
+    from django.core.files.base import ContentFile
+
+    campaign = Campaign.objects.filter(id=campaign_id).select_related("cliente").first()
+    if campaign is None:
+        return redirect("web:campanhas")
+
+    form_errors = ""
+    result = None
+
+    if request.method == "POST":
+        action = request.POST.get("_action") or "validate"
+
+        if action == "import":
+            upload_id = request.POST.get("upload_id")
+            upload = FinancialUpload.objects.filter(id=upload_id, campaign=campaign).first()
+            if upload is None:
+                form_errors = "Upload não encontrado."
+            else:
+                parsed = parse_financial_xlsx(upload.file)
+                if parsed.get("ok"):
+                    import_result = import_financial_data(campaign=campaign, parsed=parsed)
+                    upload.summary = parsed
+                    upload.save(update_fields=["summary"])
+                    AuditLog.log(
+                        AuditLog.EventType.MEDIA_PLAN_UPLOADED,
+                        user=request.user,
+                        details={"type": "financial", "upload_id": upload.id, "campaign_id": campaign.id},
+                    )
+                    return redirect("web:campaign_financeiro", campaign_id=campaign.id)
+                else:
+                    form_errors = "; ".join(parsed.get("errors") or ["Falha ao importar."])
+                    result = {"upload_id": upload_id, "errors": parsed.get("errors", [])}
+        else:
+            # validate: save file, run parse preview
+            xlsx = request.FILES.get("xlsx_file")
+            if xlsx is None or not xlsx.name.endswith(".xlsx"):
+                form_errors = "Selecione um arquivo .xlsx válido."
+            else:
+                upload = FinancialUpload.objects.create(campaign=campaign, file=xlsx, summary={})
+                parsed = parse_financial_xlsx(upload.file)
+                sheets_found = parsed.get("sheets_found") or []
+                upload.summary = {
+                    "ok": bool(parsed.get("ok")),
+                    "errors": parsed.get("errors", []),
+                    "sheets_found": sheets_found,
+                    "pi_count": len(parsed.get("pi_controls") or []),
+                    "eff_count": len(parsed.get("media_efficiencies") or []),
+                }
+                upload.save(update_fields=["summary"])
+                result = dict(upload.summary)
+                result["upload_id"] = upload.id
+
+    return render(request, "web/campaign_financial_upload.html", {
+        "active": "dashboard",
+        "page_title": "Upload Financeiro",
+        "cliente": campaign.cliente,
+        "campaign": campaign,
+        "form_errors": form_errors,
+        "result": result,
+    })

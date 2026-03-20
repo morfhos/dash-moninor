@@ -1,0 +1,618 @@
+{% extends "web/base.html" %}
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<style>
+  /* ── Page header ─────────────────────────────────────────── */
+  .fin-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+  }
+  .fin-header h1 { margin: 0; font-size: 24px; font-weight: 700; }
+  .fin-header .subtitle { margin: 4px 0 0; color: var(--text-secondary); font-size: 13px; }
+  .fin-header .btn-upload {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 10px 20px; background: var(--accent, #6366f1); color: #fff;
+    border-radius: 10px; font-size: 13px; font-weight: 600;
+    text-decoration: none; transition: opacity .15s;
+  }
+  .fin-header .btn-upload:hover { opacity: .85; }
+
+  /* ── Metric cards ────────────────────────────────────────── */
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .metric-card {
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px 20px;
+  }
+  .metric-card .label {
+    margin: 0 0 6px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--text-secondary);
+  }
+  .metric-card .value {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1.1;
+  }
+  .metric-card .sub {
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  /* ── Chart section ───────────────────────────────────────── */
+  .charts-row {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 20px;
+    margin-bottom: 28px;
+  }
+  .chart-card {
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+  }
+  .chart-card h3 {
+    margin: 0 0 16px;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--text-secondary);
+  }
+
+  /* ── Table section ───────────────────────────────────────── */
+  .table-section {
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 28px;
+  }
+  .table-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .table-toolbar .search-box {
+    position: relative;
+    flex: 1;
+    max-width: 260px;
+  }
+  .table-toolbar .search-box input {
+    width: 100%;
+    padding: 8px 12px 8px 34px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text-primary);
+    font-size: 13px;
+    outline: none;
+  }
+  .table-toolbar .search-box input:focus { border-color: var(--accent, #6366f1); }
+  .table-toolbar .search-box svg {
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    color: var(--text-secondary); pointer-events: none;
+  }
+  .table-toolbar select {
+    padding: 8px 28px 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text-primary);
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23999' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+  }
+  .table-toolbar .date-range {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 12px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--surface); font-size: 13px; color: var(--text-primary);
+  }
+  .table-toolbar .date-range input[type="date"] {
+    border: none; background: none; color: var(--text-primary);
+    font-size: 12px; outline: none; width: 120px;
+  }
+  .fin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .fin-table thead th {
+    padding: 11px 14px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--text-secondary);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+  .fin-table tbody tr {
+    transition: background .12s;
+  }
+  .fin-table tbody tr:nth-child(even) { background: rgba(0,0,0,.015); }
+  .fin-table tbody tr:hover { background: rgba(99,102,241,.06); }
+  .fin-table tbody td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .fin-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .fin-table .bold { font-weight: 600; }
+
+  /* Channel pill */
+  .ch-pill {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .ch-pill.tv_aberta  { background: rgba(99,102,241,.1); color: #6366f1; }
+  .ch-pill.paytv      { background: rgba(34,197,94,.1);  color: #16a34a; }
+  .ch-pill.radio      { background: rgba(245,158,11,.1); color: #d97706; }
+  .ch-pill.jornal     { background: rgba(239,68,68,.1);  color: #dc2626; }
+  .ch-pill.digital    { background: rgba(59,130,246,.1);  color: #3b82f6; }
+  .ch-pill.other      { background: var(--surface); color: var(--text-secondary); border: 1px solid var(--border); }
+
+  /* Row actions */
+  .row-actions {
+    display: flex; gap: 2px; justify-content: flex-end;
+  }
+  .row-act {
+    position: relative;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; border-radius: 6px;
+    color: var(--text-secondary); text-decoration: none;
+    transition: all .12s;
+  }
+  .row-act:hover { background: rgba(99,102,241,.1); color: var(--accent, #6366f1); }
+  .row-act svg { width: 16px; height: 16px; }
+  .row-act::after {
+    content: attr(data-tip);
+    position: absolute; bottom: calc(100% + 5px); left: 50%; transform: translateX(-50%);
+    padding: 3px 8px; background: var(--text-primary); color: var(--bg, #fff);
+    font-size: 10px; font-weight: 600; border-radius: 5px;
+    white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .12s;
+  }
+  .row-act:hover::after { opacity: 1; }
+
+  /* PI status pills */
+  .pi-pill {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .pi-pill.pendente { background: rgba(245,158,11,.1); color: #d97706; }
+  .pi-pill.pago     { background: rgba(34,197,94,.1);  color: #16a34a; }
+  .pi-pill.vencido  { background: rgba(239,68,68,.1);  color: #dc2626; }
+
+  /* Empty state */
+  .fin-empty {
+    text-align: center; padding: 48px 20px;
+  }
+  .fin-empty p { margin: 0; color: var(--text-secondary); font-size: 14px; }
+  .fin-empty .big { margin-bottom: 8px; font-size: 16px; font-weight: 600; color: var(--text-primary); }
+
+  /* Region bars */
+  .region-row { display: flex; align-items: center; gap: 12px; }
+  .region-row .rname { width: 110px; font-size: 13px; font-weight: 500; flex-shrink: 0; }
+  .region-row .rbar { flex: 1; height: 10px; border-radius: 5px; background: var(--surface); overflow: hidden; }
+  .region-row .rbar-fill { height: 100%; border-radius: 5px; }
+  .region-row .rpct { width: 50px; font-size: 13px; text-align: right; color: var(--text-secondary); }
+  .region-row .rval { width: 110px; font-size: 13px; text-align: right; font-weight: 600; }
+</style>
+
+<!-- ── Header ──────────────────────────────────────────────────────────────── -->
+<div class="fin-header">
+  <div style="display:flex;align-items:center;gap:14px;">
+    <a href="{% url 'web:campanha_detalhe' campaign.id %}" style="color:var(--text-secondary);text-decoration:none;font-size:20px;line-height:1;">←</a>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <h1>Financeiro</h1>
+      <a href="{% url 'web:contract_done' campaign.id %}" title="Ver Timeline da Campanha" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:rgba(99,102,241,.1);color:#6366f1;text-decoration:none;transition:all .15s;" onmouseover="this.style.background='rgba(99,102,241,.2)'" onmouseout="this.style.background='rgba(99,102,241,.1)'">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
+      </a>
+    </div>
+    <p class="subtitle">{{ campaign.name }} · {{ cliente.nome }}</p>
+  </div>
+  <a class="btn-upload" href="{% url 'web:campaign_financial_upload' campaign.id %}">
+    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+    Importar planilha
+  </a>
+</div>
+
+{% if not fs %}
+<!-- ── Empty state ─────────────────────────────────────────────────────────── -->
+<div class="table-section">
+  <div class="fin-empty">
+    <svg style="width:48px;height:48px;margin-bottom:12px;color:var(--text-secondary);opacity:.35;" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+      <path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+    </svg>
+    <p class="big">Nenhum dado financeiro importado</p>
+    <p>Importe a planilha financeira para visualizar o dashboard</p>
+    <a class="btn-upload" href="{% url 'web:campaign_financial_upload' campaign.id %}" style="margin-top:20px;display:inline-flex;">Importar planilha</a>
+  </div>
+</div>
+{% else %}
+
+<!-- ── 1. Metric Cards (full width, 4 cols) ────────────────────────────────── -->
+<div class="metric-grid">
+  <div class="metric-card">
+    <p class="label">Valor Total</p>
+    <p class="value">{% if fs.total_valor_tabela %}R$ {{ fs.total_valor_tabela|floatformat:0 }}{% else %}—{% endif %}</p>
+    <p class="sub">Valor Tabela</p>
+  </div>
+  <div class="metric-card">
+    <p class="label">Valor Pendente</p>
+    <p class="value" style="color:#6366f1;">
+      {% if fs.total_valor_negociado %}R$ {{ fs.total_valor_negociado|floatformat:0 }}{% else %}—{% endif %}
+    </p>
+    <p class="sub">Valor Negociado</p>
+  </div>
+  <div class="metric-card">
+    <p class="label">Valor Pago</p>
+    <p class="value" style="color:#16a34a;">
+      {% if fs.total_desembolso %}R$ {{ fs.total_desembolso|floatformat:0 }}{% else %}—{% endif %}
+    </p>
+    <p class="sub">Desembolso</p>
+  </div>
+  <div class="metric-card">
+    <p class="label">Desconto</p>
+    <p class="value" style="color:#d97706;">
+      {% if fs.desconto_pct %}{{ fs.desconto_pct|floatformat:1 }}%{% else %}—{% endif %}
+    </p>
+    <p class="sub">Desconto Negociado</p>
+  </div>
+</div>
+
+{% if fs.grp_pct or fs.cobertura_pct or fs.frequencia_eficaz %}
+<div style="display:flex;gap:16px;margin-bottom:28px;">
+  {% if fs.grp_pct %}
+  <div class="metric-card" style="flex:1;">
+    <p class="label">GRP</p>
+    <p class="value">{{ fs.grp_pct|floatformat:1 }}</p>
+  </div>
+  {% endif %}
+  {% if fs.cobertura_pct %}
+  <div class="metric-card" style="flex:1;">
+    <p class="label">Cobertura</p>
+    <p class="value">{{ fs.cobertura_pct|floatformat:1 }}%</p>
+  </div>
+  {% endif %}
+  {% if fs.frequencia_eficaz %}
+  <div class="metric-card" style="flex:1;">
+    <p class="label">Freq. Eficaz</p>
+    <p class="value">{{ fs.frequencia_eficaz|floatformat:1 }}x</p>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- ── 2. Charts: Split por Meio (doughnut) + Timeline (bar) ──────────────── -->
+<div class="charts-row">
+  <!-- Split doughnut -->
+  <div class="chart-card">
+    <h3>Split por Meio</h3>
+    {% if channel_labels_json != "[]" %}
+    <canvas id="split-chart" style="max-height:260px;"></canvas>
+    {% else %}
+    <p style="color:var(--text-secondary);font-size:13px;text-align:center;padding:60px 0;">Sem dados</p>
+    {% endif %}
+  </div>
+  <!-- Timeline bar -->
+  <div class="chart-card">
+    <h3>Timeline Financeira</h3>
+    {% if monthly_labels_json != "[]" %}
+    <canvas id="timeline-chart" style="max-height:260px;"></canvas>
+    {% else %}
+    <p style="color:var(--text-secondary);font-size:13px;text-align:center;padding:60px 0;">Sem dados</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── 3. Efficiency Table (with toolbar filters) ─────────────────────────── -->
+{% if efficiencies %}
+<div class="table-section">
+  <!-- Toolbar -->
+  <div class="table-toolbar">
+    <div class="search-box">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+      </svg>
+      <input type="text" id="eff-search" placeholder="Buscar" oninput="filterTable()">
+    </div>
+    <div class="date-range">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      <span style="font-size:12px;color:var(--text-secondary);">{{ campaign.start_date|date:"d/m/Y" }} - {{ campaign.end_date|date:"d/m/Y" }}</span>
+    </div>
+    <select id="eff-meio" onchange="filterTable()">
+      <option value="">Meio</option>
+      {% for m in meio_options %}
+      <option value="{{ m }}">{% if m == "tv_aberta" %}TV Aberta{% elif m == "paytv" %}Pay TV{% elif m == "radio" %}Rádio{% elif m == "jornal" %}Jornal{% elif m == "digital" %}Digital{% else %}{{ m }}{% endif %}</option>
+      {% endfor %}
+    </select>
+    <select id="eff-veiculo" onchange="filterTable()">
+      <option value="">Veículo</option>
+      {% for v in veiculo_options %}
+      <option value="{{ v }}">{{ v }}</option>
+      {% endfor %}
+    </select>
+    <a href="#" id="clear-filters-btn" onclick="clearFilters(); return false;" style="display:none;align-items:center;gap:4px;padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--text-secondary);text-decoration:none;background:var(--surface);transition:all .12s;white-space:nowrap;" onmouseover="this.style.borderColor='#ef4444';this.style.color='#ef4444'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">
+      <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      Limpar
+    </a>
+  </div>
+  <!-- Table -->
+  <div style="overflow-x:auto;max-height:600px;overflow-y:auto;">
+    <table class="fin-table" id="eff-table">
+      <thead>
+        <tr>
+          <th>Meio</th>
+          <th>Praça</th>
+          <th>Veículo</th>
+          <th class="num">Inserção</th>
+          <th class="num">Migração</th>
+          <th class="num">TRP</th>
+          <th class="num">CMP</th>
+          <th class="num">Custo</th>
+          <th style="width:80px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for eff in efficiencies %}
+        <tr data-meio="{{ eff.channel_type }}" data-veiculo="{{ eff.veiculo }}">
+          <td>
+            <span class="ch-pill {{ eff.channel_type }}">
+              {% if eff.channel_type == "tv_aberta" %}TV Aberta
+              {% elif eff.channel_type == "paytv" %}Pay TV
+              {% elif eff.channel_type == "radio" %}Rádio
+              {% elif eff.channel_type == "jornal" %}Jornal
+              {% elif eff.channel_type == "digital" %}Digital
+              {% else %}{{ eff.channel_type }}{% endif %}
+            </span>
+          </td>
+          <td>{{ eff.praca|default:"—" }}</td>
+          <td class="bold">{{ eff.veiculo }}</td>
+          <td class="num">{% if eff.custo_tabela %}R$ {{ eff.custo_tabela|floatformat:0 }}{% else %}—{% endif %}</td>
+          <td class="num">{{ eff.insercoes }}</td>
+          <td class="num">{% if eff.trp %}{{ eff.trp|floatformat:1 }}{% else %}—{% endif %}</td>
+          <td class="num">{% if eff.cpm %}R$ {{ eff.cpm|floatformat:2 }}{% elif eff.cpp %}R$ {{ eff.cpp|floatformat:2 }}{% else %}—{% endif %}</td>
+          <td class="num bold">{% if eff.valor %}R$ {{ eff.valor|floatformat:0 }}{% elif eff.custo_negociado %}R$ {{ eff.custo_negociado|floatformat:0 }}{% else %}—{% endif %}</td>
+          <td>
+            <div class="row-actions">
+              <a class="row-act" href="#" data-tip="Detalhes" onclick="return false;">
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              </a>
+              <a class="row-act" href="#" data-tip="Editar" onclick="return false;">
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </a>
+              <a class="row-act" href="#" data-tip="Baixar" onclick="return false;">
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── 5. Investimento por Praça ───────────────────────────────────────────── -->
+{% if region_investments %}
+<div class="table-section" style="padding:24px;">
+  <h3 style="margin:0 0 16px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);">Investimento por Praça</h3>
+  <div style="display:flex;flex-direction:column;gap:12px;">
+    {% for ri in region_investments %}
+    <div class="region-row">
+      <span class="rname">{{ ri.region_name }}</span>
+      <div class="rbar"><div class="rbar-fill" style="background:{{ ri.color }};width:{{ ri.percentage }}%;"></div></div>
+      <span class="rpct">{{ ri.percentage|floatformat:0 }}%</span>
+      {% if ri.valor %}<span class="rval">R$ {{ ri.valor|floatformat:0 }}</span>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- ── 6. Controle de PIs ─────────────────────────────────────────────────── -->
+{% if pi_controls %}
+<div class="table-section">
+  <div class="table-toolbar" style="justify-content:space-between;">
+    <h3 style="margin:0;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);">Controle de PIs</h3>
+    <div style="display:flex;gap:8px;">
+      {% if pi_overdue > 0 %}
+      <span class="pi-pill vencido">{{ pi_overdue }} vencido{{ pi_overdue|pluralize:"s" }}</span>
+      {% endif %}
+      {% if pi_due_soon > 0 %}
+      <span class="pi-pill pendente">{{ pi_due_soon }} vence em breve</span>
+      {% endif %}
+    </div>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="fin-table">
+      <thead>
+        <tr>
+          <th>PI</th>
+          <th>Tipo</th>
+          <th>Rede</th>
+          <th>Praça</th>
+          <th style="text-align:center;">Veiculação</th>
+          <th style="text-align:center;">Vencimento</th>
+          <th class="num">Valor Líq.</th>
+          <th style="text-align:center;">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for pi in pi_controls %}
+        <tr>
+          <td class="bold">{{ pi.pi_numero|default:"—" }}</td>
+          <td>
+            <span class="ch-pill {% if pi.pi_type == 'tv_aberta' %}tv_aberta{% else %}paytv{% endif %}">
+              {% if pi.pi_type == "tv_aberta" %}TV Aberta{% else %}TV Fechada{% endif %}
+            </span>
+          </td>
+          <td>{{ pi.rede|default:"—" }}</td>
+          <td style="color:var(--text-secondary);">{{ pi.praca|default:"—" }}</td>
+          <td style="text-align:center;color:var(--text-secondary);font-size:12px;">
+            {% if pi.veiculacao_start %}{{ pi.veiculacao_start|date:"d/m/y" }}{% endif %}
+            {% if pi.veiculacao_start and pi.veiculacao_end %} – {% endif %}
+            {% if pi.veiculacao_end %}{{ pi.veiculacao_end|date:"d/m/y" }}{% endif %}
+            {% if not pi.veiculacao_start and not pi.veiculacao_end %}—{% endif %}
+          </td>
+          <td style="text-align:center;font-weight:500;" data-venc="{{ pi.vencimento|date:'Y-m-d' }}">
+            {{ pi.vencimento|date:"d/m/Y"|default:"—" }}
+          </td>
+          <td class="num bold">{% if pi.valor_liquido %}R$ {{ pi.valor_liquido|floatformat:0 }}{% else %}—{% endif %}</td>
+          <td style="text-align:center;">
+            {% if pi.status == "pendente" %}<span class="pi-pill pendente">Pendente</span>
+            {% elif pi.status == "pago" %}<span class="pi-pill pago">Pago</span>
+            {% elif pi.status == "vencido" %}<span class="pi-pill vencido">Vencido</span>
+            {% else %}<span class="pi-pill" style="background:var(--surface);color:var(--text-secondary);">{{ pi.status }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% endif %}{# end if fs #}
+
+<!-- ── Scripts ─────────────────────────────────────────────────────────────── -->
+<script>
+{% if channel_labels_json != "[]" %}
+(function(){
+  const labels = {{ channel_labels_json|safe }};
+  const values = {{ channel_values_json|safe }};
+  const colors = ['#6366f1','#22c55e','#f59e0b','#ef4444','#3b82f6','#a855f7','#14b8a6','#ec4899'];
+  new Chart(document.getElementById('split-chart').getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{data: values, backgroundColor: colors.slice(0, labels.length), borderWidth: 2, borderColor: '#fff', hoverOffset: 6}]
+    },
+    options: {
+      responsive: true,
+      cutout: '60%',
+      plugins: {
+        legend: {position: 'bottom', labels: {font: {size: 11, weight: '600'}, padding: 14, usePointStyle: true, pointStyleWidth: 10}},
+        tooltip: {callbacks: {label: ctx => {
+          const total = ctx.dataset.data.reduce((a,b) => a+b, 0);
+          const pct = ((ctx.parsed/total)*100).toFixed(1);
+          return ` ${ctx.label}: R$ ${ctx.parsed.toLocaleString('pt-BR')} (${pct}%)`;
+        }}}
+      }
+    }
+  });
+})();
+{% endif %}
+
+{% if monthly_labels_json != "[]" %}
+(function(){
+  const labels = {{ monthly_labels_json|safe }};
+  const values = {{ monthly_values_json|safe }};
+  new Chart(document.getElementById('timeline-chart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Investimento',
+        data: values,
+        backgroundColor: 'rgba(99,102,241,.75)',
+        borderColor: '#6366f1',
+        borderWidth: 1,
+        borderRadius: 5,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {display: false},
+        tooltip: {callbacks: {label: ctx => ` R$ ${ctx.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits:0})}`}}
+      },
+      scales: {
+        x: {grid: {display: false}, ticks: {color: '#999', font: {size: 11}}},
+        y: {grid: {color: 'rgba(0,0,0,.05)'}, ticks: {color: '#999', font: {size: 11}, callback: v => 'R$ ' + (v>=1000 ? (v/1000).toFixed(0)+' K' : v)}}
+      }
+    }
+  });
+})();
+{% endif %}
+
+// Color-code PI vencimento dates
+(function(){
+  const today = new Date(); today.setHours(0,0,0,0);
+  const soon = new Date(today); soon.setDate(soon.getDate()+30);
+  document.querySelectorAll('[data-venc]').forEach(td => {
+    const v = td.dataset.venc;
+    if(!v) return;
+    const d = new Date(v);
+    if(d < today) td.style.color='#ef4444';
+    else if(d <= soon) td.style.color='#f59e0b';
+  });
+})();
+
+// Efficiency table filters
+function filterTable() {
+  const q = (document.getElementById('eff-search')?.value || '').toLowerCase();
+  const meio = document.getElementById('eff-meio')?.value || '';
+  const veiculo = document.getElementById('eff-veiculo')?.value || '';
+  const rows = document.querySelectorAll('#eff-table tbody tr');
+  rows.forEach(tr => {
+    const text = tr.textContent.toLowerCase();
+    const matchQ = !q || text.includes(q);
+    const matchM = !meio || tr.dataset.meio === meio;
+    const matchV = !veiculo || tr.dataset.veiculo === veiculo;
+    tr.style.display = (matchQ && matchM && matchV) ? '' : 'none';
+  });
+  const btn = document.getElementById('clear-filters-btn');
+  if (btn) btn.style.display = (q || meio || veiculo) ? 'inline-flex' : 'none';
+}
+
+function clearFilters() {
+  const s = document.getElementById('eff-search');
+  const m = document.getElementById('eff-meio');
+  const v = document.getElementById('eff-veiculo');
+  if (s) s.value = '';
+  if (m) m.value = '';
+  if (v) v.value = '';
+  filterTable();
+}
+</script>
+{% endblock %}

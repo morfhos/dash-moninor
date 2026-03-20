@@ -1,0 +1,142 @@
+{% extends "web/base.html" %}
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+  <a href="{% url 'web:campaign_financeiro' campaign.id %}" class="btn btn-ghost" style="padding:6px 10px;">← Voltar</a>
+  <div>
+    <h1 class="page-title" style="margin:0;">Upload Financeiro</h1>
+    <p style="margin:2px 0 0;color:var(--text-secondary);font-size:13px;">{{ campaign.name }} · {{ cliente.nome }}</p>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:900px;">
+
+  <!-- Painel 1: Enviar planilha -->
+  <div class="card" style="padding:24px;">
+    <h3 style="margin:0 0 16px;font-size:15px;font-weight:600;">1 — ENVIAR PLANILHA</h3>
+
+    {% if form_errors %}
+    <div class="alert alert-danger" style="margin-bottom:14px;padding:10px 14px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;color:#ef4444;font-size:13px;">
+      {{ form_errors }}
+    </div>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" id="upload-form">
+      {% csrf_token %}
+      <input type="hidden" name="_action" id="form-action" value="validate">
+      <input type="hidden" name="upload_id" id="upload-id-field" value="">
+
+      <div id="drop-zone"
+           style="border:2px dashed var(--border);border-radius:12px;padding:32px 20px;text-align:center;cursor:pointer;transition:.2s;"
+           onclick="document.getElementById('xlsx-input').click()"
+           ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
+           ondragleave="this.style.borderColor='var(--border)'"
+           ondrop="handleDrop(event)">
+        <div id="dz-placeholder">
+          <svg style="width:40px;height:40px;color:var(--text-secondary);margin-bottom:10px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          <p style="margin:0;font-weight:500;color:var(--text-primary);">Arraste a planilha aqui</p>
+          <p style="margin:4px 0 0;font-size:12px;color:var(--text-secondary);">ou clique para selecionar · .xlsx</p>
+        </div>
+        <div id="dz-preview" style="display:none;text-align:left;">
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface);border-radius:8px;">
+            <svg style="width:24px;height:24px;color:#22c55e;flex-shrink:0;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <div style="min-width:0;">
+              <p id="file-name" style="margin:0;font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></p>
+              <p id="file-size" style="margin:0;font-size:11px;color:var(--text-secondary);"></p>
+            </div>
+            <button type="button" onclick="clearFile()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text-secondary);padding:4px;">✕</button>
+          </div>
+        </div>
+      </div>
+      <input type="file" id="xlsx-input" name="xlsx_file" accept=".xlsx" style="display:none;" onchange="handleFile(this.files[0])">
+
+      <button type="submit" id="analyze-btn" class="btn btn-primary" style="width:100%;margin-top:14px;" disabled>
+        Analisar planilha
+      </button>
+    </form>
+  </div>
+
+  <!-- Painel 2: Preview / confirmar import -->
+  <div class="card" style="padding:24px;" id="preview-panel">
+    <h3 style="margin:0 0 16px;font-size:15px;font-weight:600;">2 — CONFIRMAR IMPORTAÇÃO</h3>
+
+    {% if result %}
+      {% if result.errors %}
+      <div style="padding:12px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;margin-bottom:14px;">
+        <p style="margin:0 0 6px;font-weight:600;font-size:13px;color:#ef4444;">Erros encontrados:</p>
+        <ul style="margin:0;padding-left:18px;font-size:12px;color:#ef4444;">
+          {% for e in result.errors %}<li>{{ e }}</li>{% endfor %}
+        </ul>
+      </div>
+      {% else %}
+      <div style="margin-bottom:16px;">
+        <p style="margin:0 0 10px;font-size:13px;color:var(--text-secondary);">Abas detectadas:</p>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">
+          {% for sheet in result.sheets_found %}
+          <span style="padding:3px 10px;background:var(--surface);border:1px solid var(--border);border-radius:20px;font-size:12px;">{{ sheet }}</span>
+          {% endfor %}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+          <div style="padding:12px;background:var(--surface);border-radius:8px;text-align:center;">
+            <p style="margin:0;font-size:22px;font-weight:700;color:var(--accent);">{{ result.eff_count }}</p>
+            <p style="margin:4px 0 0;font-size:11px;color:var(--text-secondary);">Linhas de eficiência</p>
+          </div>
+          <div style="padding:12px;background:var(--surface);border-radius:8px;text-align:center;">
+            <p style="margin:0;font-size:22px;font-weight:700;color:var(--accent);">{{ result.pi_count }}</p>
+            <p style="margin:4px 0 0;font-size:11px;color:var(--text-secondary);">PIs encontrados</p>
+          </div>
+        </div>
+        <form method="post" id="import-form">
+          {% csrf_token %}
+          <input type="hidden" name="_action" value="import">
+          <input type="hidden" name="upload_id" value="{{ result.upload_id }}">
+          <button type="submit" class="btn btn-primary" style="width:100%;">
+            Importar dados financeiros
+          </button>
+        </form>
+      </div>
+      {% endif %}
+    {% else %}
+    <div style="text-align:center;padding:40px 20px;color:var(--text-secondary);">
+      <p style="margin:0;font-size:14px;">Envie a planilha financeira para visualizar o preview</p>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+function fmtBytes(b){if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(1)+' KB';return(b/1048576).toFixed(1)+' MB';}
+
+function handleFile(file){
+  if(!file)return;
+  document.getElementById('dz-placeholder').style.display='none';
+  document.getElementById('dz-preview').style.display='block';
+  document.getElementById('file-name').textContent=file.name;
+  document.getElementById('file-size').textContent=fmtBytes(file.size);
+  document.getElementById('analyze-btn').disabled=false;
+}
+
+function clearFile(){
+  document.getElementById('xlsx-input').value='';
+  document.getElementById('dz-placeholder').style.display='block';
+  document.getElementById('dz-preview').style.display='none';
+  document.getElementById('analyze-btn').disabled=true;
+}
+
+function handleDrop(e){
+  e.preventDefault();
+  document.getElementById('drop-zone').style.borderColor='var(--border)';
+  const file=e.dataTransfer.files[0];
+  if(!file||!file.name.endsWith('.xlsx'))return;
+  const dt=new DataTransfer();
+  dt.items.add(file);
+  const inp=document.getElementById('xlsx-input');
+  inp.files=dt.files;
+  handleFile(file);
+}
+</script>
+{% endblock %}

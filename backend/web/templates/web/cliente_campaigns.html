@@ -1,58 +1,394 @@
 {% extends "web/base.html" %}
 
 {% block content %}
-  <div class="topbar">
-    <div>
-      <h1>Campanhas</h1>
-      <div style="margin-top:6px; color: var(--text-secondary); font-weight: 800; font-size: 13px;">
-        Cliente: {{ cliente.nome }}
-      </div>
-    </div>
-    <div style="display:flex; gap:10px; align-items:center;">
-      <a class="btn-outline" href="{% url 'web:clientes_detail' cliente.id %}" style="text-decoration:none;">Voltar</a>
-      <a class="btn" href="{% url 'web:contract_wizard_step1' cliente.id %}" style="text-decoration:none;">Nova campanha</a>
-    </div>
-  </div>
+<style>
+  .campaigns-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+  .campaigns-header h1 { margin: 0; font-size: 22px; font-weight: 700; }
+  .campaigns-header .subtitle {
+    margin: 4px 0 0;
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .campaigns-header .header-actions { display: flex; gap: 10px; align-items: center; }
 
-  <section class="main-panel">
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Nome</th>
-          <th style="width: 10px;">Meio</th>
-          <th style="width: 10px;">Status</th>
-          <th style="width: 320px;">Período</th>
-          <th style="width: 400px; text-align:right;">Ações</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for c in campaigns %}
-          <tr>
-            <td style="font-weight: 900;"><a href="{% url 'web:contract_done' c.id %}" style="color: var(--text-primary); text-decoration: none; border-bottom: 2px solid var(--brand-primary);">{{ c.name }}</a></td>
-            <td style="color: var(--text-secondary); font-weight: 800;">{{ c.media_type|upper }}</td>
-            <td style="color: var(--text-secondary); font-weight: 800;">{{ c.status }}</td>
-            <td style="color: var(--text-secondary); font-weight: 800;">
-              {{ c.start_date|date:"d/m/Y H:i" }} → {{ c.end_date|date:"d/m/Y H:i" }}
-            </td>
-            <td style="text-align:right;">
-              <span class="actions">
-                <a class="btn-link" href="{% url 'web:campaign_edit' c.id %}">Editar</a>
-                <a class="btn-link" href="{% url 'web:campaign_delete' c.id %}">Excluir</a>
-                <a class="btn-link" href="{% url 'web:campaign_media_plan_upload' c.id %}">Midia</a>
-                <a class="btn-link" href="{% url 'web:uploads_midia_pecas' c.id %}">Peças</a>
-                <a class="btn-link" href="{% url 'web:campanha_detalhe' c.id  %}">Editar Peças</a>
-                <a class="btn-link" href="{% url 'web:campaign_link_matrix' c.id %}">Vinculação</a>
-              </span>
-            </td>
-          </tr>
-        {% empty %}
-          <tr>
-            <td colspan="5" style="color: var(--text-secondary); text-align:center; padding: 18px;">
-              Nenhuma campanha cadastrada para este cliente.
-            </td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </section>
+  /* Filters bar */
+  .filters-bar {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .filters-bar .search-box {
+    flex: 1;
+    max-width: 360px;
+    position: relative;
+  }
+  .filters-bar .search-box input {
+    width: 100%;
+    padding: 9px 14px 9px 38px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text-primary);
+    font-size: 13px;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .filters-bar .search-box input:focus { border-color: var(--accent, #6366f1); }
+  .filters-bar .search-box svg {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    pointer-events: none;
+  }
+  .filters-bar select {
+    padding: 9px 30px 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text-primary);
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23999' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+  }
+  .filters-bar select:focus { border-color: var(--accent, #6366f1); }
+
+  /* Table */
+  .campaigns-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 13px;
+  }
+  .campaigns-table thead th {
+    padding: 10px 16px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .campaigns-table tbody tr {
+    transition: background .15s;
+    border-left: 3px solid transparent;
+  }
+  .campaigns-table tbody tr:hover {
+    background: rgba(99, 102, 241, .04);
+    border-left-color: var(--accent, #6366f1);
+  }
+  .campaigns-table tbody td {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .campaigns-table .campaign-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    text-decoration: none;
+    transition: color .15s;
+  }
+  .campaigns-table .campaign-name:hover { color: var(--accent, #6366f1); }
+
+  /* Status pills */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    white-space: nowrap;
+  }
+  .pill-online  { background: rgba(34,197,94,.12); color: #16a34a; }
+  .pill-offline { background: rgba(239,68,68,.10); color: #dc2626; }
+  .pill-active  { background: rgba(34,197,94,.12); color: #16a34a; }
+  .pill-paused  { background: rgba(245,158,11,.12); color: #d97706; }
+  .pill-draft   { background: var(--surface); color: var(--text-secondary); border: 1px solid var(--border); }
+
+  .pill-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+  }
+  .pill-online .pill-dot  { background: #16a34a; }
+  .pill-offline .pill-dot { background: #dc2626; }
+  .pill-active .pill-dot  { background: #16a34a; }
+  .pill-paused .pill-dot  { background: #d97706; }
+
+  /* Icon actions */
+  .icon-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    justify-content: flex-end;
+  }
+  .icon-action {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: all .15s;
+  }
+  .icon-action:hover {
+    background: rgba(99,102,241,.1);
+    color: var(--accent, #6366f1);
+  }
+  .icon-action.danger:hover {
+    background: rgba(239,68,68,.1);
+    color: #ef4444;
+  }
+  .icon-action svg { width: 18px; height: 18px; }
+
+  /* Tooltip */
+  .icon-action::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 4px 10px;
+    background: var(--text-primary);
+    color: var(--bg, #fff);
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 6px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .15s;
+    z-index: 10;
+  }
+  .icon-action:hover::after { opacity: 1; }
+
+  /* Pagination */
+  .pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px 0 4px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  .pagination-bar a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: all .15s;
+  }
+  .pagination-bar a:hover { background: rgba(99,102,241,.1); color: var(--accent, #6366f1); }
+  .pagination-bar .disabled { opacity: .3; pointer-events: none; }
+
+  /* Period text */
+  .period-text { color: var(--text-secondary); font-size: 12px; font-weight: 500; white-space: nowrap; }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--text-secondary);
+  }
+  .empty-state svg { width: 48px; height: 48px; margin-bottom: 12px; opacity: .4; }
+  .empty-state p { margin: 0; font-size: 14px; }
+</style>
+
+<!-- Header -->
+<div class="campaigns-header">
+  <div>
+    <h1>Campanhas</h1>
+    <p class="subtitle">Cliente: {{ cliente.nome }}</p>
+  </div>
+  <div class="header-actions">
+    <a class="btn-outline" href="{% url 'web:clientes_detail' cliente.id %}" style="text-decoration:none;">Voltar</a>
+    <a class="btn" href="{% url 'web:contract_wizard_step1' cliente.id %}" style="text-decoration:none;">+ Nova campanha</a>
+  </div>
+</div>
+
+<!-- Filters -->
+<form method="get" class="filters-bar" id="filter-form">
+  <div class="search-box">
+    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+    </svg>
+    <input type="text" name="q" value="{{ q }}" placeholder="Buscar campanhas..." autocomplete="off">
+  </div>
+  <select name="status" onchange="this.form.submit()">
+    <option value="">Status</option>
+    <option value="active" {% if status_filter == "active" %}selected{% endif %}>Active</option>
+    <option value="paused" {% if status_filter == "paused" %}selected{% endif %}>Paused</option>
+    <option value="draft" {% if status_filter == "draft" %}selected{% endif %}>Draft</option>
+  </select>
+  <select name="meio" onchange="this.form.submit()">
+    <option value="">Meio</option>
+    <option value="online" {% if meio_filter == "online" %}selected{% endif %}>Online</option>
+    <option value="offline" {% if meio_filter == "offline" %}selected{% endif %}>Offline</option>
+  </select>
+  {% if q or status_filter or meio_filter %}
+  <a href="{% url 'web:cliente_campaigns' cliente.id %}" style="display:inline-flex;align-items:center;gap:4px;padding:7px 14px;border:1px solid var(--border);border-radius:10px;font-size:13px;color:var(--text-secondary);text-decoration:none;background:var(--surface);transition:all .15s;" onmouseover="this.style.borderColor='#ef4444';this.style.color='#ef4444'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    Limpar filtros
+  </a>
+  {% endif %}
+</form>
+
+<!-- Table -->
+<section class="main-panel">
+  <table class="campaigns-table">
+    <thead>
+      <tr>
+        <th>Nome</th>
+        <th>Meio</th>
+        <th>Status</th>
+        <th>Período</th>
+        <th style="text-align:right;">Ações</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in campaigns %}
+      <tr>
+        <!-- Name -->
+        <td>
+          <a class="campaign-name" href="{% url 'web:contract_done' c.id %}">{{ c.name }}</a>
+        </td>
+
+        <!-- Meio pill -->
+        <td>
+          {% if c.media_type|upper == "ONLINE" %}
+            <span class="pill pill-online"><span class="pill-dot"></span> ONLINE</span>
+          {% else %}
+            <span class="pill pill-offline"><span class="pill-dot"></span> OFFLINE</span>
+          {% endif %}
+        </td>
+
+        <!-- Status pill -->
+        <td>
+          {% if c.status == "active" %}
+            <span class="pill pill-active"><span class="pill-dot"></span> active</span>
+          {% elif c.status == "paused" %}
+            <span class="pill pill-paused"><span class="pill-dot"></span> paused</span>
+          {% else %}
+            <span class="pill pill-draft">{{ c.status }}</span>
+          {% endif %}
+        </td>
+
+        <!-- Period -->
+        <td>
+          <span class="period-text">{{ c.start_date|date:"d/m/Y H:i" }} – {{ c.end_date|date:"d/m/Y H:i" }}</span>
+        </td>
+
+        <!-- Actions (icons + tooltips) -->
+        <td>
+          <div class="icon-actions">
+            <!-- Editar -->
+            <a class="icon-action" href="{% url 'web:campaign_edit' c.id %}" data-tip="Editar">
+              <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </a>
+            <!-- Excluir -->
+            <a class="icon-action danger" href="{% url 'web:campaign_delete' c.id %}" data-tip="Excluir">
+              <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/>
+              </svg>
+            </a>
+            <!-- Mídia -->
+            <a class="icon-action" href="{% url 'web:campaign_media_plan_upload' c.id %}" data-tip="Mídia">
+              <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              </svg>
+            </a>
+            <!-- Peças -->
+            <a class="icon-action" href="{% url 'web:uploads_midia_pecas' c.id %}" data-tip="Peças">
+              <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+              </svg>
+            </a>
+            <!-- Editar Peças -->
+            <a class="icon-action" href="{% url 'web:campanha_detalhe' c.id %}" data-tip="Editar Peças">
+              <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/>
+              </svg>
+            </a>
+            <!-- Vinculação -->
+            <a class="icon-action" href="{% url 'web:campaign_link_matrix' c.id %}" data-tip="Vinculação">
+              <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+              </svg>
+            </a>
+            <!-- Financeiro -->
+            <a class="icon-action" href="{% url 'web:campaign_financeiro' c.id %}" data-tip="Financeiro">
+              <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+            </a>
+          </div>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="5">
+          <div class="empty-state">
+            <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+              <path d="M2.25 13.5h3.86a2.25 2.25 0 012.012 1.244l.256.512a2.25 2.25 0 002.013 1.244h3.218a2.25 2.25 0 002.013-1.244l.256-.512a2.25 2.25 0 012.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 00-2.15-1.588H6.911a2.25 2.25 0 00-2.15 1.588L2.35 13.177a2.25 2.25 0 00-.1.661z"/>
+            </svg>
+            <p>Nenhuma campanha cadastrada para este cliente.</p>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Pagination -->
+  {% if page_obj.paginator.num_pages > 1 %}
+  <div class="pagination-bar">
+    <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if meio_filter %}&meio={{ meio_filter }}{% endif %}"
+       class="{% if not page_obj.has_previous %}disabled{% endif %}">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
+    </a>
+    <span>{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+    <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if meio_filter %}&meio={{ meio_filter }}{% endif %}"
+       class="{% if not page_obj.has_next %}disabled{% endif %}">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+    </a>
+  </div>
+  {% endif %}
+</section>
+
+<script>
+// Submit search on Enter
+document.querySelector('.search-box input').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    document.getElementById('filter-form').submit();
+  }
+});
+</script>
 {% endblock %}

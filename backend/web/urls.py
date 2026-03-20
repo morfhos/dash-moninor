@@ -84,6 +84,8 @@ urlpatterns = [
         name="campaign_link_matrix",
     ),
     path("campanhas/<int:campaign_id>/detalhe/", views.campanha_detalhe, name="campanha_detalhe"),
+    path("campanhas/<int:campaign_id>/financeiro/", views.campaign_financeiro, name="campaign_financeiro"),
+    path("campanhas/<int:campaign_id>/financeiro/upload/", views.campaign_financial_upload, name="campaign_financial_upload"),
     path("pecas/<int:piece_id>/", views.peca_detalhe, name="peca_detalhe"),
     path("campanhas/<int:campaign_id>/editar/", views.campaign_edit, name="campaign_edit"),
     path("campanhas/<int:campaign_id>/excluir/", views.campaign_delete, name="campaign_delete"),
