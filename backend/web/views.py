@@ -1510,7 +1510,127 @@ def clientes(request: HttpRequest) -> HttpResponse:
 @login_required
 @require_true_admin
 def configuracoes(request: HttpRequest) -> HttpResponse:
-    return _render_module(request, active="configuracoes", title="Configurações")
+    from accounts.models import SiteConfig, User
+    import json as _json
+
+    tab = request.GET.get("tab", "empresa")
+    success_message = ""
+    cfg = SiteConfig.load()
+
+    if request.method == "POST":
+        post_tab = request.POST.get("_tab", "empresa")
+
+        if post_tab == "empresa":
+            cfg.empresa = {
+                "company_name": request.POST.get("company_name", ""),
+                "cnpj": request.POST.get("cnpj", ""),
+                "timezone": request.POST.get("timezone", "America/Sao_Paulo"),
+                "currency": request.POST.get("currency", "BRL - Real Brasileiro"),
+                "primary_color": request.POST.get("primary_color", "#6C3BFF"),
+            }
+            update_fields = ["empresa", "updated_at"]
+            logo_file = request.FILES.get("logo")
+            if logo_file:
+                cfg.logo = logo_file
+                update_fields.append("logo")
+            cfg.save(update_fields=update_fields)
+            success_message = "Configurações da empresa salvas."
+
+        elif post_tab == "metricas":
+            cfg.metricas = {
+                "ctr_min": request.POST.get("ctr_min", ""),
+                "cpc_max": request.POST.get("cpc_max", ""),
+                "roi_target": request.POST.get("roi_target", ""),
+                "cpm_max": request.POST.get("cpm_max", ""),
+                "freq_max": request.POST.get("freq_max", ""),
+                "coverage_min": request.POST.get("coverage_min", ""),
+                "auto_alerts": "auto_alerts" in request.POST,
+                "daily_report": "daily_report" in request.POST,
+            }
+            cfg.save(update_fields=["metricas", "updated_at"])
+            success_message = "Métricas atualizadas."
+
+        elif post_tab == "alertas":
+            try:
+                rules = _json.loads(request.POST.get("rules_json", "[]"))
+            except _json.JSONDecodeError:
+                rules = []
+            cfg.alertas = rules
+            cfg.save(update_fields=["alertas", "updated_at"])
+            success_message = "Regras de alertas salvas."
+
+        elif post_tab == "financeiro":
+            cats = request.POST.getlist("categories")
+            cfg.financeiro = {
+                "comissao": request.POST.get("comissao", ""),
+                "imposto": request.POST.get("imposto", ""),
+                "desconto_max": request.POST.get("desconto_max", ""),
+                "prazo_pgto": request.POST.get("prazo_pgto", ""),
+                "categories": cats,
+            }
+            cfg.save(update_fields=["financeiro", "updated_at"])
+            success_message = "Configurações financeiras salvas."
+
+        elif post_tab == "estrutura":
+            cfg.estrutura = {
+                "meios": request.POST.getlist("meios"),
+                "statuses": request.POST.getlist("statuses"),
+                "pracas": request.POST.getlist("pracas"),
+            }
+            cfg.save(update_fields=["estrutura", "updated_at"])
+            success_message = "Estrutura salva."
+
+        elif post_tab == "ia":
+            cfg.ia = {
+                "auto_recommendations": "auto_recommendations" in request.POST,
+                "style": request.POST.get("ia_style", "balanced"),
+                "auto_insights": "auto_insights" in request.POST,
+                "budget_suggestion": "budget_suggestion" in request.POST,
+            }
+            cfg.save(update_fields=["ia", "updated_at"])
+            success_message = "Configurações de IA salvas."
+
+        elif post_tab == "seguranca":
+            cfg.seguranca = {
+                "force_password_change": "force_password_change" in request.POST,
+                "two_factor": "two_factor" in request.POST,
+                "log_access": "log_access" in request.POST,
+                "session_timeout": request.POST.get("session_timeout", "60"),
+                "login_attempts": request.POST.get("login_attempts", "5"),
+            }
+            cfg.save(update_fields=["seguranca", "updated_at"])
+            success_message = "Configurações de segurança salvas."
+
+        tab = post_tab
+
+    users = User.objects.filter(role__in=["admin", "colaborador"]).order_by("-date_joined")
+    clientes_list = Cliente.objects.filter(ativo=True).order_by("nome")
+
+    # Ensure defaults for empty JSON fields
+    if not cfg.estrutura:
+        cfg.estrutura = {
+            "meios": ["TV Aberta", "Pay TV", "Rádio", "Jornal", "Digital", "OOH"],
+            "statuses": ["Active", "Paused", "Draft", "Completed"],
+            "pracas": ["São Paulo Capital", "São Paulo Estado", "ABC", "Rio de Janeiro"],
+        }
+    if not cfg.financeiro or "categories" not in cfg.financeiro:
+        if not cfg.financeiro:
+            cfg.financeiro = {}
+        cfg.financeiro.setdefault("categories", ["Mídia", "Produção", "Taxas", "Veiculação", "Geração"])
+
+    return render(
+        request,
+        "web/configuracoes.html",
+        {
+            "active": "configuracoes",
+            "page_title": "Configurações",
+            "tab": tab,
+            "success_message": success_message,
+            "users": users,
+            "clientes_list": clientes_list,
+            "cfg": cfg,
+        },
+    )
 
 
 @login_required
@@ -5285,12 +5405,52 @@ def campaign_financial_upload(request: HttpRequest, campaign_id: int) -> HttpRes
                 upload = FinancialUpload.objects.create(campaign=campaign, file=xlsx, summary={})
                 parsed = parse_financial_xlsx(upload.file)
                 sheets_found = parsed.get("sheets_found") or []
+                eff_rows = parsed.get("media_efficiencies") or []
+                pi_rows = parsed.get("pi_controls") or []
+                region_rows = parsed.get("region_investments") or []
+                resumo = parsed.get("resumo_meios") or {}
+
+                # Build per-sheet detail for selection UI
+                sheet_details = {}
+                for s in sheets_found:
+                    sheet_details[s] = {"name": s, "rows": 0, "type": ""}
+
+                # Count eff rows per channel and map to sheet names
+                eff_by_ch: dict[str, int] = {}
+                for row in eff_rows:
+                    ch = row.get("channel_type", "other")
+                    eff_by_ch[ch] = eff_by_ch.get(ch, 0) + 1
+
+                # Map channel types to known sheet patterns
+                from campaigns.financial_xlsx_worker import _norm
+                CH_LABELS = {
+                    "tv_aberta": "TV Aberta", "paytv": "Pay TV", "radio": "Rádio",
+                    "jornal": "Jornal", "digital": "Digital", "geracao": "Geração",
+                }
+                for s in sheets_found:
+                    sn = _norm(s)
+                    if "resumo" in sn and "meios" in sn:
+                        total_eff = len(eff_rows)
+                        sheet_details[s] = {"name": s, "rows": total_eff, "type": "eficiência"}
+                    elif "custo" in sn and "geracao" in sn:
+                        sheet_details[s] = {"name": s, "rows": len(parsed.get("custo_geracao") or []), "type": "geração"}
+                    elif "cover" in sn:
+                        sheet_details[s] = {"name": s, "rows": 0, "type": "capa"}
+                    else:
+                        for ch_key, ch_label in CH_LABELS.items():
+                            if ch_key.replace("_", " ") in sn or ch_label.lower().replace("á", "a").replace("ã", "a") in sn:
+                                sheet_details[s] = {"name": s, "rows": eff_by_ch.get(ch_key, 0), "type": ch_label}
+                                break
+
                 upload.summary = {
                     "ok": bool(parsed.get("ok")),
                     "errors": parsed.get("errors", []),
                     "sheets_found": sheets_found,
-                    "pi_count": len(parsed.get("pi_controls") or []),
-                    "eff_count": len(parsed.get("media_efficiencies") or []),
+                    "sheet_details": sheet_details,
+                    "pi_count": len(pi_rows),
+                    "eff_count": len(eff_rows),
+                    "region_count": len(region_rows),
+                    "channels": len(resumo),
                 }
                 upload.save(update_fields=["summary"])
                 result = dict(upload.summary)
@@ -5304,3 +5464,136 @@ def campaign_financial_upload(request: HttpRequest, campaign_id: int) -> HttpRes
         "form_errors": form_errors,
         "result": result,
     })
+
+
+@login_required
+@require_admin
+def campaign_financial_delete(request: HttpRequest, campaign_id: int) -> HttpResponse:
+    """Deleta todos os dados financeiros de uma campanha."""
+    from campaigns.models import FinancialSummary, MediaEfficiency, PIControl
+
+    if request.method != "POST":
+        return redirect("web:campaign_financeiro", campaign_id=campaign_id)
+
+    campaign = Campaign.objects.filter(id=campaign_id).select_related("cliente").first()
+    if campaign is None:
+        return redirect("web:campanhas")
+
+    # Delete all financial data
+    FinancialUpload.objects.filter(campaign=campaign).delete()
+    FinancialSummary.objects.filter(campaign=campaign).delete()
+    MediaEfficiency.objects.filter(campaign=campaign).delete()
+    PIControl.objects.filter(campaign=campaign).delete()
+    RegionInvestment.objects.filter(campaign=campaign).delete()
+
+    AuditLog.log(
+        AuditLog.EventType.MEDIA_PLAN_UPLOADED,
+        user=request.user,
+        details={"type": "financial_delete", "campaign_id": campaign.id},
+    )
+
+    return redirect("web:campaign_financeiro", campaign_id=campaign.id)
+
+
+@csrf_exempt
+@login_required
+@require_admin
+def api_efficiency_detail(request: HttpRequest, eff_id: int) -> JsonResponse:
+    """GET = detail, PUT/PATCH = update, DELETE = delete a MediaEfficiency row."""
+    from campaigns.models import MediaEfficiency
+    from decimal import Decimal, InvalidOperation
+
+    eff = MediaEfficiency.objects.filter(id=eff_id).first()
+    if eff is None:
+        return JsonResponse({"error": "Not found"}, status=404)
+
+    if request.method == "GET":
+        return JsonResponse({
+            "id": eff.id,
+            "channel_type": eff.channel_type,
+            "veiculo": eff.veiculo,
+            "programa": eff.programa,
+            "praca": eff.praca,
+            "insercoes": eff.insercoes,
+            "trp": float(eff.trp) if eff.trp else None,
+            "cpp": float(eff.cpp) if eff.cpp else None,
+            "custo_tabela": float(eff.custo_tabela) if eff.custo_tabela else None,
+            "custo_negociado": float(eff.custo_negociado) if eff.custo_negociado else None,
+            "impactos": eff.impactos,
+            "cpm": float(eff.cpm) if eff.cpm else None,
+            "ia_pct": float(eff.ia_pct) if eff.ia_pct else None,
+            "formato": eff.formato,
+            "circulacao": eff.circulacao,
+            "valor": float(eff.valor) if eff.valor else None,
+        })
+
+    if request.method == "DELETE":
+        campaign_id = eff.campaign_id
+        eff.delete()
+        return JsonResponse({"ok": True, "campaign_id": campaign_id})
+
+    if request.method in ("PUT", "PATCH"):
+        import json as _json
+        try:
+            data = _json.loads(request.body)
+        except _json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+        def _dec(v):
+            if v is None or v == "":
+                return None
+            try:
+                return Decimal(str(v))
+            except InvalidOperation:
+                return None
+
+        for field in ("veiculo", "programa", "praca", "formato", "channel_type"):
+            if field in data:
+                setattr(eff, field, str(data[field]).strip())
+        for field in ("insercoes", "impactos", "circulacao"):
+            if field in data:
+                v = data[field]
+                setattr(eff, field, int(v) if v is not None and v != "" else None)
+        for field in ("trp", "cpp", "custo_tabela", "custo_negociado", "cpm", "ia_pct", "valor"):
+            if field in data:
+                setattr(eff, field, _dec(data[field]))
+        eff.save()
+        return JsonResponse({"ok": True, "id": eff.id})
+
+    return JsonResponse({"error": "Method not allowed"}, status=405)
+
+
+@login_required
+def api_search_campaigns(request: HttpRequest) -> JsonResponse:
+    """Search campaigns by name, return JSON results."""
+    q = request.GET.get("q", "").strip()
+    if len(q) < 2:
+        return JsonResponse({"results": []})
+
+    role = effective_role(request)
+    qs = Campaign.objects.select_related("cliente").order_by("-created_at")
+
+    if role == "cliente":
+        cliente_id = effective_cliente_id(request)
+        if cliente_id:
+            qs = qs.filter(cliente_id=cliente_id)
+    else:
+        sel = selected_cliente_id(request)
+        if sel:
+            qs = qs.filter(cliente_id=sel)
+
+    qs = qs.filter(name__icontains=q)[:15]
+
+    results = []
+    for c in qs:
+        results.append({
+            "id": c.id,
+            "name": c.name,
+            "cliente": c.cliente.nome if c.cliente else "",
+            "status": c.status,
+            "media_type": c.media_type,
+            "start_date": c.start_date.strftime("%d/%m/%Y") if c.start_date else "",
+            "end_date": c.end_date.strftime("%d/%m/%Y") if c.end_date else "",
+            "url": f"/contratos/upload/{c.id}/concluido/",
+        })
+    return JsonResponse({"results": results})

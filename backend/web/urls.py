@@ -86,6 +86,8 @@ urlpatterns = [
     path("campanhas/<int:campaign_id>/detalhe/", views.campanha_detalhe, name="campanha_detalhe"),
     path("campanhas/<int:campaign_id>/financeiro/", views.campaign_financeiro, name="campaign_financeiro"),
     path("campanhas/<int:campaign_id>/financeiro/upload/", views.campaign_financial_upload, name="campaign_financial_upload"),
+    path("campanhas/<int:campaign_id>/financeiro/deletar/", views.campaign_financial_delete, name="campaign_financial_delete"),
+    path("api/efficiency/<int:eff_id>/", views.api_efficiency_detail, name="api_efficiency_detail"),
     path("pecas/<int:piece_id>/", views.peca_detalhe, name="peca_detalhe"),
     path("campanhas/<int:campaign_id>/editar/", views.campaign_edit, name="campaign_edit"),
     path("campanhas/<int:campaign_id>/excluir/", views.campaign_delete, name="campaign_delete"),
@@ -102,6 +104,7 @@ urlpatterns = [
     path("api/users/", views.api_users, name="api_users"),
     path("api/users/<int:user_id>/", views.api_user_detail, name="api_user_detail"),
     path("api/alertas/<int:alerta_id>/lido/", views.api_alerta_lido, name="api_alerta_lido"),
+    path("api/search-campaigns/", views.api_search_campaigns, name="api_search_campaigns"),
     path("configuracoes/", views.configuracoes, name="configuracoes"),
     path("logs-auditoria/", views.logs_auditoria, name="logs_auditoria"),
 ]

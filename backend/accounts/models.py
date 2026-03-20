@@ -188,3 +188,28 @@ class Alert(models.Model):
             self.lido_em = timezone.now()
             self.lido_por = user
             self.save(update_fields=["lido", "lido_em", "lido_por"])
+
+
+class SiteConfig(models.Model):
+    """Singleton model for site-wide configuration stored as JSON sections."""
+    logo = models.ImageField(upload_to="site/", blank=True, null=True)
+    empresa = models.JSONField(default=dict, blank=True)
+    metricas = models.JSONField(default=dict, blank=True)
+    alertas = models.JSONField(default=list, blank=True)
+    financeiro = models.JSONField(default=dict, blank=True)
+    estrutura = models.JSONField(default=dict, blank=True)
+    ia = models.JSONField(default=dict, blank=True)
+    seguranca = models.JSONField(default=dict, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Configuração do Site"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj

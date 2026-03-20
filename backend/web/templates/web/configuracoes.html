@@ -1,0 +1,597 @@
+{% extends "web/base.html" %}
+{% block content %}
+<style>
+  .cfg-layout { display: flex; gap: 24px; min-height: calc(100vh - 120px); }
+  .cfg-nav {
+    width: 220px; flex-shrink: 0;
+    background: var(--card-bg, #fff); border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px 0; height: fit-content; position: sticky; top: 20px;
+  }
+  .cfg-nav h2 { margin: 0 0 12px; padding: 0 20px; font-size: 16px; font-weight: 700; }
+  .cfg-nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 20px; font-size: 13px; font-weight: 500;
+    color: var(--text-secondary); text-decoration: none; transition: all .12s;
+  }
+  .cfg-nav-item:hover { color: var(--text-primary); background: rgba(99,102,241,.04); }
+  .cfg-nav-item.active { color: var(--accent, #6366f1); background: rgba(99,102,241,.08); font-weight: 600; border-right: 3px solid var(--accent, #6366f1); }
+  .cfg-nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .cfg-content { flex: 1; min-width: 0; }
+  .cfg-panel { background: var(--card-bg, #fff); border: 1px solid var(--border); border-radius: 14px; padding: 28px; display: none; }
+  .cfg-panel.active { display: block; }
+  .cfg-panel h3 { margin: 0 0 20px; font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+  .cfg-panel h3 svg { width: 22px; height: 22px; color: var(--accent, #6366f1); }
+  .cfg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .cfg-grid .full { grid-column: 1 / -1; }
+  .cfg-field { display: flex; flex-direction: column; gap: 5px; }
+  .cfg-field label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-secondary); }
+  .cfg-field input, .cfg-field select, .cfg-field textarea {
+    padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
+    background: var(--surface); color: var(--text-primary); font-size: 13px; outline: none; transition: border-color .15s;
+  }
+  .cfg-field input:focus, .cfg-field select:focus, .cfg-field textarea:focus { border-color: var(--accent, #6366f1); }
+  .cfg-field textarea { resize: vertical; min-height: 80px; }
+  .cfg-btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 22px; border-radius: 10px; font-size: 13px; font-weight: 600; border: none; cursor: pointer; transition: opacity .15s; }
+  .cfg-btn-primary { background: var(--accent, #6366f1); color: #fff; }
+  .cfg-btn-primary:hover { opacity: .85; }
+  .cfg-btn-outline { background: none; border: 1px solid var(--border); color: var(--text-secondary); }
+  .cfg-btn-outline:hover { border-color: var(--accent, #6366f1); color: var(--accent, #6366f1); }
+  .cfg-btn-danger { background: rgba(239,68,68,.1); color: #ef4444; border: 1px solid rgba(239,68,68,.2); }
+  .cfg-btn-danger:hover { background: rgba(239,68,68,.15); }
+  .cfg-divider { border: none; border-top: 1px solid var(--border); margin: 22px 0; }
+  .cfg-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .cfg-toggle input { display: none; }
+  .cfg-toggle .switch { width: 40px; height: 22px; border-radius: 11px; background: var(--border); position: relative; transition: background .2s; }
+  .cfg-toggle .switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+  .cfg-toggle input:checked + .switch { background: var(--accent, #6366f1); }
+  .cfg-toggle input:checked + .switch::after { transform: translateX(18px); }
+  .cfg-toggle span { font-size: 13px; font-weight: 500; }
+  .cfg-radio-group { display: flex; flex-direction: column; gap: 8px; }
+  .cfg-radio { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; transition: all .12s; }
+  .cfg-radio:hover { border-color: var(--accent, #6366f1); }
+  .cfg-radio.selected { border-color: var(--accent, #6366f1); background: rgba(99,102,241,.04); }
+  .cfg-radio input { accent-color: var(--accent, #6366f1); }
+  .cfg-radio .radio-title { font-size: 13px; font-weight: 600; }
+  .cfg-radio .radio-desc { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+  .rule-card { padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); margin-bottom: 10px; display: flex; align-items: center; gap: 14px; }
+  .rule-card .rule-body { flex: 1; }
+  .rule-card .rule-condition { font-size: 13px; font-weight: 600; }
+  .rule-card .rule-action { font-size: 12px; color: var(--text-secondary); margin-top: 3px; }
+  .rule-badge { padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 700; }
+  .rule-active { background: rgba(34,197,94,.1); color: #16a34a; }
+  .rule-inactive { background: var(--surface); color: var(--text-secondary); border: 1px solid var(--border); }
+  .rule-actions { display: flex; gap: 4px; }
+  .rule-actions button { background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 4px; border-radius: 6px; transition: all .12s; }
+  .rule-actions button:hover { background: rgba(99,102,241,.1); color: var(--accent, #6366f1); }
+  .rule-actions button.del:hover { background: rgba(239,68,68,.1); color: #ef4444; }
+  .rule-actions button svg { width: 16px; height: 16px; }
+  .cat-list { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .cat-tag { display: flex; align-items: center; gap: 6px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 20px; font-size: 13px; font-weight: 500; background: var(--surface); }
+  .cat-tag .cat-remove { background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0; font-size: 14px; line-height: 1; }
+  .cat-tag .cat-remove:hover { color: #ef4444; }
+  .cat-add { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; border: 1px dashed var(--border); border-radius: 20px; font-size: 12px; color: var(--text-secondary); background: none; cursor: pointer; transition: all .12s; }
+  .cat-add:hover { border-color: var(--accent, #6366f1); color: var(--accent, #6366f1); }
+  .cfg-color { display: flex; align-items: center; gap: 10px; }
+  .cfg-color input[type="color"] { width: 40px; height: 40px; border: 2px solid var(--border); border-radius: 10px; cursor: pointer; padding: 2px; }
+  .cfg-color input[type="text"] { width: 100px; }
+  .cfg-success { padding: 12px 16px; background: rgba(34,197,94,.08); border: 1px solid rgba(34,197,94,.2); border-radius: 10px; color: #16a34a; font-size: 13px; font-weight: 500; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+  /* Users table */
+  .users-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .users-table thead th { padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+  .users-table tbody tr { transition: background .12s; }
+  .users-table tbody tr:hover { background: rgba(99,102,241,.04); }
+  .users-table tbody td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent, #6366f1); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+  .role-pill { padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .role-admin { background: rgba(99,102,241,.1); color: #6366f1; }
+  .role-colab { background: rgba(34,197,94,.1); color: #16a34a; }
+  /* New rule form */
+  .new-rule-form { padding: 16px; border: 1px solid var(--accent, #6366f1); border-radius: 12px; background: rgba(99,102,241,.03); margin-bottom: 10px; display: none; }
+  .new-rule-form.show { display: block; }
+</style>
+
+<div class="topbar"><h1>Configurações</h1></div>
+
+{% if success_message %}
+<div class="cfg-success">
+  <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
+  {{ success_message }}
+</div>
+{% endif %}
+
+<div class="cfg-layout">
+  <!-- ── Sidebar ──────────────────────────────────────────────────────────── -->
+  <nav class="cfg-nav">
+    <h2>Configurações</h2>
+    <a class="cfg-nav-item {% if tab == 'empresa' %}active{% endif %}" href="?tab=empresa">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+      Empresa
+    </a>
+    <a class="cfg-nav-item {% if tab == 'usuarios' %}active{% endif %}" href="?tab=usuarios">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+      Usuários
+    </a>
+    <a class="cfg-nav-item {% if tab == 'metricas' %}active{% endif %}" href="?tab=metricas">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+      Métricas
+    </a>
+    <a class="cfg-nav-item {% if tab == 'alertas' %}active{% endif %}" href="?tab=alertas">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01"/></svg>
+      Alertas
+    </a>
+    <a class="cfg-nav-item {% if tab == 'financeiro' %}active{% endif %}" href="?tab=financeiro">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      Financeiro
+    </a>
+    <a class="cfg-nav-item {% if tab == 'estrutura' %}active{% endif %}" href="?tab=estrutura">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+      Estrutura
+    </a>
+    <a class="cfg-nav-item {% if tab == 'ia' %}active{% endif %}" href="?tab=ia">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1.27c.34-.6.99-1 1.73-1a2 2 0 010 4c-.74 0-1.39-.4-1.73-1H20a7 7 0 01-7 7v1.27c.6.34 1 .99 1 1.73a2 2 0 01-4 0c0-.74.4-1.39 1-1.73V23a7 7 0 01-7-7H2.73c-.34.6-.99 1-1.73 1a2 2 0 010-4c.74 0 1.39.4 1.73 1H4a7 7 0 017-7V5.73c-.6-.34-1-.99-1-1.73a2 2 0 012-2z"/></svg>
+      IA
+    </a>
+    <a class="cfg-nav-item {% if tab == 'seguranca' %}active{% endif %}" href="?tab=seguranca">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+      Segurança
+    </a>
+  </nav>
+
+  <!-- ── Content ──────────────────────────────────────────────────────────── -->
+  <div class="cfg-content">
+
+    <!-- EMPRESA -->
+    <div class="cfg-panel {% if tab == 'empresa' %}active{% endif %}">
+      <h3><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg> Informações da Empresa</h3>
+      <form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="_tab" value="empresa">
+        <div class="cfg-grid">
+          <div class="cfg-field"><label>Nome da Empresa</label><input type="text" name="company_name" value="{{ cfg.empresa.company_name|default:'BBRO &co.' }}"></div>
+          <div class="cfg-field"><label>CNPJ</label><input type="text" name="cnpj" value="{{ cfg.empresa.cnpj|default:'00.000.000/0001-00' }}"></div>
+          <div class="cfg-field"><label>Fuso Horário</label><select name="timezone">{% for tz in "America/Sao_Paulo,America/Bahia,America/Manaus,America/Belem"|make_list %}{% endfor %}<option {% if cfg.empresa.timezone == "America/Sao_Paulo" or not cfg.empresa.timezone %}selected{% endif %}>America/Sao_Paulo</option><option {% if cfg.empresa.timezone == "America/Bahia" %}selected{% endif %}>America/Bahia</option><option {% if cfg.empresa.timezone == "America/Manaus" %}selected{% endif %}>America/Manaus</option></select></div>
+          <div class="cfg-field"><label>Moeda</label><select name="currency"><option {% if cfg.empresa.currency == "BRL - Real Brasileiro" or not cfg.empresa.currency %}selected{% endif %}>BRL - Real Brasileiro</option><option {% if cfg.empresa.currency == "USD - Dólar Americano" %}selected{% endif %}>USD - Dólar Americano</option><option {% if cfg.empresa.currency == "EUR - Euro" %}selected{% endif %}>EUR - Euro</option></select></div>
+          <div class="cfg-field">
+            <label>Logo da Empresa</label>
+            {% if cfg.logo %}
+            <div style="margin-bottom:8px;display:flex;align-items:center;gap:10px;">
+              <img src="{{ cfg.logo.url }}" alt="Logo atual" style="height:40px;border-radius:8px;border:1px solid var(--border);">
+              <span style="font-size:12px;color:var(--text-secondary);">Logo atual</span>
+            </div>
+            {% endif %}
+            <input type="file" name="logo" accept="image/*">
+          </div>
+          <div class="cfg-field"><label>Cor Primária</label><div class="cfg-color"><input type="color" name="primary_color" value="{{ cfg.empresa.primary_color|default:'#6C3BFF' }}"><input type="text" value="{{ cfg.empresa.primary_color|default:'#6C3BFF' }}"></div></div>
+        </div>
+        <hr class="cfg-divider">
+        <button type="submit" class="cfg-btn cfg-btn-primary">Salvar alterações</button>
+      </form>
+    </div>
+
+    <!-- USUÁRIOS (full embedded) -->
+    <div class="cfg-panel {% if tab == 'usuarios' %}active{% endif %}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <h3 style="margin:0;"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg> Usuários & Permissões</h3>
+        <button type="button" class="cfg-btn cfg-btn-primary" onclick="openUserModal()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          Novo Usuário
+        </button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="users-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Nome</th>
+              <th>E-mail</th>
+              <th>Usuário</th>
+              <th>Papel</th>
+              <th>Status</th>
+              <th>Criado em</th>
+              <th style="text-align:right;">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in users %}
+            <tr>
+              <td><span class="user-avatar">{{ u.username|make_list|first|upper }}</span></td>
+              <td style="font-weight:600;">{{ u.first_name }} {{ u.last_name }}{% if not u.first_name and not u.last_name %}<span style="color:var(--text-secondary);">—</span>{% endif %}</td>
+              <td style="color:var(--text-secondary);">{{ u.email|default:"—" }}</td>
+              <td style="color:var(--text-secondary);">{{ u.username }}</td>
+              <td>
+                {% if u.role == "admin" %}<span class="role-pill role-admin">Admin</span>
+                {% else %}<span class="role-pill role-colab">Colaborador</span>{% endif %}
+              </td>
+              <td>
+                {% if u.is_active %}<span class="role-pill" style="background:rgba(34,197,94,.1);color:#16a34a;">Ativo</span>
+                {% else %}<span class="role-pill" style="background:rgba(239,68,68,.1);color:#dc2626;">Inativo</span>{% endif %}
+              </td>
+              <td style="color:var(--text-secondary);font-size:12px;">{{ u.date_joined|date:"d/m/Y H:i" }}</td>
+              <td style="text-align:right;">
+                <div style="display:flex;gap:6px;justify-content:flex-end;">
+                  <button type="button" class="cfg-btn cfg-btn-outline" style="padding:5px 12px;font-size:12px;" onclick="editUser({{ u.id }}, '{{ u.username|escapejs }}', '{{ u.email|escapejs }}', '{{ u.first_name|escapejs }}', '{{ u.last_name|escapejs }}', '{{ u.role }}', {{ u.is_active|yesno:'true,false' }})">Editar</button>
+                  {% if not u.is_superuser %}
+                  <button type="button" class="cfg-btn cfg-btn-danger" style="padding:5px 12px;font-size:12px;" onclick="confirmDeleteUser({{ u.id }}, '{{ u.username|escapejs }}')">Excluir</button>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-secondary);">Nenhum usuário cadastrado.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Modal Novo/Editar Usuário -->
+      <div id="userModal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.5);align-items:center;justify-content:center;" onclick="if(event.target===this)closeUserModal()">
+        <div style="background:var(--card-bg,#fff);border-radius:16px;width:560px;max-width:92vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:20px 24px;border-bottom:1px solid var(--border);">
+            <h3 id="modalTitle" style="margin:0;font-size:18px;font-weight:700;">Novo Usuário</h3>
+            <button onclick="closeUserModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--text-secondary);line-height:1;">&times;</button>
+          </div>
+          <form id="userForm" onsubmit="saveUser(event)" style="padding:24px;">
+            <input type="hidden" id="userId" value="">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+              <div class="cfg-field"><label>Nome</label><input type="text" id="firstName" required></div>
+              <div class="cfg-field"><label>Sobrenome</label><input type="text" id="lastName"></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+              <div class="cfg-field"><label>Usuário</label><input type="text" id="userUsername" required></div>
+              <div class="cfg-field"><label>E-mail</label><input type="email" id="userEmail" required></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+              <div class="cfg-field"><label>Papel</label><select id="userRole"><option value="admin">Administrador</option><option value="colaborador">Colaborador</option></select></div>
+              <div class="cfg-field"><label>Status</label><select id="userActive"><option value="true">Ativo</option><option value="false">Inativo</option></select></div>
+            </div>
+            <div class="cfg-field" style="margin-bottom:16px;">
+              <label>Senha <span id="passwordHint" style="font-weight:400;color:var(--text-secondary);font-size:11px;">(deixe em branco para manter)</span></label>
+              <input type="password" id="userPassword" minlength="6">
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:14px;border-top:1px solid var(--border);">
+              <button type="button" class="cfg-btn cfg-btn-outline" onclick="closeUserModal()">Cancelar</button>
+              <button type="submit" class="cfg-btn cfg-btn-primary">Salvar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Modal Confirmar Exclusão -->
+      <div id="deleteModal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.5);align-items:center;justify-content:center;" onclick="if(event.target===this)closeDeleteModal()">
+        <div style="background:var(--card-bg,#fff);border-radius:16px;width:400px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,.25);">
+          <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+            <h3 style="margin:0;font-size:18px;font-weight:700;">Confirmar Exclusão</h3>
+            <button onclick="closeDeleteModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--text-secondary);">&times;</button>
+          </div>
+          <div style="padding:24px;">
+            <p style="margin:0 0 8px;">Tem certeza que deseja excluir o usuário <strong id="deleteUserName"></strong>?</p>
+            <p style="margin:0;color:var(--text-secondary);font-size:13px;">Esta ação não pode ser desfeita.</p>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:10px;padding:14px 24px;border-top:1px solid var(--border);">
+            <button type="button" class="cfg-btn cfg-btn-outline" onclick="closeDeleteModal()">Cancelar</button>
+            <button type="button" class="cfg-btn" style="background:#dc2626;color:#fff;" onclick="deleteUser()">Excluir</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MÉTRICAS -->
+    <div class="cfg-panel {% if tab == 'metricas' %}active{% endif %}">
+      <h3><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg> Configuração de KPIs</h3>
+      <form method="post">{% csrf_token %}<input type="hidden" name="_tab" value="metricas">
+        <div class="cfg-grid">
+          <div class="cfg-field"><label>CTR Mínimo (%)</label><input type="number" name="ctr_min" step="0.1" value="{{ cfg.metricas.ctr_min|default:'2.0' }}"></div>
+          <div class="cfg-field"><label>CPC Máximo (R$)</label><input type="number" name="cpc_max" step="0.01" value="{{ cfg.metricas.cpc_max|default:'1.50' }}"></div>
+          <div class="cfg-field"><label>ROI Esperado (x)</label><input type="number" name="roi_target" step="0.1" value="{{ cfg.metricas.roi_target|default:'3.0' }}"></div>
+          <div class="cfg-field"><label>CPM Máximo (R$)</label><input type="number" name="cpm_max" step="0.01" value="{{ cfg.metricas.cpm_max|default:'15.00' }}"></div>
+          <div class="cfg-field"><label>Frequência Máx.</label><input type="number" name="freq_max" step="1" value="{{ cfg.metricas.freq_max|default:'12' }}"></div>
+          <div class="cfg-field"><label>Cobertura Mín. (%)</label><input type="number" name="coverage_min" step="0.1" value="{{ cfg.metricas.coverage_min|default:'60' }}"></div>
+        </div>
+        <hr class="cfg-divider">
+        <label class="cfg-toggle" style="margin-bottom:14px;"><input type="checkbox" name="auto_alerts" {% if cfg.metricas.auto_alerts or not cfg.metricas %}checked{% endif %}><div class="switch"></div><span>Ativar alertas automáticos de KPIs</span></label>
+        <label class="cfg-toggle"><input type="checkbox" name="daily_report" {% if cfg.metricas.daily_report or not cfg.metricas %}checked{% endif %}><div class="switch"></div><span>Enviar relatório diário por e-mail</span></label>
+        <hr class="cfg-divider">
+        <button type="submit" class="cfg-btn cfg-btn-primary">Salvar métricas</button>
+      </form>
+    </div>
+
+    <!-- ALERTAS -->
+    <div class="cfg-panel {% if tab == 'alertas' %}active{% endif %}">
+      <h3><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01"/></svg> Regras de Alertas</h3>
+
+      <div id="rules-container">
+        <div class="rule-card">
+          <div class="rule-body">
+            <div class="rule-condition">SE: CTR &lt; 2%</div>
+            <div class="rule-action">ENTÃO: Enviar e-mail para o gestor da campanha</div>
+          </div>
+          <span class="rule-badge rule-active">Ativo</span>
+          <div class="rule-actions">
+            <button title="Editar"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+            <button class="del" title="Deletar" onclick="this.closest('.rule-card').remove()"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/></svg></button>
+          </div>
+        </div>
+        <div class="rule-card">
+          <div class="rule-body">
+            <div class="rule-condition">SE: Budget &gt; 90%</div>
+            <div class="rule-action">ENTÃO: Notificar gestor e pausar campanhas automáticas</div>
+          </div>
+          <span class="rule-badge rule-active">Ativo</span>
+          <div class="rule-actions">
+            <button title="Editar"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+            <button class="del" title="Deletar" onclick="this.closest('.rule-card').remove()"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/></svg></button>
+          </div>
+        </div>
+        <div class="rule-card">
+          <div class="rule-body">
+            <div class="rule-condition">SE: PI vencido há &gt; 5 dias</div>
+            <div class="rule-action">ENTÃO: Enviar alerta urgente para financeiro</div>
+          </div>
+          <span class="rule-badge rule-inactive">Inativo</span>
+          <div class="rule-actions">
+            <button title="Editar"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+            <button class="del" title="Deletar" onclick="this.closest('.rule-card').remove()"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/></svg></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- New rule inline form -->
+      <div class="new-rule-form" id="new-rule-form">
+        <div class="cfg-grid" style="margin-bottom:14px;">
+          <div class="cfg-field">
+            <label>Condição (SE)</label>
+            <select id="rule-metric"><option>CTR</option><option>CPC</option><option>Budget</option><option>PI Vencido</option><option>Impressões</option><option>ROI</option></select>
+          </div>
+          <div class="cfg-field">
+            <label>Operador / Valor</label>
+            <div style="display:flex;gap:6px;">
+              <select id="rule-op" style="width:60px;"><option>&lt;</option><option>&gt;</option><option>=</option><option>&le;</option><option>&ge;</option></select>
+              <input type="text" id="rule-val" placeholder="2%" style="flex:1;">
+            </div>
+          </div>
+          <div class="cfg-field full">
+            <label>Ação (ENTÃO)</label>
+            <select id="rule-action-type"><option>Enviar e-mail</option><option>Notificar gestor</option><option>Pausar campanhas</option><option>Enviar alerta urgente</option></select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="cfg-btn cfg-btn-primary" onclick="addRule()">Adicionar regra</button>
+          <button class="cfg-btn cfg-btn-outline" onclick="document.getElementById('new-rule-form').classList.remove('show')">Cancelar</button>
+        </div>
+      </div>
+
+      <hr class="cfg-divider">
+      <button class="cfg-btn cfg-btn-outline" onclick="document.getElementById('new-rule-form').classList.add('show')">+ Criar nova regra</button>
+    </div>
+
+    <!-- FINANCEIRO -->
+    <div class="cfg-panel {% if tab == 'financeiro' %}active{% endif %}">
+      <h3><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Configuração Financeira</h3>
+      <form method="post">{% csrf_token %}<input type="hidden" name="_tab" value="financeiro">
+        <div class="cfg-grid">
+          <div class="cfg-field"><label>Comissão Padrão (%)</label><input type="number" name="comissao" step="0.1" value="{{ cfg.financeiro.comissao|default:'15' }}"></div>
+          <div class="cfg-field"><label>Imposto (%)</label><input type="number" name="imposto" step="0.1" value="{{ cfg.financeiro.imposto|default:'6' }}"></div>
+          <div class="cfg-field"><label>Desconto Máx. (%)</label><input type="number" name="desconto_max" step="0.1" value="{{ cfg.financeiro.desconto_max|default:'50' }}"></div>
+          <div class="cfg-field"><label>Prazo Pgto Padrão (dias)</label><input type="number" name="prazo_pgto" value="{{ cfg.financeiro.prazo_pgto|default:'30' }}"></div>
+        </div>
+        <hr class="cfg-divider">
+        <label style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary);display:block;margin-bottom:10px;">Categorias de Custo</label>
+        <div class="cat-list" id="fin-cats">
+          {% for cat in cfg.financeiro.categories %}
+          <span class="cat-tag">{{ cat }} <input type="hidden" name="categories" value="{{ cat }}"><button class="cat-remove" onclick="this.parentElement.remove()">×</button></span>
+          {% endfor %}
+          <button class="cat-add" onclick="addCat('fin-cats','categories')">+ Adicionar</button>
+        </div>
+        <hr class="cfg-divider">
+        <button type="submit" class="cfg-btn cfg-btn-primary">Salvar configurações</button>
+      </form>
+    </div>
+
+    <!-- ESTRUTURA -->
+    <div class="cfg-panel {% if tab == 'estrutura' %}active{% endif %}">
+      <h3><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg> Estrutura de Dados</h3>
+      <form method="post">{% csrf_token %}<input type="hidden" name="_tab" value="estrutura">
+        <div class="cfg-grid">
+          <div class="cfg-field full">
+            <label>Meios de Comunicação</label>
+            <div class="cat-list" id="meios-cats" style="margin-top:6px;">
+              {% for m in cfg.estrutura.meios %}
+              <span class="cat-tag">{{ m }} <input type="hidden" name="meios" value="{{ m }}"><button class="cat-remove" onclick="this.parentElement.remove()">×</button></span>
+              {% endfor %}
+              <button class="cat-add" onclick="addCat('meios-cats','meios')">+ Adicionar</button>
+            </div>
+          </div>
+          <div class="cfg-field full">
+            <label>Status de Campanha</label>
+            <div class="cat-list" id="status-cats" style="margin-top:6px;">
+              {% for s in cfg.estrutura.statuses %}
+              <span class="cat-tag">{{ s }} <input type="hidden" name="statuses" value="{{ s }}"><button class="cat-remove" onclick="this.parentElement.remove()">×</button></span>
+              {% endfor %}
+              <button class="cat-add" onclick="addCat('status-cats','statuses')">+ Adicionar</button>
+            </div>
+          </div>
+          <div class="cfg-field full">
+            <label>Praças Disponíveis</label>
+            <div class="cat-list" id="praca-cats" style="margin-top:6px;">
+              {% for p in cfg.estrutura.pracas %}
+              <span class="cat-tag">{{ p }} <input type="hidden" name="pracas" value="{{ p }}"><button class="cat-remove" onclick="this.parentElement.remove()">×</button></span>
+              {% endfor %}
+              <button class="cat-add" onclick="addCat('praca-cats','pracas')">+ Adicionar</button>
+            </div>
+          </div>
+        </div>
+        <hr class="cfg-divider">
+        <button type="submit" class="cfg-btn cfg-btn-primary">Salvar estrutura</button>
+      </form>
+    </div>
+
+    <!-- IA -->
+    <div class="cfg-panel {% if tab == 'ia' %}active{% endif %}">
+      <h3><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1.27c.34-.6.99-1 1.73-1a2 2 0 010 4c-.74 0-1.39-.4-1.73-1H20a7 7 0 01-7 7v1.27c.6.34 1 .99 1 1.73a2 2 0 01-4 0c0-.74.4-1.39 1-1.73V23a7 7 0 01-7-7H2.73c-.34.6-.99 1-1.73 1a2 2 0 010-4c.74 0 1.39.4 1.73 1H4a7 7 0 017-7V5.73c-.6-.34-1-.99-1-1.73a2 2 0 012-2z"/></svg> Inteligência Artificial</h3>
+      <form method="post">{% csrf_token %}<input type="hidden" name="_tab" value="ia">
+        <label class="cfg-toggle" style="margin-bottom:20px;"><input type="checkbox" name="auto_recommendations" {% if cfg.ia.auto_recommendations or not cfg.ia %}checked{% endif %}><div class="switch"></div><span>Ativar recomendações automáticas</span></label>
+        <label style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary);display:block;margin-bottom:10px;">Estilo de Recomendação</label>
+        <div class="cfg-radio-group" style="margin-bottom:20px;">
+          <label class="cfg-radio {% if cfg.ia.style == 'conservative' %}selected{% endif %}" onclick="selRadio(this)"><input type="radio" name="ia_style" value="conservative" {% if cfg.ia.style == 'conservative' %}checked{% endif %}><div class="radio-info"><div class="radio-title">Conservador</div><div class="radio-desc">Recomendações seguras, foco em preservar budget</div></div></label>
+          <label class="cfg-radio {% if cfg.ia.style == 'balanced' or not cfg.ia.style %}selected{% endif %}" onclick="selRadio(this)"><input type="radio" name="ia_style" value="balanced" {% if cfg.ia.style == 'balanced' or not cfg.ia.style %}checked{% endif %}><div class="radio-info"><div class="radio-title">Balanceado</div><div class="radio-desc">Equilíbrio entre risco e retorno</div></div></label>
+          <label class="cfg-radio {% if cfg.ia.style == 'aggressive' %}selected{% endif %}" onclick="selRadio(this)"><input type="radio" name="ia_style" value="aggressive" {% if cfg.ia.style == 'aggressive' %}checked{% endif %}><div class="radio-info"><div class="radio-title">Agressivo</div><div class="radio-desc">Maximizar performance, aceitar maior risco</div></div></label>
+        </div>
+        <label class="cfg-toggle" style="margin-bottom:20px;"><input type="checkbox" name="auto_insights" {% if cfg.ia.auto_insights or not cfg.ia %}checked{% endif %}><div class="switch"></div><span>Gerar insights automáticos</span></label>
+        <label class="cfg-toggle" style="margin-bottom:20px;"><input type="checkbox" name="budget_suggestion" {% if cfg.ia.budget_suggestion %}checked{% endif %}><div class="switch"></div><span>Sugerir redistribuição de budget</span></label>
+        <hr class="cfg-divider">
+        <button type="submit" class="cfg-btn cfg-btn-primary">Salvar configurações</button>
+      </form>
+    </div>
+
+    <!-- SEGURANÇA -->
+    <div class="cfg-panel {% if tab == 'seguranca' %}active{% endif %}">
+      <h3><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> Segurança</h3>
+      <form method="post">{% csrf_token %}<input type="hidden" name="_tab" value="seguranca">
+        <label class="cfg-toggle" style="margin-bottom:16px;"><input type="checkbox" name="force_password_change" {% if cfg.seguranca.force_password_change or not cfg.seguranca %}checked{% endif %}><div class="switch"></div><span>Forçar troca de senha a cada 90 dias</span></label>
+        <label class="cfg-toggle" style="margin-bottom:16px;"><input type="checkbox" name="two_factor" {% if cfg.seguranca.two_factor %}checked{% endif %}><div class="switch"></div><span>Autenticação em dois fatores (2FA)</span></label>
+        <label class="cfg-toggle" style="margin-bottom:16px;"><input type="checkbox" name="log_access" {% if cfg.seguranca.log_access or not cfg.seguranca %}checked{% endif %}><div class="switch"></div><span>Registrar logs de acesso</span></label>
+        <div class="cfg-grid" style="margin-top:16px;">
+          <div class="cfg-field"><label>Timeout de sessão (min)</label><input type="number" name="session_timeout" value="{{ cfg.seguranca.session_timeout|default:'60' }}"></div>
+          <div class="cfg-field"><label>Tentativas de login</label><input type="number" name="login_attempts" value="{{ cfg.seguranca.login_attempts|default:'5' }}"></div>
+        </div>
+        <hr class="cfg-divider">
+        <button type="submit" class="cfg-btn cfg-btn-primary">Salvar segurança</button>
+      </form>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// Color picker sync
+document.querySelectorAll('.cfg-color').forEach(g => {
+  const c = g.querySelector('input[type="color"]'), t = g.querySelector('input[type="text"]');
+  if (c && t) { c.oninput = () => t.value = c.value; t.oninput = () => { if (/^#[0-9a-f]{6}$/i.test(t.value)) c.value = t.value; }; }
+});
+
+function selRadio(el) { el.parentElement.querySelectorAll('.cfg-radio').forEach(r => r.classList.remove('selected')); el.classList.add('selected'); }
+
+function addCat(containerId, inputName) {
+  const name = prompt('Nome da nova categoria:');
+  if (!name || !name.trim()) return;
+  const container = document.getElementById(containerId);
+  const btn = container.querySelector('.cat-add');
+  const tag = document.createElement('span');
+  tag.className = 'cat-tag';
+  tag.innerHTML = name.trim() + (inputName ? ' <input type="hidden" name="'+inputName+'" value="'+name.trim()+'">' : '') + ' <button class="cat-remove" onclick="this.parentElement.remove()">×</button>';
+  container.insertBefore(tag, btn);
+}
+
+function addRule() {
+  const metric = document.getElementById('rule-metric').value;
+  const op = document.getElementById('rule-op').value;
+  const val = document.getElementById('rule-val').value;
+  const action = document.getElementById('rule-action-type').value;
+  if (!val.trim()) { alert('Preencha o valor da condição.'); return; }
+
+  const container = document.getElementById('rules-container');
+  const card = document.createElement('div');
+  card.className = 'rule-card';
+  card.innerHTML = `
+    <div class="rule-body">
+      <div class="rule-condition">SE: ${metric} ${op} ${val}</div>
+      <div class="rule-action">ENTÃO: ${action}</div>
+    </div>
+    <span class="rule-badge rule-active">Ativo</span>
+    <div class="rule-actions">
+      <button title="Editar"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+      <button class="del" title="Deletar" onclick="this.closest('.rule-card').remove()"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/></svg></button>
+    </div>`;
+  container.appendChild(card);
+  document.getElementById('new-rule-form').classList.remove('show');
+  document.getElementById('rule-val').value = '';
+}
+
+// ── User management ──────────────────────────────────────────
+let deleteUserId = null;
+
+function getCsrfToken() {
+  const name = 'csrftoken';
+  let val = null;
+  if (document.cookie) {
+    document.cookie.split(';').forEach(c => {
+      c = c.trim();
+      if (c.startsWith(name + '=')) val = decodeURIComponent(c.substring(name.length + 1));
+    });
+  }
+  return val;
+}
+
+function openUserModal(isEdit) {
+  document.getElementById('userModal').style.display = 'flex';
+  document.getElementById('modalTitle').textContent = isEdit ? 'Editar Usuário' : 'Novo Usuário';
+  document.getElementById('passwordHint').style.display = isEdit ? 'inline' : 'none';
+  document.getElementById('userPassword').required = !isEdit;
+  if (!isEdit) {
+    document.getElementById('userForm').reset();
+    document.getElementById('userId').value = '';
+  }
+}
+
+function closeUserModal() { document.getElementById('userModal').style.display = 'none'; }
+
+function editUser(id, username, email, firstName, lastName, role, isActive) {
+  document.getElementById('userId').value = id;
+  document.getElementById('userUsername').value = username;
+  document.getElementById('userEmail').value = email;
+  document.getElementById('firstName').value = firstName;
+  document.getElementById('lastName').value = lastName;
+  document.getElementById('userRole').value = role;
+  document.getElementById('userActive').value = isActive ? 'true' : 'false';
+  document.getElementById('userPassword').value = '';
+  openUserModal(true);
+}
+
+function saveUser(e) {
+  e.preventDefault();
+  const userId = document.getElementById('userId').value;
+  const data = {
+    username: document.getElementById('userUsername').value,
+    email: document.getElementById('userEmail').value,
+    first_name: document.getElementById('firstName').value,
+    last_name: document.getElementById('lastName').value,
+    role: document.getElementById('userRole').value,
+    is_active: document.getElementById('userActive').value === 'true',
+  };
+  const pw = document.getElementById('userPassword').value;
+  if (pw) data.password = pw;
+
+  fetch(userId ? '/api/users/' + userId + '/' : '/api/users/', {
+    method: userId ? 'PUT' : 'POST',
+    headers: {'Content-Type':'application/json', 'X-CSRFToken': getCsrfToken()},
+    body: JSON.stringify(data),
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res.success) window.location.href = '?tab=usuarios';
+    else alert(res.error || 'Erro ao salvar usuário');
+  })
+  .catch(() => alert('Erro ao salvar usuário'));
+}
+
+function confirmDeleteUser(id, username) {
+  deleteUserId = id;
+  document.getElementById('deleteUserName').textContent = username;
+  document.getElementById('deleteModal').style.display = 'flex';
+}
+
+function closeDeleteModal() { document.getElementById('deleteModal').style.display = 'none'; deleteUserId = null; }
+
+function deleteUser() {
+  if (!deleteUserId) return;
+  fetch('/api/users/' + deleteUserId + '/', {
+    method: 'DELETE',
+    headers: {'X-CSRFToken': getCsrfToken()},
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res.success) window.location.href = '?tab=usuarios';
+    else alert(res.error || 'Erro ao excluir usuário');
+  })
+  .catch(() => alert('Erro ao excluir usuário'));
+}
+</script>
+{% endblock %}

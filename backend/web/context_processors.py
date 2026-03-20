@@ -60,6 +60,16 @@ def nav_context(request):
                 request.session.pop("selected_cliente_id", None)
                 sidebar_selected_cliente_id = None
 
+    # Site logo from SiteConfig
+    site_logo_url = None
+    try:
+        from accounts.models import SiteConfig
+        site_cfg = SiteConfig.objects.filter(pk=1).only("logo").first()
+        if site_cfg and site_cfg.logo:
+            site_logo_url = site_cfg.logo.url
+    except Exception:
+        pass
+
     return {
         "nav_mode": nav_mode,
         "nav_cliente": nav_cliente,
@@ -69,4 +79,5 @@ def nav_context(request):
         "alertas_pendentes": alertas_pendentes,
         "sidebar_clientes": sidebar_clientes,
         "sidebar_selected_cliente_id": sidebar_selected_cliente_id,
+        "site_logo_url": site_logo_url,
     }

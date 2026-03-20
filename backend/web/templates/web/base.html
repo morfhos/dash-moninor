@@ -299,5 +299,101 @@
         .catch(err => console.error('Erro ao marcar alerta como lido:', err));
       }
     </script>
+
+    <!-- Search Campaign Modal -->
+    <style>
+      .search-modal { display:none; position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,.5); align-items:flex-start; justify-content:center; padding-top:10vh; }
+      .search-modal.show { display:flex; }
+      .search-modal-box { background:var(--card-bg,#fff); border-radius:16px; width:560px; max-width:92vw; max-height:70vh; overflow:hidden; box-shadow:0 25px 60px rgba(0,0,0,.25); display:flex; flex-direction:column; }
+      .search-modal-header { padding:20px 22px 0; }
+      .search-modal-header h3 { margin:0 0 14px; font-size:16px; font-weight:700; display:flex; align-items:center; gap:8px; }
+      .search-modal-input { width:100%; padding:12px 14px 12px 40px; border:1px solid var(--border-color,#e2e8f0); border-radius:10px; background:var(--surface,#f8fafc); font-size:14px; outline:none; color:var(--text-primary,#1a1a2e); }
+      .search-modal-input:focus { border-color:#6366f1; }
+      .search-input-wrap { position:relative; margin-bottom:14px; }
+      .search-input-wrap svg { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-secondary,#94a3b8); pointer-events:none; }
+      .search-modal-results { overflow-y:auto; max-height:calc(70vh - 120px); padding:0; }
+      .search-result-item { display:flex; align-items:center; gap:14px; padding:14px 22px; border-bottom:1px solid var(--border-color,#e2e8f0); cursor:pointer; transition:background .12s; text-decoration:none; color:inherit; }
+      .search-result-item:hover { background:rgba(99,102,241,.06); }
+      .search-result-item:last-child { border-bottom:none; }
+      .sr-info { flex:1; min-width:0; }
+      .sr-name { font-size:14px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .sr-meta { font-size:12px; color:var(--text-secondary,#94a3b8); margin-top:2px; }
+      .sr-pill { padding:2px 8px; border-radius:12px; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap; }
+      .sr-pill-active { background:rgba(34,197,94,.1); color:#16a34a; }
+      .sr-pill-offline { background:rgba(239,68,68,.1); color:#dc2626; }
+      .sr-pill-online { background:rgba(99,102,241,.1); color:#6366f1; }
+      .search-empty { text-align:center; padding:40px 20px; color:var(--text-secondary,#94a3b8); }
+      .search-empty svg { width:40px; height:40px; margin-bottom:8px; opacity:.4; }
+      .search-hint { font-size:12px; color:var(--text-secondary,#94a3b8); text-align:center; padding:14px; }
+    </style>
+
+    <div id="searchModal" class="search-modal" onclick="if(event.target===this)closeSearchModal()">
+      <div class="search-modal-box">
+        <div class="search-modal-header">
+          <h3>
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            Pesquise sua Campanha
+          </h3>
+          <div class="search-input-wrap">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            <input type="text" class="search-modal-input" id="search-campaign-input" placeholder="Digite o nome da campanha..." autocomplete="off">
+          </div>
+        </div>
+        <div class="search-modal-results" id="search-results">
+          <div class="search-hint">Digite ao menos 2 caracteres para pesquisar</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let _searchTimer = null;
+      function openSearchModal() {
+        document.getElementById('searchModal').classList.add('show');
+        const input = document.getElementById('search-campaign-input');
+        input.value = '';
+        input.focus();
+        document.getElementById('search-results').innerHTML = '<div class="search-hint">Digite ao menos 2 caracteres para pesquisar</div>';
+      }
+      function closeSearchModal() {
+        document.getElementById('searchModal').classList.remove('show');
+      }
+      document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); openSearchModal(); }
+        if (e.key === 'Escape' && document.getElementById('searchModal').classList.contains('show')) closeSearchModal();
+      });
+      document.getElementById('search-campaign-input').addEventListener('input', function() {
+        clearTimeout(_searchTimer);
+        const q = this.value.trim();
+        if (q.length < 2) {
+          document.getElementById('search-results').innerHTML = '<div class="search-hint">Digite ao menos 2 caracteres para pesquisar</div>';
+          return;
+        }
+        _searchTimer = setTimeout(() => {
+          fetch('/api/search-campaigns/?q=' + encodeURIComponent(q))
+            .then(r => r.json())
+            .then(data => {
+              const el = document.getElementById('search-results');
+              if (!data.results || data.results.length === 0) {
+                el.innerHTML = '<div class="search-empty"><svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg><p>Nenhuma campanha encontrada</p></div>';
+                return;
+              }
+              let html = '';
+              data.results.forEach(c => {
+                const pillClass = c.media_type === 'online' ? 'sr-pill-online' : 'sr-pill-offline';
+                const statusClass = c.status === 'active' ? 'sr-pill-active' : '';
+                html += `<a class="search-result-item" href="${c.url}">
+                  <div class="sr-info">
+                    <div class="sr-name">${c.name}</div>
+                    <div class="sr-meta">${c.cliente} · ${c.start_date} – ${c.end_date}</div>
+                  </div>
+                  <span class="sr-pill ${pillClass}">${c.media_type}</span>
+                  <span class="sr-pill ${statusClass}">${c.status}</span>
+                </a>`;
+              });
+              el.innerHTML = html;
+            });
+        }, 250);
+      });
+    </script>
   </body>
 </html>

@@ -196,7 +196,50 @@
     transition: all .12s;
   }
   .row-act:hover { background: rgba(99,102,241,.1); color: var(--accent, #6366f1); }
+  .row-act.danger-act:hover { background: rgba(239,68,68,.1); color: #ef4444; }
   .row-act svg { width: 16px; height: 16px; }
+
+  /* Lightbox overlay */
+  .lb-overlay {
+    display: none; position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,.45); align-items: center; justify-content: center;
+  }
+  .lb-overlay.active { display: flex; }
+  .lb-box {
+    background: var(--card-bg, #fff); border-radius: 16px; width: 480px; max-width: 92vw;
+    max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.2);
+  }
+  .lb-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 22px; border-bottom: 1px solid var(--border);
+  }
+  .lb-header h3 { margin: 0; font-size: 16px; font-weight: 700; }
+  .lb-close {
+    background: none; border: none; cursor: pointer; color: var(--text-secondary);
+    padding: 4px; border-radius: 6px; transition: all .12s;
+  }
+  .lb-close:hover { background: rgba(0,0,0,.06); }
+  .lb-body { padding: 20px 22px; }
+  .lb-row { display: flex; gap: 12px; margin-bottom: 12px; }
+  .lb-field { flex: 1; }
+  .lb-field label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-secondary); margin-bottom: 4px; }
+  .lb-field .lb-val { font-size: 14px; font-weight: 500; color: var(--text-primary); padding: 6px 0; }
+  .lb-field input, .lb-field select {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--surface); color: var(--text-primary); font-size: 13px; outline: none;
+  }
+  .lb-field input:focus, .lb-field select:focus { border-color: var(--accent, #6366f1); }
+  .lb-footer {
+    display: flex; gap: 10px; justify-content: flex-end;
+    padding: 14px 22px; border-top: 1px solid var(--border);
+  }
+  .lb-btn {
+    padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    border: none; cursor: pointer; transition: opacity .15s;
+  }
+  .lb-btn-cancel { background: var(--surface); color: var(--text-secondary); border: 1px solid var(--border); }
+  .lb-btn-save { background: var(--accent, #6366f1); color: #fff; }
+  .lb-btn-save:hover { opacity: .85; }
   .row-act::after {
     content: attr(data-tip);
     position: absolute; bottom: calc(100% + 5px); left: 50%; transform: translateX(-50%);
@@ -234,6 +277,7 @@
   .region-row .rval { width: 110px; font-size: 13px; text-align: right; font-weight: 600; }
 </style>
 
+{% csrf_token %}
 <!-- ── Header ──────────────────────────────────────────────────────────────── -->
 <div class="fin-header">
   <div style="display:flex;align-items:center;gap:14px;">
@@ -246,10 +290,17 @@
     </div>
     <p class="subtitle">{{ campaign.name }} · {{ cliente.nome }}</p>
   </div>
-  <a class="btn-upload" href="{% url 'web:campaign_financial_upload' campaign.id %}">
-    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
-    Importar planilha
-  </a>
+  <div style="display:flex;gap:10px;align-items:center;">
+    {% if fs %}
+    <button type="button" onclick="confirmDelete()" title="Deletar dados financeiros" style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:none;color:var(--text-secondary);cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='#ef4444';this.style.color='#ef4444'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/></svg>
+    </button>
+    Deletar Dados
+    <form method="post" id="delete-form" action="{% url 'web:campaign_financial_delete' campaign.id %}" style="display:none;">
+      {% csrf_token %}
+    </form>
+    {% endif %}
+  </div>
 </div>
 
 {% if not fs %}
@@ -391,7 +442,7 @@
       </thead>
       <tbody>
         {% for eff in efficiencies %}
-        <tr data-meio="{{ eff.channel_type }}" data-veiculo="{{ eff.veiculo }}">
+        <tr data-meio="{{ eff.channel_type }}" data-veiculo="{{ eff.veiculo }}" data-eff-id="{{ eff.id }}">
           <td>
             <span class="ch-pill {{ eff.channel_type }}">
               {% if eff.channel_type == "tv_aberta" %}TV Aberta
@@ -411,14 +462,14 @@
           <td class="num bold">{% if eff.valor %}R$ {{ eff.valor|floatformat:0 }}{% elif eff.custo_negociado %}R$ {{ eff.custo_negociado|floatformat:0 }}{% else %}—{% endif %}</td>
           <td>
             <div class="row-actions">
-              <a class="row-act" href="#" data-tip="Detalhes" onclick="return false;">
+              <a class="row-act" href="#" data-tip="Detalhes" onclick="viewEff({{ eff.id }}); return false;">
                 <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
               </a>
-              <a class="row-act" href="#" data-tip="Editar" onclick="return false;">
+              <a class="row-act" href="#" data-tip="Editar" onclick="editEff({{ eff.id }}); return false;">
                 <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
               </a>
-              <a class="row-act" href="#" data-tip="Baixar" onclick="return false;">
-                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              <a class="row-act danger-act" href="#" data-tip="Deletar" onclick="deleteEff({{ eff.id }}, this); return false;">
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/></svg>
               </a>
             </div>
           </td>
@@ -512,6 +563,32 @@
 {% endif %}
 
 {% endif %}{# end if fs #}
+
+<!-- ── View Lightbox ───────────────────────────────────────────────────────── -->
+<div class="lb-overlay" id="lb-view" onclick="if(event.target===this)closeLB('lb-view')">
+  <div class="lb-box">
+    <div class="lb-header">
+      <h3>Detalhes da Linha</h3>
+      <button class="lb-close" onclick="closeLB('lb-view')"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="lb-body" id="lb-view-body"></div>
+  </div>
+</div>
+
+<!-- ── Edit Lightbox ───────────────────────────────────────────────────────── -->
+<div class="lb-overlay" id="lb-edit" onclick="if(event.target===this)closeLB('lb-edit')">
+  <div class="lb-box">
+    <div class="lb-header">
+      <h3>Editar Linha</h3>
+      <button class="lb-close" onclick="closeLB('lb-edit')"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="lb-body" id="lb-edit-body"></div>
+    <div class="lb-footer">
+      <button class="lb-btn lb-btn-cancel" onclick="closeLB('lb-edit')">Cancelar</button>
+      <button class="lb-btn lb-btn-save" id="lb-save-btn" onclick="saveEff()">Salvar</button>
+    </div>
+  </div>
+</div>
 
 <!-- ── Scripts ─────────────────────────────────────────────────────────────── -->
 <script>
@@ -613,6 +690,126 @@ function clearFilters() {
   if (m) m.value = '';
   if (v) v.value = '';
   filterTable();
+}
+
+function confirmDelete() {
+  if (confirm('Tem certeza que deseja deletar todos os dados financeiros desta campanha?\n\nEsta ação não pode ser desfeita.')) {
+    document.getElementById('delete-form').submit();
+  }
+}
+
+// ── Lightbox helpers ─────────────────────────────────────────
+function closeLB(id) { document.getElementById(id).classList.remove('active'); }
+function openLB(id)  { document.getElementById(id).classList.add('active'); }
+
+const CH_LABELS = {tv_aberta:'TV Aberta', paytv:'Pay TV', radio:'Rádio', jornal:'Jornal', digital:'Digital', geracao:'Geração', other:'Outro'};
+const FIELDS = [
+  {key:'channel_type', label:'Meio', type:'select', opts: CH_LABELS},
+  {key:'veiculo',      label:'Veículo'},
+  {key:'praca',        label:'Praça'},
+  {key:'programa',     label:'Programa'},
+  {key:'formato',      label:'Formato'},
+  {key:'insercoes',    label:'Inserções', type:'number'},
+  {key:'custo_tabela', label:'Custo Tabela', type:'number', prefix:'R$ '},
+  {key:'custo_negociado', label:'Custo Negociado', type:'number', prefix:'R$ '},
+  {key:'valor',        label:'Valor', type:'number', prefix:'R$ '},
+  {key:'trp',          label:'TRP', type:'number'},
+  {key:'cpp',          label:'CPP', type:'number', prefix:'R$ '},
+  {key:'cpm',          label:'CPM', type:'number', prefix:'R$ '},
+  {key:'impactos',     label:'Impactos', type:'number'},
+  {key:'ia_pct',       label:'IA %', type:'number'},
+  {key:'circulacao',   label:'Circulação', type:'number'},
+];
+
+let _editId = null;
+
+function fmtVal(v, prefix) {
+  if (v === null || v === undefined || v === '') return '—';
+  if (prefix) return prefix + Number(v).toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 2});
+  return String(v);
+}
+
+async function viewEff(id) {
+  const res = await fetch('/api/efficiency/' + id + '/');
+  if (!res.ok) return;
+  const d = await res.json();
+  let html = '';
+  for (let i = 0; i < FIELDS.length; i += 2) {
+    html += '<div class="lb-row">';
+    for (let j = i; j < Math.min(i+2, FIELDS.length); j++) {
+      const f = FIELDS[j];
+      let val = d[f.key];
+      if (f.key === 'channel_type') val = CH_LABELS[val] || val;
+      else val = fmtVal(val, f.prefix);
+      html += '<div class="lb-field"><label>' + f.label + '</label><div class="lb-val">' + val + '</div></div>';
+    }
+    html += '</div>';
+  }
+  document.getElementById('lb-view-body').innerHTML = html;
+  openLB('lb-view');
+}
+
+async function editEff(id) {
+  const res = await fetch('/api/efficiency/' + id + '/');
+  if (!res.ok) return;
+  const d = await res.json();
+  _editId = id;
+  let html = '';
+  for (let i = 0; i < FIELDS.length; i += 2) {
+    html += '<div class="lb-row">';
+    for (let j = i; j < Math.min(i+2, FIELDS.length); j++) {
+      const f = FIELDS[j];
+      const val = d[f.key] ?? '';
+      html += '<div class="lb-field"><label>' + f.label + '</label>';
+      if (f.type === 'select') {
+        html += '<select id="ef-' + f.key + '">';
+        for (const [k,v] of Object.entries(f.opts)) {
+          html += '<option value="' + k + '"' + (k === val ? ' selected' : '') + '>' + v + '</option>';
+        }
+        html += '</select>';
+      } else {
+        const t = f.type === 'number' ? 'number' : 'text';
+        html += '<input type="' + t + '" id="ef-' + f.key + '" value="' + val + '"' + (t==='number' ? ' step="any"' : '') + '>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+  document.getElementById('lb-edit-body').innerHTML = html;
+  openLB('lb-edit');
+}
+
+async function saveEff() {
+  if (!_editId) return;
+  const data = {};
+  FIELDS.forEach(f => {
+    const el = document.getElementById('ef-' + f.key);
+    if (!el) return;
+    let v = el.value;
+    if (f.type === 'number') v = v === '' ? null : Number(v);
+    data[f.key] = v;
+  });
+  const res = await fetch('/api/efficiency/' + _editId + '/', {
+    method: 'PATCH',
+    headers: {'Content-Type':'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''},
+    body: JSON.stringify(data),
+  });
+  if (res.ok) {
+    closeLB('lb-edit');
+    location.reload();
+  }
+}
+
+async function deleteEff(id, el) {
+  if (!confirm('Deletar esta linha de eficiência?')) return;
+  const res = await fetch('/api/efficiency/' + id + '/', {
+    method: 'DELETE',
+    headers: {'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''},
+  });
+  if (res.ok) {
+    const tr = el.closest('tr');
+    if (tr) tr.remove();
+  }
 }
 </script>
 {% endblock %}

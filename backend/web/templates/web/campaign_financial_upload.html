@@ -1,5 +1,37 @@
 {% extends "web/base.html" %}
 {% block content %}
+<style>
+  .sheet-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .sheet-card:hover { border-color: var(--accent, #6366f1); }
+  .sheet-card.checked { border-color: var(--accent, #6366f1); background: rgba(99,102,241,.06); }
+  .sheet-card input[type="checkbox"] { accent-color: var(--accent, #6366f1); width: 16px; height: 16px; cursor: pointer; }
+  .sheet-card .sheet-info { flex: 1; min-width: 0; }
+  .sheet-card .sheet-name { font-size: 13px; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sheet-card .sheet-meta { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+  .sheet-card .sheet-badge {
+    padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .03em; white-space: nowrap;
+  }
+  .badge-eficiencia  { background: rgba(99,102,241,.1);  color: #6366f1; }
+  .badge-tv          { background: rgba(34,197,94,.1);   color: #16a34a; }
+  .badge-radio       { background: rgba(245,158,11,.1);  color: #d97706; }
+  .badge-jornal      { background: rgba(239,68,68,.1);   color: #dc2626; }
+  .badge-digital     { background: rgba(59,130,246,.1);  color: #3b82f6; }
+  .badge-geracao     { background: rgba(168,85,247,.1);  color: #a855f7; }
+  .badge-capa        { background: var(--surface); color: var(--text-secondary); border: 1px solid var(--border); }
+  .badge-default     { background: var(--surface); color: var(--text-secondary); border: 1px solid var(--border); }
+</style>
+
 <div class="page-header" style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
   <a href="{% url 'web:campaign_financeiro' campaign.id %}" class="btn btn-ghost" style="padding:6px 10px;">← Voltar</a>
   <div>
@@ -8,14 +40,14 @@
   </div>
 </div>
 
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:900px;">
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:960px;">
 
-  <!-- Painel 1: Enviar planilha -->
+  <!-- ── Painel 1: Enviar planilha ──────────────────────────────────────── -->
   <div class="card" style="padding:24px;">
     <h3 style="margin:0 0 16px;font-size:15px;font-weight:600;">1 — ENVIAR PLANILHA</h3>
 
     {% if form_errors %}
-    <div class="alert alert-danger" style="margin-bottom:14px;padding:10px 14px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;color:#ef4444;font-size:13px;">
+    <div style="margin-bottom:14px;padding:10px 14px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;color:#ef4444;font-size:13px;">
       {{ form_errors }}
     </div>
     {% endif %}
@@ -23,7 +55,6 @@
     <form method="post" enctype="multipart/form-data" id="upload-form">
       {% csrf_token %}
       <input type="hidden" name="_action" id="form-action" value="validate">
-      <input type="hidden" name="upload_id" id="upload-id-field" value="">
 
       <div id="drop-zone"
            style="border:2px dashed var(--border);border-radius:12px;padding:32px 20px;text-align:center;cursor:pointer;transition:.2s;"
@@ -54,54 +85,91 @@
       <input type="file" id="xlsx-input" name="xlsx_file" accept=".xlsx" style="display:none;" onchange="handleFile(this.files[0])">
 
       <button type="submit" id="analyze-btn" class="btn btn-primary" style="width:100%;margin-top:14px;" disabled>
-        Analisar planilha
+        Analisar abas
       </button>
     </form>
   </div>
 
-  <!-- Painel 2: Preview / confirmar import -->
+  <!-- ── Painel 2: Selecionar abas + Importar ──────────────────────────── -->
   <div class="card" style="padding:24px;" id="preview-panel">
-    <h3 style="margin:0 0 16px;font-size:15px;font-weight:600;">2 — CONFIRMAR IMPORTAÇÃO</h3>
+    <h3 style="margin:0 0 16px;font-size:15px;font-weight:600;">2 — SELECIONAR ABAS</h3>
 
-    {% if result %}
-      {% if result.errors %}
-      <div style="padding:12px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;margin-bottom:14px;">
+    {% if result and not result.errors %}
+      <!-- Stats -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">
+        <div style="padding:10px;background:var(--surface);border-radius:8px;text-align:center;">
+          <p style="margin:0;font-size:20px;font-weight:700;color:var(--accent);">{{ result.eff_count }}</p>
+          <p style="margin:2px 0 0;font-size:10px;color:var(--text-secondary);text-transform:uppercase;">Eficiência</p>
+        </div>
+        <div style="padding:10px;background:var(--surface);border-radius:8px;text-align:center;">
+          <p style="margin:0;font-size:20px;font-weight:700;color:var(--accent);">{{ result.pi_count }}</p>
+          <p style="margin:2px 0 0;font-size:10px;color:var(--text-secondary);text-transform:uppercase;">PIs</p>
+        </div>
+        <div style="padding:10px;background:var(--surface);border-radius:8px;text-align:center;">
+          <p style="margin:0;font-size:20px;font-weight:700;color:var(--accent);">{{ result.region_count }}</p>
+          <p style="margin:2px 0 0;font-size:10px;color:var(--text-secondary);text-transform:uppercase;">Regiões</p>
+        </div>
+      </div>
+
+      <!-- Select all / Clear -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <span id="selected-count" style="font-size:12px;font-weight:600;color:var(--text-secondary);"></span>
+        <div style="display:flex;gap:8px;">
+          <button type="button" onclick="selectAll()" style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:none;font-size:11px;color:var(--text-secondary);cursor:pointer;">Todas</button>
+          <button type="button" onclick="clearAll()" style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:none;font-size:11px;color:var(--text-secondary);cursor:pointer;">Nenhuma</button>
+        </div>
+      </div>
+
+      <!-- Sheet cards -->
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;max-height:340px;overflow-y:auto;" id="sheets-list">
+        {% for sheet_name, detail in result.sheet_details.items %}
+        <label class="sheet-card checked">
+          <input type="checkbox" value="{{ sheet_name }}" checked onchange="toggleCard(this)">
+          <div class="sheet-info">
+            <div class="sheet-name">{{ sheet_name }}</div>
+            <div class="sheet-meta">
+              {% if detail.rows > 0 %}{{ detail.rows }} linhas{% else %}metadados{% endif %}
+            </div>
+          </div>
+          {% if detail.type %}
+          <span class="sheet-badge
+            {% if detail.type == 'eficiência' %}badge-eficiencia
+            {% elif 'TV' in detail.type %}badge-tv
+            {% elif detail.type == 'Rádio' %}badge-radio
+            {% elif detail.type == 'Jornal' %}badge-jornal
+            {% elif detail.type == 'Digital' %}badge-digital
+            {% elif detail.type == 'geração' or detail.type == 'Geração' %}badge-geracao
+            {% elif detail.type == 'capa' %}badge-capa
+            {% else %}badge-default{% endif %}">{{ detail.type }}</span>
+          {% endif %}
+        </label>
+        {% endfor %}
+      </div>
+
+      <!-- Import button -->
+      <form method="post" id="import-form">
+        {% csrf_token %}
+        <input type="hidden" name="_action" value="import">
+        <input type="hidden" name="upload_id" value="{{ result.upload_id }}">
+        <button type="submit" id="import-btn" class="btn btn-primary" style="width:100%;" onclick="injectSheets(event)">
+          Importar dados financeiros
+        </button>
+      </form>
+
+    {% elif result and result.errors %}
+      <div style="padding:12px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;">
         <p style="margin:0 0 6px;font-weight:600;font-size:13px;color:#ef4444;">Erros encontrados:</p>
         <ul style="margin:0;padding-left:18px;font-size:12px;color:#ef4444;">
           {% for e in result.errors %}<li>{{ e }}</li>{% endfor %}
         </ul>
       </div>
-      {% else %}
-      <div style="margin-bottom:16px;">
-        <p style="margin:0 0 10px;font-size:13px;color:var(--text-secondary);">Abas detectadas:</p>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">
-          {% for sheet in result.sheets_found %}
-          <span style="padding:3px 10px;background:var(--surface);border:1px solid var(--border);border-radius:20px;font-size:12px;">{{ sheet }}</span>
-          {% endfor %}
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
-          <div style="padding:12px;background:var(--surface);border-radius:8px;text-align:center;">
-            <p style="margin:0;font-size:22px;font-weight:700;color:var(--accent);">{{ result.eff_count }}</p>
-            <p style="margin:4px 0 0;font-size:11px;color:var(--text-secondary);">Linhas de eficiência</p>
-          </div>
-          <div style="padding:12px;background:var(--surface);border-radius:8px;text-align:center;">
-            <p style="margin:0;font-size:22px;font-weight:700;color:var(--accent);">{{ result.pi_count }}</p>
-            <p style="margin:4px 0 0;font-size:11px;color:var(--text-secondary);">PIs encontrados</p>
-          </div>
-        </div>
-        <form method="post" id="import-form">
-          {% csrf_token %}
-          <input type="hidden" name="_action" value="import">
-          <input type="hidden" name="upload_id" value="{{ result.upload_id }}">
-          <button type="submit" class="btn btn-primary" style="width:100%;">
-            Importar dados financeiros
-          </button>
-        </form>
-      </div>
-      {% endif %}
+
     {% else %}
     <div style="text-align:center;padding:40px 20px;color:var(--text-secondary);">
-      <p style="margin:0;font-size:14px;">Envie a planilha financeira para visualizar o preview</p>
+      <svg style="width:36px;height:36px;margin-bottom:8px;opacity:.4;" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+        <path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+      </svg>
+      <p style="margin:0;font-size:14px;">Envie a planilha para analisar as abas</p>
     </div>
     {% endif %}
   </div>
@@ -134,9 +202,57 @@ function handleDrop(e){
   if(!file||!file.name.endsWith('.xlsx'))return;
   const dt=new DataTransfer();
   dt.items.add(file);
-  const inp=document.getElementById('xlsx-input');
-  inp.files=dt.files;
+  document.getElementById('xlsx-input').files=dt.files;
   handleFile(file);
 }
+
+function toggleCard(cb) {
+  const card = cb.closest('.sheet-card');
+  if (cb.checked) card.classList.add('checked');
+  else card.classList.remove('checked');
+  updateCount();
+}
+
+function updateCount() {
+  const all = document.querySelectorAll('#sheets-list input[type="checkbox"]');
+  const checked = document.querySelectorAll('#sheets-list input[type="checkbox"]:checked');
+  const el = document.getElementById('selected-count');
+  if (el) el.textContent = checked.length + ' de ' + all.length + ' abas selecionadas';
+  const btn = document.getElementById('import-btn');
+  if (btn) btn.disabled = checked.length === 0;
+}
+
+function selectAll() {
+  document.querySelectorAll('#sheets-list input[type="checkbox"]').forEach(cb => {
+    cb.checked = true;
+    cb.closest('.sheet-card').classList.add('checked');
+  });
+  updateCount();
+}
+
+function clearAll() {
+  document.querySelectorAll('#sheets-list input[type="checkbox"]').forEach(cb => {
+    cb.checked = false;
+    cb.closest('.sheet-card').classList.remove('checked');
+  });
+  updateCount();
+}
+
+function injectSheets(e) {
+  const form = document.getElementById('import-form');
+  // Remove old hidden inputs
+  form.querySelectorAll('input[name="selected_sheets"]').forEach(el => el.remove());
+  // Add checked sheets
+  document.querySelectorAll('#sheets-list input[type="checkbox"]:checked').forEach(cb => {
+    const hi = document.createElement('input');
+    hi.type = 'hidden';
+    hi.name = 'selected_sheets';
+    hi.value = cb.value;
+    form.appendChild(hi);
+  });
+}
+
+// Init count on page load
+document.addEventListener('DOMContentLoaded', updateCount);
 </script>
 {% endblock %}
