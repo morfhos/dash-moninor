@@ -2939,7 +2939,7 @@ def contract_wizard_step1(request: HttpRequest, cliente_id: int) -> HttpResponse
         request,
         "web/contract_wizard_step1.html",
         {
-            "active": "dashboard",
+            "active": "clientes",
             "page_title": "Contrato de Upload",
             "cliente": cliente,
             "form": form,
@@ -3026,7 +3026,7 @@ def contract_wizard_step2(request: HttpRequest, campaign_id: int) -> HttpRespons
         request,
         "web/contract_wizard_step2.html",
         {
-            "active": "dashboard",
+            "active": "clientes",
             "page_title": "Contrato de Upload",
             "cliente": campaign.cliente,
             "campaign": campaign,
@@ -3280,7 +3280,7 @@ def contract_done(request: HttpRequest, campaign_id: int) -> HttpResponse:
         request,
         "web/contract_done.html",
         {
-            "active": "timeline_campanhas",
+            "active": "campanhas",
             "page_title": "Timeline - Campanhas",
             "campaign": campaign,
             "cliente": campaign.cliente,
@@ -4692,7 +4692,7 @@ def peca_detalhe(request: HttpRequest, piece_id: int) -> HttpResponse:
         request,
         "web/peca_detalhe.html",
         {
-            "active": "campanhas",
+            "active": "pecas_criativos",
             "page_title": piece.title,
             "role": effective_role(request),
             "piece": piece,
@@ -5597,3 +5597,97 @@ def api_search_campaigns(request: HttpRequest) -> JsonResponse:
             "url": f"/contratos/upload/{c.id}/concluido/",
         })
     return JsonResponse({"results": results})
+
+
+# ── User Profile ──────────────────────────────────────────────────────────────
+
+@login_required
+def user_profile(request: HttpRequest) -> HttpResponse:
+    """Página de perfil e configurações do usuário."""
+    from accounts.models import User
+    from django.contrib.auth import update_session_auth_hash
+
+    user = request.user
+    success_msg = ""
+    error_msg = ""
+
+    if request.method == "POST":
+        section = request.POST.get("_section", "info")
+
+        if section == "avatar":
+            import io, json as _json
+            from PIL import Image
+            from django.core.files.base import ContentFile
+
+            avatar_file = request.FILES.get("avatar")
+            crop_data = request.POST.get("crop_data", "")
+            if avatar_file:
+                try:
+                    img = Image.open(avatar_file)
+                    if img.mode in ("RGBA", "P"):
+                        img = img.convert("RGB")
+                    # Apply crop if provided
+                    if crop_data:
+                        try:
+                            cd = _json.loads(crop_data)
+                            # Crop values are ratios 0-1
+                            w, h = img.size
+                            left = int(cd.get("x", 0) * w)
+                            top = int(cd.get("y", 0) * h)
+                            right = left + int(cd.get("width", 1) * w)
+                            bottom = top + int(cd.get("height", 1) * h)
+                            img = img.crop((left, top, right, bottom))
+                        except (ValueError, KeyError):
+                            pass
+                    # Resize to 256x256
+                    img = img.resize((256, 256), Image.LANCZOS if hasattr(Image, "LANCZOS") else Image.ANTIALIAS)
+                    buf = io.BytesIO()
+                    img.save(buf, format="JPEG", quality=85)
+                    buf.seek(0)
+                    fname = f"avatar_{user.pk}.jpg"
+                    user.avatar.save(fname, ContentFile(buf.read()), save=True)
+                    success_msg = "Foto atualizada com sucesso."
+                except Exception as e:
+                    error_msg = f"Erro ao processar imagem: {e}"
+            else:
+                error_msg = "Selecione uma imagem."
+
+        elif section == "info":
+            user.first_name = request.POST.get("first_name", "").strip()
+            user.last_name = request.POST.get("last_name", "").strip()
+            user.email = request.POST.get("email", "").strip()
+            new_username = request.POST.get("username", "").strip()
+            if new_username and new_username != user.username:
+                if User.objects.filter(username=new_username).exclude(pk=user.pk).exists():
+                    error_msg = "Este nome de usuário já está em uso."
+                else:
+                    user.username = new_username
+            if not error_msg:
+                user.save(update_fields=["first_name", "last_name", "email", "username"])
+                success_msg = "Informações atualizadas com sucesso."
+
+        elif section == "password":
+            current = request.POST.get("current_password", "")
+            new_pw = request.POST.get("new_password", "")
+            confirm = request.POST.get("confirm_password", "")
+            if not user.check_password(current):
+                error_msg = "Senha atual incorreta."
+            elif len(new_pw) < 6:
+                error_msg = "A nova senha deve ter pelo menos 6 caracteres."
+            elif new_pw != confirm:
+                error_msg = "As senhas não conferem."
+            else:
+                user.set_password(new_pw)
+                user.save(update_fields=["password"])
+                update_session_auth_hash(request, user)
+                success_msg = "Senha alterada com sucesso."
+
+    role = effective_role(request)
+    return render(request, "web/user_profile.html", {
+        "active": "",
+        "page_title": "Meu Perfil",
+        "profile_user": user,
+        "role": role,
+        "success_msg": success_msg,
+        "error_msg": error_msg,
+    })

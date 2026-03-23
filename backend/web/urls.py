@@ -107,4 +107,5 @@ urlpatterns = [
     path("api/search-campaigns/", views.api_search_campaigns, name="api_search_campaigns"),
     path("configuracoes/", views.configuracoes, name="configuracoes"),
     path("logs-auditoria/", views.logs_auditoria, name="logs_auditoria"),
+    path("perfil/", views.user_profile, name="user_profile"),
 ]

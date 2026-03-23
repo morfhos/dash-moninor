@@ -1,9 +1,66 @@
 {% extends "web/base.html" %}
 
 {% block content %}
+<style>
+  .cl-icon-action {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: all .15s;
+    border: none;
+    background: none;
+    cursor: pointer;
+  }
+  .cl-icon-action:hover {
+    background: rgba(99,102,241,.1);
+    color: var(--accent, #6366f1);
+  }
+  .cl-icon-action.danger:hover {
+    background: rgba(239,68,68,.1);
+    color: #ef4444;
+  }
+  .cl-icon-action svg { width: 18px; height: 18px; }
+  .cl-icon-action::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 4px 10px;
+    background: var(--text-primary);
+    color: var(--bg, #fff);
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 6px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .15s;
+    z-index: 10;
+  }
+  .cl-icon-action:hover::after { opacity: 1; }
+
+  .cl-actions { display: flex; align-items: center; gap: 2px; justify-content: flex-end; }
+
+  .cl-copied-toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    padding: 10px 20px; background: var(--text-primary); color: #fff;
+    border-radius: 10px; font-size: 13px; font-weight: 600;
+    z-index: 9999; opacity: 0; transition: opacity .3s;
+    pointer-events: none;
+  }
+  .cl-copied-toast.show { opacity: 1; }
+</style>
+
   <div class="topbar">
     <h1>{{ page_title }}</h1>
-    <a class="btn" href="{% url 'web:clientes_create' %}" style="text-decoration:none;">Novo cliente</a>
+    <a class="btn" href="{% url 'web:clientes_create' %}" style="text-decoration:none;">+ Novo cliente</a>
   </div>
 
   <section class="main-panel">
@@ -11,12 +68,12 @@
       <thead>
         <tr>
           <th style="width: 60px;">LOGO</th>
-          <th style="width: 100px;">NOME</th>
-          <th style="width: 60px;">slug</th>
+          <th>NOME</th>
+          <th style="width: 80px;">SLUG</th>
           <th style="width: 160px;">CNPJ</th>
-          <th style="width: 100px;">STATUS</th>
-          <th style="width: 150px;">ÚLTIMA ATUALIZAÇÃO</th>
-          <th style="width: 220px; text-align:right;">AÇÕES</th>
+          <th style="width: 90px;">STATUS</th>
+          <th style="width: 150px;">ATUALIZADO</th>
+          <th style="width: 240px; text-align:right;">AÇÕES</th>
         </tr>
       </thead>
       <tbody>
@@ -32,12 +89,12 @@
               </div>
             </td>
             <td>
-              <a href="{% url 'web:clientes_detail' c.id %}" style="text-decoration:none; font-weight:800; color: var(--text-primary);">
+              <a href="{% url 'web:clientes_detail' c.id %}" style="text-decoration:none; font-weight:700; color: var(--text-primary);">
                 {{ c.nome }}
               </a>
             </td>
-            <td style="color: var(--text-secondary); font-weight: 700;">{{ c.slug|default:"-" }}</td>
-            <td style="color: var(--text-secondary); font-weight: 700;">{{ c.cnpj|default:"-" }}</td>
+            <td style="color: var(--text-secondary); font-weight: 600; font-size:12px;">{{ c.slug|default:"-" }}</td>
+            <td style="color: var(--text-secondary); font-weight: 600;">{{ c.cnpj|default:"-" }}</td>
             <td>
               {% if c.ativo %}
                 <span class="status-pill active"><span class="dot"></span>Ativo</span>
@@ -45,21 +102,43 @@
                 <span class="status-pill inactive"><span class="dot"></span>Inativo</span>
               {% endif %}
             </td>
-            <td style="color: var(--text-secondary); font-weight: 700;">
+            <td style="color: var(--text-secondary); font-weight: 600; font-size:12px;">
               {{ c.atualizado_em|date:"d/m/Y H:i" }}
             </td>
-            <td style="text-align:right;">
-              <span class="actions">
-                <a class="btn-link" href="{% url 'web:clientes_upload' c.id %}">Upload</a>
-                <a class="btn-link" href="{% url 'web:cliente_campaigns' c.id %}">Campanhas</a>
-                <a class="btn-link" href="{% url 'web:clientes_edit' c.id %}">Editar</a>
-                <a class="btn-link" href="{% url 'web:clientes_enter' c.id %}">Entrar</a>
-              </span>
+            <td>
+              <div class="cl-actions">
+                <!-- Upload -->
+                <a class="cl-icon-action" href="{% url 'web:clientes_upload' c.id %}" data-tip="Upload">
+                  <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+                </a>
+                <!-- Campanhas -->
+                <a class="cl-icon-action" href="{% url 'web:cliente_campaigns' c.id %}" data-tip="Campanhas">
+                  <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                </a>
+                <!-- Editar -->
+                <a class="cl-icon-action" href="{% url 'web:clientes_edit' c.id %}" data-tip="Editar">
+                  <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </a>
+                <!-- Entrar (impersonate) -->
+                <a class="cl-icon-action" href="{% url 'web:clientes_enter' c.id %}" data-tip="Entrar">
+                  <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
+                </a>
+                <!-- Copiar URL -->
+                {% if c.slug %}
+                <button class="cl-icon-action" data-tip="Copiar URL" onclick="copyClientUrl('{{ c.slug }}')">
+                  <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                </button>
+                {% endif %}
+                <!-- Deletar -->
+                <a class="cl-icon-action danger" href="{% url 'web:cliente_delete' c.id %}" data-tip="Excluir">
+                  <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/></svg>
+                </a>
+              </div>
             </td>
           </tr>
         {% empty %}
           <tr>
-            <td colspan="7" style="color: var(--text-secondary); text-align:center; padding: 18px;">
+            <td colspan="7" style="color: var(--text-secondary); text-align:center; padding: 40px;">
               Nenhum cliente cadastrado.
             </td>
           </tr>
@@ -67,4 +146,30 @@
       </tbody>
     </table>
   </section>
+
+<div class="cl-copied-toast" id="copy-toast">URL copiada!</div>
+
+<script>
+function copyClientUrl(slug) {
+  const url = window.location.origin + '/login/' + slug + '/';
+  navigator.clipboard.writeText(url).then(function() {
+    const toast = document.getElementById('copy-toast');
+    toast.textContent = 'URL copiada: ' + url;
+    toast.classList.add('show');
+    setTimeout(function() { toast.classList.remove('show'); }, 2500);
+  }).catch(function() {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = url;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    const toast = document.getElementById('copy-toast');
+    toast.textContent = 'URL copiada: ' + url;
+    toast.classList.add('show');
+    setTimeout(function() { toast.classList.remove('show'); }, 2500);
+  });
+}
+</script>
 {% endblock %}

@@ -12,7 +12,6 @@
       <a class="btn-outline" href="{% url 'web:clientes' %}">Voltar</a>
       <a class="btn-outline" href="{% url 'web:clientes_edit' cliente.id %}">Editar</a>
       <a class="btn-outline" href="{% url 'web:clientes_upload' cliente.id %}" style="text-decoration:none;">Upload</a>
-      <a class="btn-outline" href="{% url 'web:cliente_campaigns' cliente.id %}" style="text-decoration:none;">Campanhas</a>
       <button class="btn-outline" onclick="abrirModalDeletar()" style="color:#dc2626; border-color:#dc2626;">Deletar</button>
       <a class="btn" href="{% url 'web:clientes_enter' cliente.id %}" style="text-decoration:none;">Entrar</a>
     </div>

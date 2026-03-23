@@ -225,7 +225,7 @@
     <p class="subtitle">Cliente: {{ cliente.nome }}</p>
   </div>
   <div class="header-actions">
-    <a class="btn-outline" href="{% url 'web:clientes_detail' cliente.id %}" style="text-decoration:none;">Voltar</a>
+    <a class="btn" href="{% url 'web:clientes_detail' cliente.id %}" style="text-decoration:none;">Usuários do Cliente</a>
     <a class="btn" href="{% url 'web:contract_wizard_step1' cliente.id %}" style="text-decoration:none;">+ Nova campanha</a>
   </div>
 </div>

@@ -42,9 +42,13 @@
     <div class="profile-wrap" data-profile-wrap>
       <button class="profile-btn" type="button" data-profile-toggle>
         <span class="avatar">
-          {% with name=request.user.get_full_name|default:request.user.username %}
-            <span class="avatar-fallback">{{ name|slice:":2"|upper }}</span>
-          {% endwith %}
+          {% if request.user.avatar %}
+            <img src="{{ request.user.avatar.url }}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">
+          {% else %}
+            {% with name=request.user.get_full_name|default:request.user.username %}
+              <span class="avatar-fallback">{{ name|slice:":2"|upper }}</span>
+            {% endwith %}
+          {% endif %}
         </span>
         <span class="profile-name">
           {% if request.user.get_full_name %}{{ request.user.get_full_name }}{% else %}{{ request.user.username }}{% endif %}
@@ -55,6 +59,21 @@
       </button>
 
       <div class="profile-menu" data-profile-menu hidden>
+        <a class="profile-menu-item" href="{% url 'web:user_profile' %}" style="text-decoration:none;color:inherit;">
+          <span class="menu-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </span>
+          Meu Perfil
+        </a>
+        {% if is_true_admin %}
+        <a class="profile-menu-item" href="{% url 'web:configuracoes' %}" style="text-decoration:none;color:inherit;">
+          <span class="menu-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          </span>
+          Configuracoes
+        </a>
+        {% endif %}
+        <div style="border-top:1px solid var(--border-color,#e5e7eb);margin:4px 0;"></div>
         <button class="profile-menu-item" type="button" data-action="logout">
           <span class="menu-icon">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>

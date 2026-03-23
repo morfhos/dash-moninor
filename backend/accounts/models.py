@@ -30,6 +30,7 @@ class User(AbstractUser):
         VIEWER = "viewer", "Apenas ver"
 
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.CLIENTE)
+    avatar = models.ImageField(upload_to="avatars/", blank=True, null=True)
     funcao = models.CharField(max_length=30, choices=Funcao.choices, blank=True, default="")
     cliente = models.ForeignKey(
         Cliente,

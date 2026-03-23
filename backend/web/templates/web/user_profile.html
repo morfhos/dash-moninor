@@ -1,0 +1,380 @@
+{% extends "web/base.html" %}
+{% block content %}
+<style>
+  .profile-layout { max-width: 720px; margin: 0 auto; }
+
+  .profile-header {
+    display: flex; align-items: center; gap: 20px;
+    padding: 28px; margin-bottom: 24px;
+    background: var(--card-bg, #fff); border: 1px solid var(--border); border-radius: 14px;
+  }
+  .profile-avatar {
+    width: 72px; height: 72px; border-radius: 50%;
+    background: var(--accent, #6366f1); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; font-weight: 700; flex-shrink: 0;
+  }
+  .profile-header-info h2 { margin: 0 0 2px; font-size: 20px; font-weight: 700; }
+  .profile-header-info p { margin: 0; color: var(--text-secondary); font-size: 13px; }
+  .profile-header-info .role-badge {
+    display: inline-block; margin-top: 6px;
+    padding: 3px 12px; border-radius: 20px;
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+  }
+  .role-admin { background: rgba(99,102,241,.12); color: #6366f1; }
+  .role-colaborador { background: rgba(59,130,246,.12); color: #2563eb; }
+  .role-cliente { background: rgba(34,197,94,.12); color: #16a34a; }
+
+  .profile-card {
+    background: var(--card-bg, #fff); border: 1px solid var(--border); border-radius: 14px;
+    padding: 28px; margin-bottom: 20px;
+  }
+  .profile-card h3 {
+    margin: 0 0 20px; font-size: 16px; font-weight: 700;
+    display: flex; align-items: center; gap: 10px; color: var(--text-primary);
+  }
+  .profile-card h3 svg { width: 20px; height: 20px; color: var(--accent, #6366f1); }
+
+  .pf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .pf-grid .full { grid-column: 1 / -1; }
+  .pf-field { display: flex; flex-direction: column; gap: 5px; }
+  .pf-field label {
+    font-size: 12px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .04em; color: var(--text-secondary);
+  }
+  .pf-field input {
+    padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
+    background: var(--surface); color: var(--text-primary); font-size: 13px; outline: none;
+    transition: border-color .15s;
+  }
+  .pf-field input:focus { border-color: var(--accent, #6366f1); }
+  .pf-field input:disabled { opacity: .6; cursor: not-allowed; }
+
+  .pf-divider { border: none; border-top: 1px solid var(--border); margin: 22px 0; }
+
+  .pf-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 10px 22px; border-radius: 10px; font-size: 13px; font-weight: 600;
+    border: none; cursor: pointer; transition: opacity .15s;
+    background: var(--accent, #6366f1); color: #fff;
+  }
+  .pf-btn:hover { opacity: .85; }
+
+  .pf-alert {
+    padding: 12px 16px; border-radius: 10px; font-size: 13px; font-weight: 500;
+    margin-bottom: 20px; display: flex; align-items: center; gap: 8px;
+  }
+  .pf-alert-success {
+    background: rgba(34,197,94,.08); border: 1px solid rgba(34,197,94,.2); color: #16a34a;
+  }
+  .pf-alert-error {
+    background: rgba(239,68,68,.08); border: 1px solid rgba(239,68,68,.2); color: #dc2626;
+  }
+
+  .pf-info-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 0; border-bottom: 1px solid var(--border);
+  }
+  .pf-info-row:last-child { border-bottom: none; }
+  .pf-info-label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+  .pf-info-value { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+</style>
+
+<div class="profile-layout">
+
+  {% if success_msg %}
+  <div class="pf-alert pf-alert-success">
+    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
+    {{ success_msg }}
+  </div>
+  {% endif %}
+
+  {% if error_msg %}
+  <div class="pf-alert pf-alert-error">
+    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+    {{ error_msg }}
+  </div>
+  {% endif %}
+
+  <!-- Header card -->
+  <div class="profile-header">
+    <div style="position:relative;cursor:pointer;" onclick="document.getElementById('avatar-input').click()" title="Alterar foto">
+      {% if profile_user.avatar %}
+      <img src="{{ profile_user.avatar.url }}" alt="Avatar" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid var(--border);">
+      {% else %}
+      <div class="profile-avatar">
+        {% with name=profile_user.get_full_name|default:profile_user.username %}
+          {{ name|slice:":2"|upper }}
+        {% endwith %}
+      </div>
+      {% endif %}
+      <div style="position:absolute;bottom:0;right:0;width:24px;height:24px;border-radius:50%;background:var(--accent,#6366f1);color:#fff;display:flex;align-items:center;justify-content:center;border:2px solid #fff;">
+        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      </div>
+    </div>
+    <div class="profile-header-info">
+      <h2>{% if profile_user.get_full_name %}{{ profile_user.get_full_name }}{% else %}{{ profile_user.username }}{% endif %}</h2>
+      <p>{{ profile_user.email|default:"Sem e-mail" }}</p>
+      <span class="role-badge role-{{ profile_user.role }}">
+        {% if profile_user.role == "admin" %}Administrador
+        {% elif profile_user.role == "colaborador" %}Colaborador
+        {% else %}Cliente{% endif %}
+      </span>
+    </div>
+  </div>
+
+  <!-- Hidden file input for avatar -->
+  <input type="file" id="avatar-input" accept="image/*" style="display:none;" onchange="openCropModal(this)">
+
+  <!-- Crop Modal -->
+  <div id="crop-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.6);align-items:center;justify-content:center;">
+    <div style="background:var(--card-bg,#fff);border-radius:16px;width:440px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);">
+        <h3 style="margin:0;font-size:16px;font-weight:700;">Ajustar foto</h3>
+        <button type="button" onclick="closeCropModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-secondary);">&times;</button>
+      </div>
+      <div style="padding:20px;display:flex;flex-direction:column;align-items:center;gap:16px;">
+        <div id="crop-container" style="position:relative;width:280px;height:280px;overflow:hidden;border-radius:50%;background:#000;border:3px solid var(--border);">
+          <img id="crop-img" src="" style="position:absolute;cursor:grab;" draggable="false">
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;width:100%;max-width:280px;">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/></svg>
+          <input type="range" id="crop-zoom" min="100" max="300" value="100" style="flex:1;accent-color:var(--accent,#6366f1);">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;padding:16px 20px;border-top:1px solid var(--border);background:var(--surface);">
+        <button type="button" onclick="closeCropModal()" style="padding:8px 18px;border-radius:10px;border:1px solid var(--border);background:none;font-size:13px;font-weight:600;cursor:pointer;color:var(--text-secondary);">Cancelar</button>
+        <button type="button" onclick="saveCrop()" class="pf-btn">Salvar foto</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Info pessoal -->
+  <div class="profile-card">
+    <h3>
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Informacoes Pessoais
+    </h3>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="_section" value="info">
+      <div class="pf-grid">
+        <div class="pf-field">
+          <label>Nome</label>
+          <input type="text" name="first_name" value="{{ profile_user.first_name }}" placeholder="Nome">
+        </div>
+        <div class="pf-field">
+          <label>Sobrenome</label>
+          <input type="text" name="last_name" value="{{ profile_user.last_name }}" placeholder="Sobrenome">
+        </div>
+        <div class="pf-field">
+          <label>Usuario</label>
+          <input type="text" name="username" value="{{ profile_user.username }}" required>
+        </div>
+        <div class="pf-field">
+          <label>E-mail</label>
+          <input type="email" name="email" value="{{ profile_user.email }}" placeholder="email@exemplo.com">
+        </div>
+      </div>
+      <hr class="pf-divider">
+      <button type="submit" class="pf-btn">Salvar informacoes</button>
+    </form>
+  </div>
+
+  <!-- Alterar senha -->
+  <div class="profile-card">
+    <h3>
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+      Alterar Senha
+    </h3>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="_section" value="password">
+      <div class="pf-grid">
+        <div class="pf-field full">
+          <label>Senha Atual</label>
+          <input type="password" name="current_password" required placeholder="Digite sua senha atual">
+        </div>
+        <div class="pf-field">
+          <label>Nova Senha</label>
+          <input type="password" name="new_password" required minlength="6" placeholder="Minimo 6 caracteres">
+        </div>
+        <div class="pf-field">
+          <label>Confirmar Nova Senha</label>
+          <input type="password" name="confirm_password" required minlength="6" placeholder="Repita a nova senha">
+        </div>
+      </div>
+      <hr class="pf-divider">
+      <button type="submit" class="pf-btn">Alterar senha</button>
+    </form>
+  </div>
+
+  <!-- Dados da conta (somente leitura) -->
+  <div class="profile-card">
+    <h3>
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+      Dados da Conta
+    </h3>
+    <div class="pf-info-row">
+      <span class="pf-info-label">Papel</span>
+      <span class="pf-info-value">{% if profile_user.role == "admin" %}Administrador{% elif profile_user.role == "colaborador" %}Colaborador{% else %}Cliente{% endif %}</span>
+    </div>
+    {% if profile_user.cliente %}
+    <div class="pf-info-row">
+      <span class="pf-info-label">Cliente</span>
+      <span class="pf-info-value">{{ profile_user.cliente.nome }}</span>
+    </div>
+    {% endif %}
+    <div class="pf-info-row">
+      <span class="pf-info-label">Status</span>
+      <span class="pf-info-value">{% if profile_user.is_active %}Ativo{% else %}Inativo{% endif %}</span>
+    </div>
+    <div class="pf-info-row">
+      <span class="pf-info-label">Membro desde</span>
+      <span class="pf-info-value">{{ profile_user.date_joined|date:"d/m/Y H:i" }}</span>
+    </div>
+    <div class="pf-info-row">
+      <span class="pf-info-label">Ultimo login</span>
+      <span class="pf-info-value">{{ profile_user.last_login|date:"d/m/Y H:i"|default:"Nunca" }}</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- Hidden form for avatar upload -->
+<form id="avatar-form" method="post" enctype="multipart/form-data" style="display:none;">
+  {% csrf_token %}
+  <input type="hidden" name="_section" value="avatar">
+  <input type="file" name="avatar" id="avatar-form-file">
+  <input type="hidden" name="crop_data" id="avatar-crop-data">
+</form>
+
+<script>
+let cropState = { file: null, imgW: 0, imgH: 0, offX: 0, offY: 0, zoom: 100, dragging: false, startX: 0, startY: 0 };
+
+function openCropModal(input) {
+  if (!input.files || !input.files[0]) return;
+  cropState.file = input.files[0];
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = document.getElementById('crop-img');
+    img.onload = function() {
+      cropState.imgW = img.naturalWidth;
+      cropState.imgH = img.naturalHeight;
+      cropState.zoom = 100;
+      document.getElementById('crop-zoom').value = 100;
+      resetCropPosition();
+    };
+    img.src = e.target.result;
+    document.getElementById('crop-modal').style.display = 'flex';
+  };
+  reader.readAsDataURL(cropState.file);
+}
+
+function closeCropModal() {
+  document.getElementById('crop-modal').style.display = 'none';
+  document.getElementById('avatar-input').value = '';
+}
+
+function resetCropPosition() {
+  const container = 280;
+  const img = document.getElementById('crop-img');
+  const scale = cropState.zoom / 100;
+  // Fit the smallest dimension to the container, then apply zoom
+  const ratio = Math.max(container / cropState.imgW, container / cropState.imgH) * scale;
+  const w = cropState.imgW * ratio;
+  const h = cropState.imgH * ratio;
+  img.style.width = w + 'px';
+  img.style.height = h + 'px';
+  cropState.offX = (container - w) / 2;
+  cropState.offY = (container - h) / 2;
+  img.style.left = cropState.offX + 'px';
+  img.style.top = cropState.offY + 'px';
+}
+
+// Zoom
+document.getElementById('crop-zoom').addEventListener('input', function() {
+  cropState.zoom = parseInt(this.value);
+  resetCropPosition();
+});
+
+// Drag
+(function() {
+  const container = document.getElementById('crop-container');
+  const img = document.getElementById('crop-img');
+
+  container.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    cropState.dragging = true;
+    cropState.startX = e.clientX - cropState.offX;
+    cropState.startY = e.clientY - cropState.offY;
+    img.style.cursor = 'grabbing';
+  });
+
+  document.addEventListener('mousemove', function(e) {
+    if (!cropState.dragging) return;
+    cropState.offX = e.clientX - cropState.startX;
+    cropState.offY = e.clientY - cropState.startY;
+    img.style.left = cropState.offX + 'px';
+    img.style.top = cropState.offY + 'px';
+  });
+
+  document.addEventListener('mouseup', function() {
+    cropState.dragging = false;
+    img.style.cursor = 'grab';
+  });
+
+  // Touch support
+  container.addEventListener('touchstart', function(e) {
+    const t = e.touches[0];
+    cropState.dragging = true;
+    cropState.startX = t.clientX - cropState.offX;
+    cropState.startY = t.clientY - cropState.offY;
+  }, {passive: true});
+
+  document.addEventListener('touchmove', function(e) {
+    if (!cropState.dragging) return;
+    const t = e.touches[0];
+    cropState.offX = t.clientX - cropState.startX;
+    cropState.offY = t.clientY - cropState.startY;
+    img.style.left = cropState.offX + 'px';
+    img.style.top = cropState.offY + 'px';
+  }, {passive: true});
+
+  document.addEventListener('touchend', function() { cropState.dragging = false; });
+})();
+
+function saveCrop() {
+  // Calculate crop area as ratios relative to original image
+  const containerSize = 280;
+  const img = document.getElementById('crop-img');
+  const displayW = parseFloat(img.style.width);
+  const displayH = parseFloat(img.style.height);
+  const scaleX = cropState.imgW / displayW;
+  const scaleY = cropState.imgH / displayH;
+
+  // The visible circle area in image coordinates
+  const cropX = Math.max(0, (-cropState.offX) * scaleX);
+  const cropY = Math.max(0, (-cropState.offY) * scaleY);
+  const cropSize = containerSize * scaleX;
+
+  // As ratios
+  const data = {
+    x: cropX / cropState.imgW,
+    y: cropY / cropState.imgH,
+    width: Math.min(cropSize / cropState.imgW, 1),
+    height: Math.min((containerSize * scaleY) / cropState.imgH, 1),
+  };
+
+  document.getElementById('avatar-crop-data').value = JSON.stringify(data);
+
+  // Copy file to form
+  const dt = new DataTransfer();
+  dt.items.add(cropState.file);
+  document.getElementById('avatar-form-file').files = dt.files;
+  document.getElementById('avatar-form').submit();
+}
+</script>
+{% endblock %}
