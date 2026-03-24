@@ -1,0 +1,139 @@
+{# Reusable date presets component. Include inside a form with date_from and date_to inputs. #}
+<style>
+  .date-presets {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .date-preset-btn {
+    padding: 5px 12px;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 8px;
+    background: none;
+    color: var(--text-secondary, #64748b);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all .15s;
+  }
+  .date-preset-btn:hover {
+    border-color: var(--accent, #6366f1);
+    color: var(--accent, #6366f1);
+    background: rgba(99,102,241,.04);
+  }
+  .date-preset-btn.active {
+    border-color: var(--accent, #6366f1);
+    background: var(--accent, #6366f1);
+    color: #fff;
+  }
+  .date-presets-sep {
+    width: 1px;
+    height: 20px;
+    background: var(--border-color, #e2e8f0);
+    margin: 0 4px;
+  }
+</style>
+
+<div class="date-presets">
+  <button type="button" class="date-preset-btn" data-preset="today">Hoje</button>
+  <button type="button" class="date-preset-btn" data-preset="7d">7 dias</button>
+  <button type="button" class="date-preset-btn" data-preset="30d">30 dias</button>
+  <div class="date-presets-sep"></div>
+  <button type="button" class="date-preset-btn" data-preset="this_month">Este Mês</button>
+  <button type="button" class="date-preset-btn" data-preset="last_month">Mês Passado</button>
+  <button type="button" class="date-preset-btn" data-preset="quarter">Trimestre</button>
+  <div class="date-presets-sep"></div>
+  <button type="button" class="date-preset-btn" data-preset="custom">Personalizado</button>
+</div>
+
+<script>
+(function() {
+  function fmt(d) {
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+
+  function getPresetRange(key) {
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+    switch(key) {
+      case 'today':
+        return [fmt(now), fmt(now)];
+      case '7d':
+        var s = new Date(y, m, d - 6);
+        return [fmt(s), fmt(now)];
+      case '30d':
+        var s = new Date(y, m, d - 29);
+        return [fmt(s), fmt(now)];
+      case 'this_month':
+        return [fmt(new Date(y, m, 1)), fmt(now)];
+      case 'last_month':
+        return [fmt(new Date(y, m-1, 1)), fmt(new Date(y, m, 0))];
+      case 'quarter':
+        var qm = m - (m % 3);
+        return [fmt(new Date(y, qm, 1)), fmt(now)];
+      default:
+        return null;
+    }
+  }
+
+  // Find the form containing this component
+  document.querySelectorAll('.date-presets').forEach(function(container) {
+    var form = container.closest('form');
+    if (!form) return;
+
+    var fromInput = form.querySelector('[name="date_from"]');
+    var toInput = form.querySelector('[name="date_to"]');
+    if (!fromInput || !toInput) return;
+
+    // Highlight active preset on load
+    function highlightActive() {
+      var fv = fromInput.value, tv = toInput.value;
+      container.querySelectorAll('.date-preset-btn').forEach(function(btn) {
+        var preset = btn.dataset.preset;
+        if (preset === 'custom') {
+          btn.classList.remove('active');
+          return;
+        }
+        var range = getPresetRange(preset);
+        if (range && range[0] === fv && range[1] === tv) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+    }
+
+    container.querySelectorAll('.date-preset-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var preset = this.dataset.preset;
+
+        if (preset === 'custom') {
+          // Toggle date inputs visibility (show them, focus the first)
+          fromInput.focus();
+          // Clear active state
+          container.querySelectorAll('.date-preset-btn').forEach(function(b) { b.classList.remove('active'); });
+          this.classList.add('active');
+          return;
+        }
+
+        var range = getPresetRange(preset);
+        if (!range) return;
+
+        fromInput.value = range[0];
+        toInput.value = range[1];
+
+        // Highlight this button
+        container.querySelectorAll('.date-preset-btn').forEach(function(b) { b.classList.remove('active'); });
+        this.classList.add('active');
+
+        // Auto-submit the form
+        form.submit();
+      });
+    });
+
+    highlightActive();
+  });
+})();
+</script>

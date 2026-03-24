@@ -1823,6 +1823,54 @@ def analytics(request: HttpRequest) -> HttpResponse:
     global_ctr = round((total_clk / total_imp * 100), 2) if total_imp > 0 else 0
     global_cpc = round((total_cost / total_clk), 2) if total_clk > 0 else 0
 
+    # ── Period comparison (current vs previous) ──
+    period_comparison = None
+    compare_mode = request.GET.get("compare", "")
+    if date_from and date_to:
+        try:
+            from datetime import timedelta as _td
+            p_start = datetime.strptime(date_from, "%Y-%m-%d").date()
+            p_end = datetime.strptime(date_to, "%Y-%m-%d").date()
+            p_len = (p_end - p_start).days + 1
+            prev_end = p_start - _td(days=1)
+            prev_start = prev_end - _td(days=p_len - 1)
+
+            prev_qs = PlacementDay.objects.filter(
+                placement_line_id__in=line_ids,
+                date__gte=prev_start,
+                date__lte=prev_end,
+            )
+            prev_stats = prev_qs.aggregate(
+                total_imp=Sum("impressions"), total_clk=Sum("clicks"), total_cost=Sum("cost"),
+            )
+            prev_imp = prev_stats["total_imp"] or 0
+            prev_clk = prev_stats["total_clk"] or 0
+            prev_cost = float(prev_stats["total_cost"] or 0)
+            prev_ctr = round((prev_clk / prev_imp * 100), 2) if prev_imp > 0 else 0
+            prev_cpc = round((prev_cost / prev_clk), 2) if prev_clk > 0 else 0
+
+            def _pct_change(curr, prev):
+                if prev == 0:
+                    return None
+                return round(((curr - prev) / prev) * 100, 1)
+
+            period_comparison = {
+                "prev_start": prev_start.strftime("%d/%m/%Y"),
+                "prev_end": prev_end.strftime("%d/%m/%Y"),
+                "curr_start": p_start.strftime("%d/%m/%Y"),
+                "curr_end": p_end.strftime("%d/%m/%Y"),
+                "days": p_len,
+                "metrics": [
+                    {"label": "Impressões", "curr": total_imp, "prev": prev_imp, "change": _pct_change(total_imp, prev_imp), "up_good": True},
+                    {"label": "Cliques", "curr": total_clk, "prev": prev_clk, "change": _pct_change(total_clk, prev_clk), "up_good": True},
+                    {"label": "CTR", "curr": global_ctr, "prev": prev_ctr, "change": _pct_change(global_ctr, prev_ctr), "unit": "%", "up_good": True},
+                    {"label": "CPC", "curr": global_cpc, "prev": prev_cpc, "change": _pct_change(global_cpc, prev_cpc), "unit": "R$", "up_good": False},
+                    {"label": "Investimento", "curr": round(total_cost, 2), "prev": round(prev_cost, 2), "change": _pct_change(total_cost, prev_cost), "unit": "R$", "up_good": False},
+                ],
+            }
+        except (ValueError, TypeError):
+            pass
+
     # ── Per-platform aggregates ──
     google_line_ids = list(lines_qs.filter(media_channel__in=google_channels).values_list("id", flat=True))
     meta_line_ids = list(lines_qs.filter(media_channel__in=meta_channels).values_list("id", flat=True))
@@ -2577,6 +2625,8 @@ def analytics(request: HttpRequest) -> HttpResponse:
         },
         # Campaign table
         "campaigns": campaign_metrics,
+        # Period comparison
+        "period_comparison": period_comparison,
     })
 
 

@@ -185,7 +185,25 @@
     border-radius: 12px;
     border: 1px solid var(--border-color);
     background: var(--surface-2);
+    cursor: pointer;
+    transition: box-shadow .15s, transform .15s;
   }
+  .insight-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,.08);
+    transform: translateY(-1px);
+  }
+  .insight-card .insight-expand {
+    font-size: 11px; font-weight: 600; color: var(--accent, #6366f1);
+    margin-top: 8px; display: flex; align-items: center; gap: 4px;
+  }
+  .insight-detail {
+    display: none; margin-top: 10px; padding: 12px;
+    background: rgba(99,102,241,.03); border-radius: 8px;
+    border: 1px solid var(--border-color); font-size: 12px; line-height: 1.6;
+    color: var(--text-secondary);
+  }
+  .insight-card.expanded .insight-detail { display: block; }
+  .insight-card.expanded .insight-expand svg { transform: rotate(180deg); }
   .insight-card.positive { border-left: 4px solid #22c55e; }
   .insight-card.negative { border-left: 4px solid #ef4444; }
   .insight-card.warning { border-left: 4px solid #f59e0b; }
@@ -626,6 +644,25 @@
     .comparison-grid { grid-template-columns: repeat(2, 1fr); }
     .sim-result-grid { grid-template-columns: 1fr; }
   }
+
+  /* Notification channel buttons */
+  .notif-channel-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 12px; border-radius: 8px;
+    border: 1px solid var(--border-color, #e2e8f0);
+    background: none; color: var(--text-secondary);
+    font-size: 11px; font-weight: 600; cursor: pointer;
+    transition: all .15s;
+  }
+  .notif-channel-btn:hover {
+    border-color: var(--accent, #6366f1);
+    color: var(--accent, #6366f1);
+  }
+  .notif-channel-btn.active {
+    background: var(--accent, #6366f1);
+    color: #fff;
+    border-color: var(--accent, #6366f1);
+  }
 </style>
 
 <div class="topbar">
@@ -660,6 +697,7 @@
     <button type="button" class="btn-filter" onclick="window.print()" style="margin-left:8px;display:flex;align-items:center;gap:6px;">
       🧠 Gerar Relatório Executivo
     </button>
+    <div style="flex-basis:100%;margin-top:4px;">{% include "web/_date_presets.html" %}</div>
   </form>
   <div class="analytics-section">
     <div class="empty-state">
@@ -686,6 +724,7 @@
     </div>
     <button type="submit" class="btn-filter">Filtrar</button>
     <a href="{% url 'web:analytics' %}" id="btnClearDates" class="btn-filter" style="background:#e5e7eb;color:#111827;text-decoration:none;display:inline-flex;align-items:center;margin-left:8px;">Limpar</a>
+    <div style="flex-basis:100%;margin-top:4px;">{% include "web/_date_presets.html" %}</div>
   </form>
 
   <!-- Stats Bar -->
@@ -715,6 +754,52 @@
       <div class="stat-mini-label">CPM</div>
     </div>
   </div>
+
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- BLOCO 0: COMPARAÇÃO DE PERÍODOS                  -->
+  <!-- ════════════════════════════════════════════════ -->
+  {% if period_comparison %}
+  <div class="analytics-section" style="margin-bottom:24px;">
+    <div class="section-header">
+      <div class="section-icon" style="background: linear-gradient(135deg, #dbeafe, #bfdbfe); color: #2563eb;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+      </div>
+      Comparação de Períodos
+      <span style="margin-left:auto;font-size:11px;color:var(--text-secondary);font-weight:500;">
+        {{ period_comparison.curr_start }} – {{ period_comparison.curr_end }}
+        <span style="margin:0 6px;opacity:.4;">vs</span>
+        {{ period_comparison.prev_start }} – {{ period_comparison.prev_end }}
+      </span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;padding:16px 0;">
+      {% for m in period_comparison.metrics %}
+      <div style="background:var(--surface-2,#f8fafc);border:1px solid var(--border-color,#e2e8f0);border-radius:12px;padding:14px 16px;">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary);margin-bottom:6px;">{{ m.label }}</div>
+        <div style="display:flex;align-items:baseline;gap:8px;">
+          <span style="font-size:20px;font-weight:800;color:var(--text-primary);">
+            {% if m.unit == "R$" %}R$ {{ m.curr|floatformat:2 }}{% elif m.unit == "%" %}{{ m.curr }}%{% else %}{{ m.curr|floatformat:0 }}{% endif %}
+          </span>
+          {% if m.change is not None %}
+          <span style="font-size:12px;font-weight:700;padding:2px 8px;border-radius:12px;
+            {% if m.change > 0 and m.up_good %}background:rgba(34,197,94,.1);color:#16a34a;
+            {% elif m.change < 0 and not m.up_good %}background:rgba(34,197,94,.1);color:#16a34a;
+            {% elif m.change > 0 and not m.up_good %}background:rgba(239,68,68,.1);color:#dc2626;
+            {% elif m.change < 0 and m.up_good %}background:rgba(239,68,68,.1);color:#dc2626;
+            {% else %}background:var(--surface);color:var(--text-secondary);{% endif %}">
+            {% if m.change > 0 %}+{% endif %}{{ m.change }}%
+          </span>
+          {% endif %}
+        </div>
+        <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">
+          Anterior: {% if m.unit == "R$" %}R$ {{ m.prev|floatformat:2 }}{% elif m.unit == "%" %}{{ m.prev }}%{% else %}{{ m.prev|floatformat:0 }}{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% elif date_from and date_to %}
+  {# Show a hint to use comparison #}
+  {% endif %}
 
   <!-- ════════════════════════════════════════════════ -->
   <!-- BLOCO 1: DIAGNOSTICO AUTOMATICO                  -->
@@ -835,6 +920,28 @@
         <span class="al-dot al-dot-info"></span> Informativo <b>{{ alert_counts.info }}</b>
       </span>
     </div>
+
+    {# Notification push config #}
+    {% if is_true_admin %}
+    <div style="display:flex;align-items:center;gap:10px;margin-top:12px;padding:12px 16px;background:var(--surface-2,#f8fafc);border:1px solid var(--border-color,#e2e8f0);border-radius:10px;">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color:var(--accent,#6366f1);flex-shrink:0;"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+      <span style="font-size:12px;font-weight:600;color:var(--text-primary);">Notificações Push</span>
+      <div style="display:flex;gap:6px;margin-left:auto;">
+        <button type="button" class="notif-channel-btn" data-channel="email" title="Receber alertas críticos por e-mail" onclick="toggleNotifChannel(this)">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          <span>E-mail</span>
+        </button>
+        <button type="button" class="notif-channel-btn" data-channel="webhook" title="Enviar para webhook externo" onclick="toggleNotifChannel(this)">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 13a5 5 0 017.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+          <span>Webhook</span>
+        </button>
+        <button type="button" class="notif-channel-btn" data-channel="slack" title="Enviar para canal Slack" onclick="toggleNotifChannel(this)">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14.5 10c-.83 0-1.5-.67-1.5-1.5v-5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5z"/><path d="M20.5 10H19V8.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/><path d="M9.5 14c.83 0 1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5S8 21.33 8 20.5v-5c0-.83.67-1.5 1.5-1.5z"/><path d="M3.5 14H5v1.5c0 .83-.67 1.5-1.5 1.5S2 16.33 2 15.5 2.67 14 3.5 14z"/><path d="M14 14.5c0-.83.67-1.5 1.5-1.5h5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5h-5c-.83 0-1.5-.67-1.5-1.5z"/><path d="M15.5 19H14v1.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5-.67-1.5-1.5-1.5z"/><path d="M10 9.5C10 10.33 9.33 11 8.5 11h-5C2.67 11 2 10.33 2 9.5S2.67 8 3.5 8h5c.83 0 1.5.67 1.5 1.5z"/><path d="M8.5 5H10V3.5C10 2.67 9.33 2 8.5 2S7 2.67 7 3.5 7.67 5 8.5 5z"/></svg>
+          <span>Slack</span>
+        </button>
+      </div>
+    </div>
+    {% endif %}
   </div>
 
   <div class="al-wrap">
@@ -996,7 +1103,7 @@
     </div>
     <div class="insights-grid">
       {% for ins in insights %}
-      <div class="insight-card {{ ins.type }}">
+      <div class="insight-card {{ ins.type }}" onclick="this.classList.toggle('expanded')">
         <div class="insight-icon">
           {% if ins.icon == "trending-up" %}
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
@@ -1017,6 +1124,22 @@
         <div class="insight-content">
           <div class="insight-title">{{ ins.title }}</div>
           <div class="insight-text">{{ ins.text }}</div>
+          <div class="insight-expand">
+            Ver detalhes
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="transition:transform .2s;"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="insight-detail">
+            <strong>Análise detalhada:</strong> {{ ins.text }}<br>
+            {% if ins.type == "positive" %}
+            <span style="color:#16a34a;">Este indicador está acima do esperado.</span> Continue monitorando para manter o desempenho. Considere replicar a estratégia em outras campanhas com perfil similar.
+            {% elif ins.type == "negative" %}
+            <span style="color:#dc2626;">Este indicador requer atenção imediata.</span> Recomendamos revisar os criativos, segmentação e lances. Verifique se houve mudanças recentes na campanha.
+            {% elif ins.type == "warning" %}
+            <span style="color:#d97706;">Atenção: tendência de queda identificada.</span> Monitore nos próximos dias e prepare ajustes preventivos caso o cenário se confirme.
+            {% else %}
+            <span style="color:#2563eb;">Informação contextual.</span> Use este dado para embasar decisões estratégicas junto com os demais indicadores.
+            {% endif %}
+          </div>
         </div>
       </div>
       {% endfor %}
@@ -1879,4 +2002,33 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 </style>
 {% endif %}
+
+<script>
+// Notification channel toggle (visual only — persisted in localStorage)
+function toggleNotifChannel(btn) {
+  btn.classList.toggle('active');
+  var channel = btn.dataset.channel;
+  var active = btn.classList.contains('active');
+  var stored = JSON.parse(localStorage.getItem('analytics_notif_channels') || '{}');
+  stored[channel] = active;
+  localStorage.setItem('analytics_notif_channels', JSON.stringify(stored));
+
+  // Show feedback
+  var label = active ? 'ativadas' : 'desativadas';
+  var name = btn.querySelector('span').textContent.trim();
+  var toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:10px 20px;background:var(--text-primary,#1e293b);color:#fff;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;transition:opacity .3s;';
+  toast.textContent = 'Notificações ' + name + ' ' + label;
+  document.body.appendChild(toast);
+  setTimeout(function() { toast.style.opacity = '0'; setTimeout(function() { toast.remove(); }, 300); }, 2000);
+}
+
+// Restore notification channel state
+document.addEventListener('DOMContentLoaded', function() {
+  var stored = JSON.parse(localStorage.getItem('analytics_notif_channels') || '{}');
+  document.querySelectorAll('.notif-channel-btn').forEach(function(btn) {
+    if (stored[btn.dataset.channel]) btn.classList.add('active');
+  });
+});
+</script>
 {% endblock %}
