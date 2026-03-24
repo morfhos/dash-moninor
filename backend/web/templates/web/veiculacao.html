@@ -1,5 +1,5 @@
 {% extends "web/base.html" %}
-{% load static %}
+{% load static humanize %}
 
 {% block content %}
 <style>
@@ -314,8 +314,8 @@
         </svg>
       </div>
       <div>
-        <div class="veic-stat-value">{{ total_impressions|floatformat:0 }}</div>
-        <div class="veic-stat-label">Impressoes</div>
+        <div class="veic-stat-value">{{ total_impressions|floatformat:0|intcomma }}</div>
+        <div class="veic-stat-label">Impressões</div>
       </div>
     </div>
     <div class="veic-stat-card">
@@ -325,7 +325,7 @@
         </svg>
       </div>
       <div>
-        <div class="veic-stat-value">{{ total_clicks|floatformat:0 }}</div>
+        <div class="veic-stat-value">{{ total_clicks|floatformat:0|intcomma }}</div>
         <div class="veic-stat-label">Cliques</div>
       </div>
     </div>
@@ -348,7 +348,7 @@
         </svg>
       </div>
       <div>
-        <div class="veic-stat-value">R$ {{ total_cost|floatformat:2 }}</div>
+        <div class="veic-stat-value">R$ {{ total_cost|floatformat:2|intcomma }}</div>
         <div class="veic-stat-label">Investimento</div>
       </div>
     </div>
@@ -414,11 +414,11 @@
             <span style="color:var(--text-secondary);">—</span>
             {% endif %}
           </td>
-          <td class="num">{{ c.impressions|floatformat:0 }}</td>
-          <td class="num">{{ c.clicks|floatformat:0 }}</td>
+          <td class="num">{{ c.impressions|floatformat:0|intcomma }}</td>
+          <td class="num">{{ c.clicks|floatformat:0|intcomma }}</td>
           <td class="num">{{ c.ctr }}%</td>
-          <td class="num">{{ c.cost|floatformat:2 }}</td>
-          <td class="num">{{ c.cpc|floatformat:2 }}</td>
+          <td class="num">{{ c.cost|floatformat:2|intcomma }}</td>
+          <td class="num">{{ c.cpc|floatformat:2|intcomma }}</td>
         </tr>
         {% endfor %}
       </tbody>

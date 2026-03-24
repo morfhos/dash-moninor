@@ -1,5 +1,5 @@
 {% extends "web/base.html" %}
-{% load static %}
+{% load static humanize %}
 
 {% block content %}
   <!-- Dashboard Section -->
@@ -23,7 +23,7 @@
           </svg>
         </div>
         <div class="stat-content">
-          <div class="stat-value">R${{ totals.investment|floatformat:0|default:"0" }}</div>
+          <div class="stat-value">R$ {{ totals.investment|floatformat:0|intcomma|default:"0" }}</div>
           <div class="stat-label">Investimento Total</div>
         </div>
       </div>
@@ -36,7 +36,7 @@
           </svg>
         </div>
         <div class="stat-content">
-          <div class="stat-value">{{ pieces_stats.on }} : {{ pieces_stats.off }}</div>
+          <div class="stat-value">{{ pieces_stats.on|intcomma }} : {{ pieces_stats.off|intcomma }}</div>
           <div class="stat-label">Ativas / Inativas</div>
         </div>
       </div>
@@ -51,7 +51,7 @@
           </svg>
         </div>
         <div class="stat-content">
-          <div class="stat-value">{{ pieces_stats.total|default:"0" }}</div>
+          <div class="stat-value">{{ pieces_stats.total|default:"0"|intcomma }}</div>
           <div class="stat-label">Total de Peças</div>
         </div>
       </div>
@@ -65,7 +65,7 @@
           </svg>
         </div>
         <div class="stat-content">
-          <div class="stat-value">{{ totals.insertions|default:"0" }}</div>
+          <div class="stat-value">{{ totals.insertions|default:"0"|intcomma }}</div>
           <div class="stat-label">Inserções Total</div>
         </div>
       </div>

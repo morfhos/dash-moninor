@@ -1,14 +1,11 @@
 {% extends "web/base.html" %}
-{% load static %}
+{% load static humanize %}
 
 {% block content %}
 <div class="topbar">
   <h1>{{ page_title }}</h1>
   {% if cliente %}
     <span class="cliente-badge">{{ cliente.nome }}</span>
-    {% if role != "cliente" %}
-      <a href="{% url 'web:dashboard' %}" class="btn-clear-filter">Ver todos</a>
-    {% endif %}
   {% endif %}
 </div>
 
@@ -90,8 +87,8 @@
       </svg>
     </div>
     <div class="stat-content">
-      <div class="stat-value">{{ stats.insertions_done|default:0 }}<span class="stat-sub">/{{ stats.insertions|default:0 }}</span></div>
-      <div class="stat-label">Insercoes (Realizadas/Planejadas)</div>
+      <div class="stat-value">{{ stats.insertions_done|default:0|intcomma }}<span class="stat-sub">/{{ stats.insertions|default:0|intcomma }}</span></div>
+      <div class="stat-label">Inserções (Realizadas/Planejadas)</div>
     </div>
   </div>
 
@@ -104,7 +101,7 @@
       </svg>
     </div>
     <div class="stat-content">
-      <div class="stat-value">R${{ stats.investment|floatformat:0|default:"0" }}</div>
+      <div class="stat-value">R$ {{ stats.investment|floatformat:0|default:"0"|intcomma }}</div>
       <div class="stat-label">Investimento Total</div>
     </div>
   </div>
@@ -117,7 +114,7 @@
       </svg>
     </div>
     <div class="stat-content">
-      <div class="stat-value">{{ stats.on_count }} <span class="stat-sub">/ {{ stats.off_count }}</span></div>
+      <div class="stat-value">{{ stats.on_count|intcomma }} <span class="stat-sub">/ {{ stats.off_count|intcomma }}</span></div>
       <div class="stat-label">Linhas ON / OFF</div>
     </div>
   </div>

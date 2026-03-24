@@ -1,12 +1,12 @@
 {% extends "web/base.html" %}
-{% load static %}
+{% load static humanize %}
 
 {% block content %}
   <div class="topbar" style="display:flex;align-items:center;justify-content:space-between;">
     <div style="display:flex;align-items:center;gap:12px;">
       <h1>{{ page_title }}</h1>
     </div>
-    {% if is_true_admin and cliente %}
+   {% if nav_mode != 'cliente' %}
     <a href="{% url 'web:contract_wizard_step1' cliente.id %}" class="btn" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-size:13px;">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
       Nova campanha
@@ -34,11 +34,11 @@
           <div class="card-stats">
             <div class="stat-row">
               <span class="stat-label">Investimento</span>
-              <span class="stat-value">R$ {{ item.investment|floatformat:0|default:"0" }}</span>
+              <span class="stat-value">R$ {{ item.investment|floatformat:0|intcomma|default:"0" }}</span>
             </div>
             <div class="stat-row">
               <span class="stat-label">Inserções</span>
-              <span class="stat-value">{{ item.insertions|default:"0" }}</span>
+              <span class="stat-value">{{ item.insertions|default:"0"|intcomma }}</span>
             </div>
             <div class="stat-row">
               <span class="stat-label">ON / OFF</span>

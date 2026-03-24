@@ -1350,6 +1350,48 @@ def dashon(request: HttpRequest) -> HttpResponse:
     bar_values = [c["cost"] for c in top10]
     bar_colors = ["#1877F2" if c["platform"] == "Meta Ads" else "#FBBC04" for c in top10]
 
+    # ── Channel performance comparison ──────────────────────────────
+    channel_perf = []
+    for ch_label, ch_ids in [("Google Ads", google_channels), ("Meta Ads", meta_channels)]:
+        ch_line_ids = list(lines_qs.filter(media_channel__in=ch_ids).values_list("id", flat=True))
+        if not ch_line_ids:
+            continue
+        ch_qs = days_qs.filter(placement_line_id__in=ch_line_ids)
+        ch_stats = ch_qs.aggregate(imp=Sum("impressions"), clk=Sum("clicks"), cst=Sum("cost"))
+        ch_imp = ch_stats["imp"] or 0
+        ch_clk = ch_stats["clk"] or 0
+        ch_cst = float(ch_stats["cst"] or 0)
+        ch_ctr = round((ch_clk / ch_imp * 100), 2) if ch_imp > 0 else 0
+        ch_cpc = round((ch_cst / ch_clk), 2) if ch_clk > 0 else 0
+        ch_cpm = round((ch_cst / ch_imp * 1000), 2) if ch_imp > 0 else 0
+        ch_roi = round((ch_clk / ch_cst), 2) if ch_cst > 0 else 0  # clicks per R$
+        channel_perf.append({
+            "channel": ch_label,
+            "impressions": ch_imp,
+            "clicks": ch_clk,
+            "cost": round(ch_cst, 2),
+            "ctr": ch_ctr,
+            "cpc": ch_cpc,
+            "cpm": ch_cpm,
+            "roi": ch_roi,
+        })
+
+    # ── Top campaigns by ROI (clicks / cost) ───────────────────────
+    top_roi = []
+    for c in campaigns_data:
+        if c["cost"] > 0:
+            c_roi = round(c["clicks"] / c["cost"], 2)
+            top_roi.append({**c, "roi": c_roi})
+    top_roi.sort(key=lambda x: x["roi"], reverse=True)
+    top_roi = top_roi[:10]
+
+    # Average ROI across all campaigns with spend
+    total_roi_campaigns = [c for c in campaigns_data if c["cost"] > 0]
+    avg_roi = round(
+        sum(c["clicks"] / c["cost"] for c in total_roi_campaigns) / len(total_roi_campaigns), 2
+    ) if total_roi_campaigns else 0
+    total_roi = round(total_clicks / total_cost, 2) if total_cost > 0 else 0
+
     return render(
         request,
         "web/dashon.html",
@@ -1382,6 +1424,11 @@ def dashon(request: HttpRequest) -> HttpResponse:
             "bar_colors_json": json.dumps(bar_colors),
             # Table
             "campaigns_data": campaigns_data,
+            # Channel comparison & ROI
+            "channel_perf": channel_perf,
+            "top_roi": top_roi,
+            "avg_roi": avg_roi,
+            "total_roi": total_roi,
         },
     )
 

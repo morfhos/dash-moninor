@@ -8,7 +8,24 @@
     <link rel="stylesheet" href="{% static 'styles.css' %}" />
     <link rel="stylesheet" href="{% static 'django.css' %}" />
     <link rel="icon" type="image/x-icon" href="{% static 'favicon.ico' %}" />
+    <script>
+      // Apply sidebar collapsed state immediately to prevent flash
+      if(localStorage.getItem('sidebar_collapsed')==='1'){
+        document.documentElement.classList.add('sidebar-is-collapsed');
+      }
+    </script>
     <style>
+      /* Sidebar collapsed - prevent flash on load */
+      html.sidebar-is-collapsed .sidebar { width: 64px; padding: 24px 8px; overflow: hidden; }
+      html.sidebar-is-collapsed .sidebar .sidebar-client-selector,
+      html.sidebar-is-collapsed .sidebar .nav-group-toggle .nav-group-label,
+      html.sidebar-is-collapsed .sidebar .nav-group-toggle .nav-chevron,
+      html.sidebar-is-collapsed .sidebar .menu-item .item-content span:not(.icon),
+      html.sidebar-is-collapsed .sidebar .logout-btn span:not(.icon),
+      html.sidebar-is-collapsed .sidebar .version-badge { display: none; }
+      html.sidebar-is-collapsed .sidebar .menu-item .item-content,
+      html.sidebar-is-collapsed .sidebar .logout-btn,
+      html.sidebar-is-collapsed .sidebar .nav-group-toggle { justify-content: center; }
       /* Notification Badge */
       .notification-btn {
         position: relative;

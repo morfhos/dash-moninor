@@ -1,5 +1,5 @@
 {% extends "web/base.html" %}
-{% load static %}
+{% load static humanize %}
 
 {% block content %}
 <style>
@@ -730,11 +730,11 @@
   <!-- Stats Bar -->
   <div class="stats-bar">
     <div class="stat-mini">
-      <div class="stat-mini-value">{{ total_imp|floatformat:0 }}</div>
-      <div class="stat-mini-label">Impressoes</div>
+      <div class="stat-mini-value">{{ total_imp|floatformat:0|intcomma }}</div>
+      <div class="stat-mini-label">Impressões</div>
     </div>
     <div class="stat-mini">
-      <div class="stat-mini-value">{{ total_clk|floatformat:0 }}</div>
+      <div class="stat-mini-value">{{ total_clk|floatformat:0|intcomma }}</div>
       <div class="stat-mini-label">Cliques</div>
     </div>
     <div class="stat-mini">
@@ -742,15 +742,15 @@
       <div class="stat-mini-label">CTR</div>
     </div>
     <div class="stat-mini">
-      <div class="stat-mini-value">R$ {{ total_cost|floatformat:2 }}</div>
+      <div class="stat-mini-value">R$ {{ total_cost|floatformat:2|intcomma }}</div>
       <div class="stat-mini-label">Investimento</div>
     </div>
     <div class="stat-mini">
-      <div class="stat-mini-value">R$ {{ global_cpc|floatformat:2 }}</div>
+      <div class="stat-mini-value">R$ {{ global_cpc|floatformat:2|intcomma }}</div>
       <div class="stat-mini-label">CPC</div>
     </div>
     <div class="stat-mini">
-      <div class="stat-mini-value">R$ {{ cpm|floatformat:2 }}</div>
+      <div class="stat-mini-value">R$ {{ cpm|floatformat:2|intcomma }}</div>
       <div class="stat-mini-label">CPM</div>
     </div>
   </div>

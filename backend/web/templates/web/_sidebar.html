@@ -1,5 +1,8 @@
 {% load static %}
-<aside class="sidebar">
+<aside class="sidebar" id="main-sidebar">
+  <button type="button" class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Recolher menu">
+    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 19l-7-7 7-7"/><path d="M18 19l-7-7 7-7" opacity=".4"/></svg>
+  </button>
   <div class="brand">
     <div class="logo-box">
       {% if nav_mode == 'cliente' and nav_cliente and nav_cliente.logo %}
@@ -75,22 +78,18 @@
             <span>Timeline</span>
           </div>
         </a>
-        {% if nav_mode != 'cliente' %}
         <a href="{% url 'web:campanhas' %}" class="menu-item{% if active == 'campanhas' %} active{% endif %}">
           <div class="item-content">
             <span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7h-7"/><path d="M14 17H7"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg></span>
             <span>Campanhas</span>
           </div>
         </a>
-        {% endif %}
-        {% if nav_mode != 'cliente' %}
         <a href="{% url 'web:pecas_criativos' %}" class="menu-item{% if active == 'pecas_criativos' %} active{% endif %}">
           <div class="item-content">
             <span class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg></span>
             <span>Peças &amp; Criativos</span>
           </div>
         </a>
-        {% endif %}
       </div>
     </div>
 
@@ -248,32 +247,136 @@
 
   /* Auto-open group that has active item */
   .nav-group-items { }
+
+  /* ── Sidebar toggle button ───────────────────────────────── */
+  .sidebar-toggle {
+    position: absolute;
+    top: 16px;
+    right: -12px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--brand-primary, #6366f1);
+    border: 2px solid var(--sidebar-grad, #1e1b4b);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10;
+    padding: 0;
+    transition: transform .2s, opacity .2s;
+    opacity: 0;
+  }
+  .sidebar:hover .sidebar-toggle { opacity: 1; }
+  .sidebar-toggle:hover { transform: scale(1.15); }
+  .sidebar-toggle svg { width: 14px; height: 14px; }
+
+  /* ── Collapsed state ─────────────────────────────────────── */
+  .sidebar.collapsed {
+    width: 64px;
+    padding: 24px 8px;
+    overflow-x: visible;
+    overflow-y: hidden;
+  }
+  .sidebar.collapsed .sidebar-toggle { opacity: 1; }
+  .sidebar.collapsed .sidebar-toggle svg { transform: rotate(180deg); }
+
+  .sidebar.collapsed .brand .logo-box img { max-width: 32px; }
+  .sidebar.collapsed .sidebar-client-selector { display: none; }
+
+  .sidebar.collapsed .nav-group-toggle {
+    justify-content: center;
+    padding: 8px 0;
+  }
+  .sidebar.collapsed .nav-group-toggle .nav-group-label,
+  .sidebar.collapsed .nav-group-toggle .nav-chevron { display: none; }
+
+  .sidebar.collapsed .menu-item .item-content {
+    justify-content: center;
+  }
+  .sidebar.collapsed .menu-item .item-content span:not(.icon) {
+    display: none;
+  }
+  .sidebar.collapsed .menu-item .item-content .icon {
+    margin: 0;
+  }
+
+  .sidebar.collapsed .logout-btn span:not(.icon) { display: none; }
+  .sidebar.collapsed .logout-btn { justify-content: center; padding: 8px; }
+  .sidebar.collapsed .version-badge { display: none; }
+  .sidebar.collapsed .sidebar-footer { padding-top: 10px; }
+  .sidebar.collapsed .nav { overflow-y: hidden !important; }
+
+  /* Tooltip on hover for collapsed items */
+  .sidebar.collapsed .menu-item { position: relative; }
+  .sidebar.collapsed .menu-item::after {
+    content: attr(data-label);
+    position: absolute;
+    left: calc(100% + 12px);
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 5px 12px;
+    background: var(--text-primary, #1e293b);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 6px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .15s;
+    z-index: 100;
+  }
+  .sidebar.collapsed .menu-item:hover::after { opacity: 1; }
+
+  /* Content area transition */
+  .sidebar { position: relative; transition: width .25s ease, padding .25s ease; }
+  .content { transition: margin-left .25s ease; }
 </style>
 
 <script>
 function toggleGroup(btn) {
   const group = btn.closest('.nav-group');
   group.classList.toggle('collapsed');
-  // Save state
   const key = 'sidebar_' + group.dataset.group;
   localStorage.setItem(key, group.classList.contains('collapsed') ? '1' : '0');
 }
 
-// Restore collapsed state & auto-open active group
-document.addEventListener('DOMContentLoaded', function() {
-  document.querySelectorAll('.nav-group').forEach(function(group) {
-    const key = 'sidebar_' + group.dataset.group;
-    const hasActive = group.querySelector('.menu-item.active');
+function toggleSidebar() {
+  var sb = document.getElementById('main-sidebar');
+  sb.classList.toggle('collapsed');
+  var isCollapsed = sb.classList.contains('collapsed');
+  localStorage.setItem('sidebar_collapsed', isCollapsed ? '1' : '0');
+  document.documentElement.classList.toggle('sidebar-is-collapsed', isCollapsed);
+}
 
-    // If has active item, always open
+document.addEventListener('DOMContentLoaded', function() {
+  // Sync sidebar collapse state (html class already set in <head>)
+  var sb = document.getElementById('main-sidebar');
+  if (localStorage.getItem('sidebar_collapsed') === '1') {
+    sb.classList.add('collapsed');
+  } else {
+    sb.classList.remove('collapsed');
+    document.documentElement.classList.remove('sidebar-is-collapsed');
+  }
+
+  // Auto-populate data-label for collapsed tooltips
+  document.querySelectorAll('.sidebar .menu-item').forEach(function(item) {
+    var txt = item.querySelector('.item-content span:not(.icon)');
+    if (txt) item.setAttribute('data-label', txt.textContent.trim());
+  });
+
+  // Restore nav-group collapsed state & auto-open active group
+  document.querySelectorAll('.nav-group').forEach(function(group) {
+    var key = 'sidebar_' + group.dataset.group;
+    var hasActive = group.querySelector('.menu-item.active');
     if (hasActive) {
       group.classList.remove('collapsed');
       localStorage.setItem(key, '0');
       return;
     }
-
-    // Otherwise restore saved state
-    const saved = localStorage.getItem(key);
+    var saved = localStorage.getItem(key);
     if (saved === '1') {
       group.classList.add('collapsed');
     }
