@@ -1811,7 +1811,13 @@ def logs_auditoria(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
-def analytics(request: HttpRequest) -> HttpResponse:
+def analytics_real(request: HttpRequest) -> HttpResponse:
+    """Analytics Real – AI-powered version with Claude-generated insights."""
+    return analytics(request, template="web/analytics_real.html", ai_mode=True)
+
+
+@login_required
+def analytics(request: HttpRequest, template: str = "web/analytics.html", ai_mode: bool = False) -> HttpResponse:
     """Analytics Intelligence – diagnostic scoring, insights, recommendations, funnel & alerts."""
     from collections import defaultdict
     from decimal import Decimal
@@ -1822,7 +1828,7 @@ def analytics(request: HttpRequest) -> HttpResponse:
         cliente_id = selected_cliente_id(request)
 
     if not cliente_id:
-        return render(request, "web/analytics.html", {
+        return render(request, template, {
             "active": "analytics",
             "page_title": "Analytics Intelligence",
             "require_cliente": True,
@@ -1850,7 +1856,7 @@ def analytics(request: HttpRequest) -> HttpResponse:
         days_qs = days_qs.filter(date__lte=date_to)
 
     if not line_ids or not days_qs.exists():
-        return render(request, "web/analytics.html", {
+        return render(request, template, {
             "active": "analytics",
             "page_title": "Analytics Intelligence",
             "no_data": True,
@@ -2619,9 +2625,65 @@ def analytics(request: HttpRequest) -> HttpResponse:
         "markets": markets_data,
     }
 
-    return render(request, "web/analytics.html", {
+    # ── AI-powered insights (only in ai_mode) ─────────────────────
+    ai_summary = ""
+    ai_status = None
+    if ai_mode:
+        try:
+            from web.services.ai_analytics import generate_analytics_insights, persist_ai_insights, check_ai_status
+            ai_status = check_ai_status()
+            ai_context = {
+                "total_imp": total_imp, "total_clk": total_clk,
+                "global_ctr": global_ctr, "cpc": global_cpc, "cpm": cpm,
+                "total_cost": round(total_cost, 2),
+                "date_from": date_from, "date_to": date_to,
+                "benchmarks": {"ctr": BENCH_CTR, "cpc": BENCH_CPC, "cpm": BENCH_CPM},
+                "efficiency_matrix": efficiency_matrix,
+                "historical": historical,
+                "google": google_agg, "meta": meta_agg,
+                "active_campaigns": len(campaign_metrics),
+            }
+            ai_result = generate_analytics_insights(ai_context, cliente_id=cliente_id or 0)
+            if ai_result:
+                # Override deterministic insights/alerts/recommendations with AI
+                ai_insights = ai_result.get("insights")
+                if ai_insights:
+                    insights = ai_insights
+                ai_alerts = ai_result.get("alerts")
+                if ai_alerts:
+                    alerts = ai_alerts
+                    # Rebuild grouped alerts
+                    alerts_grouped = {"critical": [], "warning": [], "info": []}
+                    for a in alerts:
+                        sev = a.get("severity", "info")
+                        if sev in alerts_grouped:
+                            alerts_grouped[sev].append(a)
+                    alert_counts = {
+                        "all": len(alerts),
+                        "critical": len(alerts_grouped["critical"]),
+                        "warning": len(alerts_grouped["warning"]),
+                        "info": len(alerts_grouped["info"]),
+                    }
+                ai_recs = ai_result.get("recommendations")
+                if ai_recs:
+                    recommendations = ai_recs
+                ai_summary = ai_result.get("executive_summary", "")
+                # Persist to DB
+                if cliente_id:
+                    try:
+                        persist_ai_insights(cliente_id, date_from, date_to, ai_result)
+                    except Exception:
+                        pass
+        except Exception:
+            import traceback
+            traceback.print_exc()
+
+    return render(request, template, {
         "active": "analytics",
-        "page_title": "Analytics Intelligence",
+        "page_title": "Analytics Intelligence" + (" (AI)" if ai_mode else ""),
+        "ai_mode": ai_mode,
+        "ai_status": ai_status,
+        "ai_summary": ai_summary,
         "date_from": date_from,
         "date_to": date_to,
         # Global stats
@@ -3587,9 +3649,8 @@ def campaign_set_status(request: HttpRequest, campaign_id: int) -> HttpResponse:
     return redirect("web:clientes_detail", cliente_id=campaign.cliente_id)
 
 
+@login_required
 def api_campaign_detail(request: HttpRequest, campaign_id: int) -> HttpResponse:
-    if not request.user.is_authenticated:
-        return JsonResponse({"error": "unauthorized"}, status=401)
     campaign = (
         Campaign.objects.filter(id=campaign_id)
         .select_related("cliente")
@@ -5788,3 +5849,71 @@ def user_profile(request: HttpRequest) -> HttpResponse:
         "success_msg": success_msg,
         "error_msg": error_msg,
     })
+
+
+# ── AI Executive Report API ──────────────────────────────────────────────────
+
+@login_required
+def api_ai_executive_report(request: HttpRequest) -> JsonResponse:
+    """Generate an AI-powered executive report via AJAX."""
+    from web.services.ai_analytics import generate_executive_report
+
+    cliente_id = effective_cliente_id(request)
+    if not cliente_id and is_admin(request.user):
+        cliente_id = selected_cliente_id(request)
+
+    if not cliente_id:
+        return JsonResponse({"error": "Selecione um cliente."}, status=400)
+
+    date_from = request.GET.get("date_from", "")
+    date_to = request.GET.get("date_to", "")
+
+    # Quick aggregate for context
+    google_channels = ["google", "youtube", "display", "search"]
+    meta_channels = ["meta"]
+    all_channels = google_channels + meta_channels
+
+    lines_qs = PlacementLine.objects.filter(
+        media_channel__in=all_channels, campaign__cliente_id=cliente_id,
+    )
+    line_ids = list(lines_qs.values_list("id", flat=True))
+    days_qs = PlacementDay.objects.filter(placement_line_id__in=line_ids)
+    if date_from:
+        days_qs = days_qs.filter(date__gte=date_from)
+    if date_to:
+        days_qs = days_qs.filter(date__lte=date_to)
+
+    from django.db.models import Sum
+    stats = days_qs.aggregate(
+        total_imp=Sum("impressions"), total_clk=Sum("clicks"), total_cost=Sum("cost"),
+    )
+    total_imp = stats["total_imp"] or 0
+    total_clk = stats["total_clk"] or 0
+    total_cost = float(stats["total_cost"] or 0)
+    global_ctr = round((total_clk / total_imp * 100), 2) if total_imp > 0 else 0
+    global_cpc = round((total_cost / total_clk), 2) if total_clk > 0 else 0
+    cpm = round((total_cost / total_imp * 1000), 2) if total_imp > 0 else 0
+
+    context = {
+        "total_imp": total_imp, "total_clk": total_clk,
+        "global_ctr": global_ctr, "cpc": global_cpc, "cpm": cpm,
+        "total_cost": round(total_cost, 2),
+        "date_from": date_from, "date_to": date_to,
+        "benchmarks": {"ctr": 2.0, "cpc": 1.50, "cpm": 15.0},
+    }
+
+    report = generate_executive_report(context, cliente_id=cliente_id)
+    if report is None:
+        return JsonResponse({"error": "Não foi possível gerar o relatório. Verifique a chave ANTHROPIC_API_KEY."}, status=500)
+
+    return JsonResponse({"report": report})
+
+
+@login_required
+def api_ai_status(request: HttpRequest) -> JsonResponse:
+    """Check AI service status (force refresh by clearing cache)."""
+    from django.core.cache import cache as _cache
+    _cache.delete("ai:status")
+    from web.services.ai_analytics import check_ai_status
+    status = check_ai_status()
+    return JsonResponse(status)

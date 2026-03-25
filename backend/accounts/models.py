@@ -214,3 +214,35 @@ class SiteConfig(models.Model):
     def load(cls):
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+
+class AIInsight(models.Model):
+    """Persisted AI-generated analytics insights, alerts, and recommendations."""
+
+    class InsightType(models.TextChoices):
+        INSIGHT = "insight", "Insight"
+        ALERT = "alert", "Alerta"
+        RECOMMENDATION = "recommendation", "Recomendação"
+        SUMMARY = "summary", "Resumo Executivo"
+
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="ai_insights")
+    date_from = models.DateField()
+    date_to = models.DateField()
+    insight_type = models.CharField(max_length=20, choices=InsightType.choices)
+    severity = models.CharField(max_length=20, blank=True, default="")
+    title = models.CharField(max_length=300)
+    text = models.TextField()
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    dismissed = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = "AI Insight"
+        verbose_name_plural = "AI Insights"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["cliente", "date_from", "date_to"], name="aiinsight_cliente_dates_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.get_insight_type_display()}: {self.title[:60]}"

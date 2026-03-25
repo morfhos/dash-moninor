@@ -452,5 +452,176 @@
         }, 250);
       });
     </script>
+
+    <!-- ══════════════════════════════════════════════ -->
+    <!-- ROI Calculator Lightbox                        -->
+    <!-- ══════════════════════════════════════════════ -->
+    <style>
+      .roi-modal { display:none; position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,.5); align-items:center; justify-content:center; }
+      .roi-modal.show { display:flex; }
+      .roi-box { background:var(--card-bg,#fff); border-radius:16px; width:520px; max-width:92vw; box-shadow:0 25px 60px rgba(0,0,0,.25); overflow:hidden; }
+      .roi-header { padding:20px 24px; border-bottom:1px solid var(--border-color,#e2e8f0); display:flex; align-items:center; justify-content:space-between; }
+      .roi-header h3 { margin:0; font-size:16px; font-weight:700; display:flex; align-items:center; gap:10px; }
+      .roi-body { padding:24px; }
+      .roi-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+      .roi-field { display:flex; flex-direction:column; gap:4px; }
+      .roi-field label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text-secondary,#64748b); }
+      .roi-field input { padding:10px 12px; border:1px solid var(--border-color,#e2e8f0); border-radius:10px; font-size:14px; background:var(--surface,#f8fafc); color:var(--text-primary,#1e293b); outline:none; font-family:inherit; }
+      .roi-field input:focus { border-color:#6366f1; }
+      .roi-field .roi-prefix { display:flex; align-items:center; gap:0; }
+      .roi-field .roi-prefix span { padding:10px 12px; background:var(--border-color,#e2e8f0); border:1px solid var(--border-color,#e2e8f0); border-right:none; border-radius:10px 0 0 10px; font-size:12px; font-weight:700; color:var(--text-secondary); }
+      .roi-field .roi-prefix input { border-radius:0 10px 10px 0; }
+      .roi-divider { border:none; border-top:1px solid var(--border-color,#e2e8f0); margin:18px 0; }
+      .roi-results { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+      .roi-result { text-align:center; padding:14px 10px; background:var(--surface,#f8fafc); border-radius:12px; border:1px solid var(--border-color,#e2e8f0); }
+      .roi-result .roi-val { font-size:22px; font-weight:800; color:var(--text-primary); line-height:1.2; }
+      .roi-result .roi-lbl { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text-secondary); margin-top:4px; }
+      .roi-result.highlight { background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(139,92,246,.08)); border-color:rgba(99,102,241,.2); }
+      .roi-result.highlight .roi-val { color:#6366f1; }
+      .roi-result.green .roi-val { color:#16a34a; }
+      .roi-result.red .roi-val { color:#dc2626; }
+    </style>
+
+    <div class="roi-modal" id="roiModal" onclick="if(event.target===this)closeRoiCalc()">
+      <div class="roi-box">
+        <div class="roi-header">
+          <h3>
+            <svg width="20" height="20" fill="none" stroke="#6366f1" stroke-width="2" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="12" y1="10" x2="14" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="12" y1="14" x2="14" y2="14"/><line x1="8" y1="18" x2="10" y2="18"/><line x1="12" y1="18" x2="16" y2="18"/></svg>
+            Calculadora de ROI
+          </h3>
+          <button type="button" onclick="closeRoiCalc()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-secondary);padding:4px 8px;line-height:1;">&times;</button>
+        </div>
+        <div class="roi-body">
+          <div class="roi-grid">
+            <div class="roi-field">
+              <label>Investimento</label>
+              <div class="roi-prefix">
+                <span>R$</span>
+                <input type="number" id="roiInvestment" value="10000" step="100" oninput="calcRoi()">
+              </div>
+            </div>
+            <div class="roi-field">
+              <label>Receita gerada</label>
+              <div class="roi-prefix">
+                <span>R$</span>
+                <input type="number" id="roiRevenue" value="35000" step="100" oninput="calcRoi()">
+              </div>
+            </div>
+            <div class="roi-field">
+              <label>Impressões</label>
+              <input type="number" id="roiImpressions" value="100000" step="1000" oninput="calcRoi()">
+            </div>
+            <div class="roi-field">
+              <label>Cliques</label>
+              <input type="number" id="roiClicks" value="3000" step="100" oninput="calcRoi()">
+            </div>
+            <div class="roi-field">
+              <label>Conversões</label>
+              <input type="number" id="roiConversions" value="150" step="10" oninput="calcRoi()">
+            </div>
+            <div class="roi-field">
+              <label>Ticket médio</label>
+              <div class="roi-prefix">
+                <span>R$</span>
+                <input type="number" id="roiTicket" value="233" step="10" oninput="calcRoi()">
+              </div>
+            </div>
+          </div>
+
+          <hr class="roi-divider">
+
+          <div class="roi-results" id="roiResults">
+            <div class="roi-result highlight">
+              <div class="roi-val" id="roiROI">250%</div>
+              <div class="roi-lbl">ROI</div>
+            </div>
+            <div class="roi-result">
+              <div class="roi-val" id="roiROAS">3.5x</div>
+              <div class="roi-lbl">ROAS</div>
+            </div>
+            <div class="roi-result">
+              <div class="roi-val" id="roiCTR">3.00%</div>
+              <div class="roi-lbl">CTR</div>
+            </div>
+            <div class="roi-result">
+              <div class="roi-val" id="roiCPC">R$ 3,33</div>
+              <div class="roi-lbl">CPC</div>
+            </div>
+            <div class="roi-result">
+              <div class="roi-val" id="roiCPM">R$ 100</div>
+              <div class="roi-lbl">CPM</div>
+            </div>
+            <div class="roi-result">
+              <div class="roi-val" id="roiCPA">R$ 66,67</div>
+              <div class="roi-lbl">CPA</div>
+            </div>
+            <div class="roi-result">
+              <div class="roi-val" id="roiConvRate">5.00%</div>
+              <div class="roi-lbl">Conv. Rate</div>
+            </div>
+            <div class="roi-result">
+              <div class="roi-val" id="roiProfit">R$ 25.000</div>
+              <div class="roi-lbl">Lucro</div>
+            </div>
+            <div class="roi-result">
+              <div class="roi-val" id="roiLTV">R$ 233</div>
+              <div class="roi-lbl">Ticket Médio</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    function openRoiCalc() {
+      document.getElementById('roiModal').classList.add('show');
+      calcRoi();
+    }
+    function closeRoiCalc() {
+      document.getElementById('roiModal').classList.remove('show');
+    }
+    function calcRoi() {
+      var inv = parseFloat(document.getElementById('roiInvestment').value) || 0;
+      var rev = parseFloat(document.getElementById('roiRevenue').value) || 0;
+      var imp = parseFloat(document.getElementById('roiImpressions').value) || 0;
+      var clk = parseFloat(document.getElementById('roiClicks').value) || 0;
+      var conv = parseFloat(document.getElementById('roiConversions').value) || 0;
+      var ticket = parseFloat(document.getElementById('roiTicket').value) || 0;
+
+      // Auto-calc revenue if not manually set and we have conversions + ticket
+      if (rev === 0 && conv > 0 && ticket > 0) rev = conv * ticket;
+
+      var roi = inv > 0 ? ((rev - inv) / inv * 100) : 0;
+      var roas = inv > 0 ? (rev / inv) : 0;
+      var ctr = imp > 0 ? (clk / imp * 100) : 0;
+      var cpc = clk > 0 ? (inv / clk) : 0;
+      var cpm = imp > 0 ? (inv / imp * 1000) : 0;
+      var cpa = conv > 0 ? (inv / conv) : 0;
+      var convRate = clk > 0 ? (conv / clk * 100) : 0;
+      var profit = rev - inv;
+
+      function fmt(n) { return n.toLocaleString('pt-BR', {maximumFractionDigits:0}); }
+      function fmtD(n) { return n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+
+      document.getElementById('roiROI').textContent = fmtD(roi) + '%';
+      document.getElementById('roiROAS').textContent = fmtD(roas) + 'x';
+      document.getElementById('roiCTR').textContent = fmtD(ctr) + '%';
+      document.getElementById('roiCPC').textContent = 'R$ ' + fmtD(cpc);
+      document.getElementById('roiCPM').textContent = 'R$ ' + fmtD(cpm);
+      document.getElementById('roiCPA').textContent = 'R$ ' + fmtD(cpa);
+      document.getElementById('roiConvRate').textContent = fmtD(convRate) + '%';
+      document.getElementById('roiProfit').textContent = 'R$ ' + fmt(profit);
+      document.getElementById('roiLTV').textContent = 'R$ ' + fmt(ticket);
+
+      // Color coding
+      var roiEl = document.getElementById('roiROI').parentElement;
+      roiEl.className = 'roi-result ' + (roi > 0 ? 'green' : roi < 0 ? 'red' : 'highlight');
+      var profitEl = document.getElementById('roiProfit').parentElement;
+      profitEl.className = 'roi-result ' + (profit > 0 ? 'green' : profit < 0 ? 'red' : '');
+    }
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && document.getElementById('roiModal').classList.contains('show')) closeRoiCalc();
+    });
+    </script>
   </body>
 </html>

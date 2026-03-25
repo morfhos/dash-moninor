@@ -15,7 +15,9 @@
       "Bash(/c/Users/Marcio/anaconda3/python.exe /tmp/inspect_xlsx.py)",
       "Bash(git commit:*)",
       "Bash(grep -E \"html$\")",
-      "Bash(grep -n \"load humanize\" /c/projetos/monitor/dashmonitor/backend/web/templates/web/*.html)"
+      "Bash(grep -n \"load humanize\" /c/projetos/monitor/dashmonitor/backend/web/templates/web/*.html)",
+      "Bash(pip list:*)",
+      "Bash(pip install:*)"
     ]
   }
 }
