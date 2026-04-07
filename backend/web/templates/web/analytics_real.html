@@ -275,57 +275,65 @@
     letter-spacing: 0.3px;
   }
 
-  /* ──── BLOCO 4: Funnel ──── */
-  .funnel-container { display: flex; flex-direction: column; gap: 0; }
-  .funnel-step {
+  /* ──── BLOCO 4: Funnel (visual trapezoid) ──── */
+  .funnel-visual {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    padding: 20px 0;
+    flex: 1;
+    min-width: 0;
+    width: 80%;
+    margin-left: 10%;
+  }
+  .funnel-tier {
     display: flex;
     align-items: center;
-    gap: 16px;
-    padding: 18px 24px;
-    position: relative;
-  }
-  .funnel-step:not(:last-child) { border-bottom: 1px dashed var(--border-color); }
-  .funnel-bar-wrap { flex: 1; min-width: 0; }
-  .funnel-bar {
-    height: 36px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    padding: 0 14px;
-    color: white;
+    justify-content: center;
+    flex-direction: column;
+    color: #fff;
     font-weight: 700;
-    font-size: 13px;
-    transition: width 0.8s ease-out;
-    min-width: 60px;
-  }
-  .funnel-step:nth-child(1) .funnel-bar { background: linear-gradient(90deg, #6366f1, #8b5cf6); }
-  .funnel-step:nth-child(2) .funnel-bar { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
-  .funnel-step:nth-child(3) .funnel-bar { background: linear-gradient(90deg, #0ea5e9, #38bdf8); }
-  .funnel-step:nth-child(4) .funnel-bar { background: linear-gradient(90deg, #22c55e, #4ade80); }
-  .funnel-label {
-    width: 140px;
-    flex-shrink: 0;
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--text-primary);
-  }
-  .funnel-value {
-    width: 120px;
-    flex-shrink: 0;
-    text-align: right;
-    font-size: 15px;
-    font-weight: 800;
-    color: var(--text-primary);
-  }
-  .funnel-drop {
-    width: 80px;
-    flex-shrink: 0;
+    padding: 22px 0;
     text-align: center;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--text-secondary);
+    position: relative;
+    transition: transform .2s;
   }
-  .funnel-drop .drop-value { color: #ef4444; font-size: 12px; }
+  .funnel-tier:hover { transform: scale(1.03); z-index: 2; }
+  .funnel-tier-label { font-size: 15px; font-weight: 600; opacity: .95; }
+  .funnel-tier-value { font-size: 28px; font-weight: 800; line-height: 1.2; }
+  .funnel-tier-sub { font-size: 12px; opacity: .7; margin-top: 2px; }
+
+  /* Trapezoid shape via clip-path — each tier gets narrower */
+  .funnel-tier:nth-child(1) { background: linear-gradient(135deg, #7c3aed, #8b5cf6); clip-path: polygon(0% 0%, 100% 0%, 94% 100%, 6% 100%); width: 100%; border-radius: 14px 14px 0 0; }
+  .funnel-tier:nth-child(2) { background: linear-gradient(135deg, #8b5cf6, #a78bfa); clip-path: polygon(6% 0%, 94% 0%, 88% 100%, 12% 100%); width: 100%; margin-top: -2px; }
+  .funnel-tier:nth-child(3) { background: linear-gradient(135deg, #a78bfa, #c084fc); clip-path: polygon(12% 0%, 88% 0%, 82% 100%, 18% 100%); width: 100%; margin-top: -2px; }
+  .funnel-tier:nth-child(4) { background: linear-gradient(135deg, #c084fc, #d8b4fe); clip-path: polygon(18% 0%, 82% 0%, 76% 100%, 24% 100%); width: 100%; margin-top: -2px; }
+  .funnel-tier:nth-child(5) { background: linear-gradient(135deg, #7c3aed, #6d28d9); clip-path: polygon(24% 0%, 76% 0%, 72% 100%, 28% 100%); width: 100%; margin-top: -2px; border-radius: 0 0 50% 50%; }
+
+  /* Side stats */
+  .funnel-layout { display: grid; grid-template-columns: 3fr 1fr; gap: 28px; align-items: center; }
+  .funnel-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .funnel-stat-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    font-size: 12px;
+  }
+  .funnel-stat-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .funnel-stat-label { color: var(--text-secondary); font-weight: 600; flex: 1; }
+  .funnel-stat-val { font-weight: 800; color: var(--text-primary); }
+  .funnel-stat-drop { font-size: 11px; font-weight: 700; color: #ef4444; }
 
   /* ──── BLOCO 5: Alerts → estilos movidos para bloco al-* abaixo ──── */
 
@@ -344,7 +352,7 @@
     text-align: center;
   }
   .stat-mini-value {
-    font-size: 20px;
+    font-size: 15px;
     font-weight: 800;
     color: var(--text-primary);
     line-height: 1.2;
@@ -718,16 +726,6 @@
   </div>
 </div>
 
-{% if ai_summary %}
-<div style="margin-bottom:20px;padding:16px 20px;background:linear-gradient(135deg,rgba(99,102,241,.06),rgba(139,92,246,.06));border:1px solid rgba(99,102,241,.15);border-radius:14px;border-left:4px solid #6366f1;">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-    <svg width="16" height="16" fill="none" stroke="#6366f1" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1.27c.34-.6.99-1 1.73-1a2 2 0 010 4c-.74 0-1.39-.4-1.73-1H20a7 7 0 01-7 7v1.27c.6.34 1 .99 1 1.73a2 2 0 01-4 0c0-.74.4-1.39 1-1.73V23a7 7 0 01-7-7H2.73c-.34.6-.99 1-1.73 1a2 2 0 010-4c.74 0 1.39.4 1.73 1H4a7 7 0 017-7V5.73c-.6-.34-1-.99-1-1.73a2 2 0 012-2z"/></svg>
-    <span style="font-size:12px;font-weight:700;color:#6366f1;text-transform:uppercase;letter-spacing:.04em;">Resumo executivo (gerado por IA)</span>
-  </div>
-  <p style="margin:0;font-size:14px;color:var(--text-primary);line-height:1.6;">{{ ai_summary }}</p>
-</div>
-{% endif %}
-
 <div class="analytics-container">
   {% if require_cliente %}
   <div class="analytics-section">
@@ -814,6 +812,20 @@
       <div class="stat-mini-label">CPM</div>
     </div>
   </div>
+
+  <!-- ── Resumo executivo IA (carregado via AJAX) ──────────────── -->
+  {% if ai_mode %}
+  <div id="ai-summary-box" style="margin-bottom:20px;padding:16px 20px;background:linear-gradient(135deg,rgba(99,102,241,.06),rgba(139,92,246,.06));border:1px solid rgba(99,102,241,.15);border-radius:14px;border-left:4px solid #6366f1;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+      <svg width="16" height="16" fill="none" stroke="#6366f1" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1.27c.34-.6.99-1 1.73-1a2 2 0 010 4c-.74 0-1.39-.4-1.73-1H20a7 7 0 01-7 7v1.27c.6.34 1 .99 1 1.73a2 2 0 01-4 0c0-.74.4-1.39 1-1.73V23a7 7 0 01-7-7H2.73c-.34.6-.99 1-1.73 1a2 2 0 010-4c.74 0 1.39.4 1.73 1H4a7 7 0 017-7V5.73c-.6-.34-1-.99-1-1.73a2 2 0 012-2z"/></svg>
+      <span style="font-size:12px;font-weight:700;color:#6366f1;text-transform:uppercase;letter-spacing:.04em;">Resumo executivo (Oracli AI)</span>
+    </div>
+    <div id="ai-summary-content" style="display:flex;align-items:center;gap:10px;">
+      <div style="width:18px;height:18px;border:2px solid #6366f1;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;flex-shrink:0;"></div>
+      <p style="margin:0;font-size:14px;color:var(--text-secondary);line-height:1.6;">Oracli AI está analisando seus dados...</p>
+    </div>
+  </div>
+  {% endif %}
 
   <!-- ════════════════════════════════════════════════ -->
   <!-- BLOCO 0: COMPARAÇÃO DE PERÍODOS                  -->
@@ -995,9 +1007,9 @@
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 13a5 5 0 017.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
           <span>Webhook</span>
         </button>
-        <button type="button" class="notif-channel-btn" data-channel="slack" title="Enviar para canal Slack" onclick="toggleNotifChannel(this)">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14.5 10c-.83 0-1.5-.67-1.5-1.5v-5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5z"/><path d="M20.5 10H19V8.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/><path d="M9.5 14c.83 0 1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5S8 21.33 8 20.5v-5c0-.83.67-1.5 1.5-1.5z"/><path d="M3.5 14H5v1.5c0 .83-.67 1.5-1.5 1.5S2 16.33 2 15.5 2.67 14 3.5 14z"/><path d="M14 14.5c0-.83.67-1.5 1.5-1.5h5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5h-5c-.83 0-1.5-.67-1.5-1.5z"/><path d="M15.5 19H14v1.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5-.67-1.5-1.5-1.5z"/><path d="M10 9.5C10 10.33 9.33 11 8.5 11h-5C2.67 11 2 10.33 2 9.5S2.67 8 3.5 8h5c.83 0 1.5.67 1.5 1.5z"/><path d="M8.5 5H10V3.5C10 2.67 9.33 2 8.5 2S7 2.67 7 3.5 7.67 5 8.5 5z"/></svg>
-          <span>Slack</span>
+        <button type="button" class="notif-channel-btn" data-channel="whatsapp" title="Enviar relatório via WhatsApp" onclick="toggleNotifChannel(this)" style="border-color:#25D366;color:#25D366;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347zM12.05 21.785h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.981.998-3.648-.235-.374A9.86 9.86 0 012.14 12.01C2.14 6.54 6.57 2.11 12.05 2.11a9.84 9.84 0 016.994 2.898A9.83 9.83 0 0121.94 12c-.003 5.47-4.433 9.9-9.89 9.9v-.115zM12.05.006C5.495.006.006 5.494.006 12.05a11.95 11.95 0 001.6 5.985L0 24l6.166-1.617a11.94 11.94 0 005.878 1.539h.005c6.557 0 11.946-5.49 11.95-12.044A11.94 11.94 0 0012.05.006z"/></svg>
+          <span>WhatsApp</span>
         </button>
       </div>
     </div>
@@ -1270,27 +1282,30 @@
       </div>
       Funil de Performance
     </div>
-    <div class="funnel-container">
-      {% for step in funnel_steps %}
-      <div class="funnel-step">
-        <div class="funnel-label">{{ step.label }}</div>
-        <div class="funnel-bar-wrap">
-          <div class="funnel-bar" style="width: {{ step.pct }}%">
-            {{ step.pct }}%
-          </div>
-        </div>
-        <div class="funnel-value">{{ step.formatted }}</div>
-        <div class="funnel-drop">
-          {% if step.drop is not None %}
-            <div class="drop-value">-{{ step.drop }}%</div>
-            <div>perda</div>
+    <div class="funnel-layout">
+      <div class="funnel-visual">
+        {% for step in funnel_steps %}
+        <div class="funnel-tier">
+          <div class="funnel-tier-label">{{ step.label }}</div>
+          <div class="funnel-tier-value">{{ step.formatted }}</div>
+          {% if step.cost_label %}
+          <div class="funnel-tier-sub">{{ step.cost_label }}</div>
           {% endif %}
         </div>
-        {% if step.cost_label %}
-        <div class="funnel-cost" style="width:140px;text-align:right;color:var(--text-secondary);font-size:12px;font-weight:700;">{{ step.cost_label }}</div>
-        {% endif %}
+        {% endfor %}
       </div>
-      {% endfor %}
+      <div class="funnel-stats">
+        {% for step in funnel_steps %}
+        <div class="funnel-stat-row">
+          <div class="funnel-stat-dot" style="background:{% if forloop.counter == 1 %}#7c3aed{% elif forloop.counter == 2 %}#8b5cf6{% elif forloop.counter == 3 %}#a78bfa{% elif forloop.counter == 4 %}#c084fc{% else %}#6d28d9{% endif %};"></div>
+          <div class="funnel-stat-label">{{ step.label }}</div>
+          <div class="funnel-stat-val">{{ step.pct }}%</div>
+          {% if step.drop is not None %}
+          <div class="funnel-stat-drop">-{{ step.drop }}%</div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
     </div>
   </div>
 
@@ -2064,32 +2079,105 @@ document.addEventListener('DOMContentLoaded', function() {
 {% endif %}
 
 <script>
-// Notification channel toggle (visual only — persisted in localStorage)
-function toggleNotifChannel(btn) {
-  btn.classList.toggle('active');
-  var channel = btn.dataset.channel;
-  var active = btn.classList.contains('active');
-  var stored = JSON.parse(localStorage.getItem('analytics_notif_channels') || '{}');
-  stored[channel] = active;
-  localStorage.setItem('analytics_notif_channels', JSON.stringify(stored));
-
-  // Show feedback
-  var label = active ? 'ativadas' : 'desativadas';
-  var name = btn.querySelector('span').textContent.trim();
-  var toast = document.createElement('div');
-  toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:10px 20px;background:var(--text-primary,#1e293b);color:#fff;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;transition:opacity .3s;';
-  toast.textContent = 'Notificações ' + name + ' ' + label;
-  document.body.appendChild(toast);
-  setTimeout(function() { toast.style.opacity = '0'; setTimeout(function() { toast.remove(); }, 300); }, 2000);
+// ── Notification channels (E-mail, Webhook) ──
+function _csrfToken() {
+  var m = document.cookie.match(/csrftoken=([^;]+)/);
+  return m ? m[1] : '';
 }
 
-// Restore notification channel state
-document.addEventListener('DOMContentLoaded', function() {
-  var stored = JSON.parse(localStorage.getItem('analytics_notif_channels') || '{}');
-  document.querySelectorAll('.notif-channel-btn').forEach(function(btn) {
-    if (stored[btn.dataset.channel]) btn.classList.add('active');
-  });
-});
+function _showToast(msg, isError) {
+  var toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:12px;font-size:13px;font-weight:600;z-index:9999;transition:opacity .3s;max-width:400px;text-align:center;' +
+    (isError ? 'background:#fee2e2;color:#dc2626;border:1px solid #fecaca;' : 'background:#1e293b;color:#fff;');
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(function() { toast.style.opacity = '0'; setTimeout(function() { toast.remove(); }, 300); }, 3500);
+}
+
+function toggleNotifChannel(btn) {
+  var channel = btn.dataset.channel;
+
+  if (channel === 'email') {
+    // Send insights email
+    btn.disabled = true;
+    btn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="animation:spin 1s linear infinite"><circle cx="12" cy="12" r="10" stroke-dasharray="30" stroke-dashoffset="10"/></svg> <span>Enviando...</span>';
+    fetch('/api/ai-send-email/', {
+      method: 'POST',
+      headers: {'X-CSRFToken': _csrfToken(), 'Content-Type': 'application/json'},
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.ok) {
+        btn.classList.add('active');
+        _showToast('E-mail enviado para ' + data.email + ' com ' + data.insights_count + ' insights — Oracli AI');
+      } else {
+        _showToast(data.error || 'Erro ao enviar', true);
+      }
+    })
+    .catch(function() { _showToast('Erro de conexão', true); })
+    .finally(function() {
+      btn.disabled = false;
+      btn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> <span>E-mail</span>';
+    });
+    return;
+  }
+
+  if (channel === 'webhook') {
+    // Open webhook data in new tab / copy URL
+    var url = '/api/ai-webhook/';
+    // Show a modal with the URL and a preview
+    btn.disabled = true;
+    fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.ok) {
+        _showToast(data.error || 'Sem dados', true);
+        return;
+      }
+      // Show webhook modal
+      var total = data.total || 0;
+      var webhookUrl = window.location.origin + url;
+      var modal = document.getElementById('webhookModal');
+      if (modal) {
+        document.getElementById('webhookUrl').value = webhookUrl;
+        document.getElementById('webhookPreview').textContent = JSON.stringify(data, null, 2);
+        document.getElementById('webhookCount').textContent = total + ' registros';
+        modal.style.display = 'flex';
+      } else {
+        // Fallback: copy URL
+        navigator.clipboard.writeText(webhookUrl);
+        _showToast('URL da API copiada: ' + webhookUrl);
+      }
+    })
+    .catch(function() { _showToast('Erro de conexão', true); })
+    .finally(function() { btn.disabled = false; });
+    return;
+  }
+
+  if (channel === 'whatsapp') {
+    btn.disabled = true;
+    btn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="animation:spin 1s linear infinite"><circle cx="12" cy="12" r="10" stroke-dasharray="30" stroke-dashoffset="10"/></svg> <span>Enviando...</span>';
+    fetch('/api/ai-send-whatsapp/', {
+      method: 'POST',
+      headers: {'X-CSRFToken': _csrfToken(), 'Content-Type': 'application/json'},
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.ok) {
+        btn.classList.add('active');
+        _showToast('Relatório enviado via WhatsApp para ' + data.phone + ' — Oracli AI');
+      } else {
+        _showToast(data.error || 'Erro ao enviar', true);
+      }
+    })
+    .catch(function() { _showToast('Erro de conexão', true); })
+    .finally(function() {
+      btn.disabled = false;
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347zM12.05 21.785h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.981.998-3.648-.235-.374A9.86 9.86 0 012.14 12.01C2.14 6.54 6.57 2.11 12.05 2.11a9.84 9.84 0 016.994 2.898A9.83 9.83 0 0121.94 12c-.003 5.47-4.433 9.9-9.89 9.9v-.115zM12.05.006C5.495.006.006 5.494.006 12.05a11.95 11.95 0 001.6 5.985L0 24l6.166-1.617a11.94 11.94 0 005.878 1.539h.005c6.557 0 11.946-5.49 11.95-12.044A11.94 11.94 0 0012.05.006z"/></svg> <span>WhatsApp</span>';
+    });
+    return;
+  }
+}
 </script>
 
 <!-- Executive Report Modal -->
@@ -2118,6 +2206,119 @@ document.addEventListener('DOMContentLoaded', function() {
 <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 
 <script>
+// ── Load AI insights asynchronously ──
+(function() {
+  var summaryBox = document.getElementById('ai-summary-box');
+  if (!summaryBox) return;
+
+  var dateFrom = document.getElementById('dateFrom');
+  var dateTo = document.getElementById('dateTo');
+  var params = new URLSearchParams();
+  if (dateFrom && dateFrom.value) params.set('date_from', dateFrom.value);
+  if (dateTo && dateTo.value) params.set('date_to', dateTo.value);
+
+  fetch('/api/ai-insights/?' + params.toString())
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var contentEl = document.getElementById('ai-summary-content');
+      if (!data.ok) {
+        contentEl.innerHTML = '<p style="margin:0;font-size:14px;color:var(--text-secondary);line-height:1.6;">Análise determinística ativa. ' + (data.error || '') + '</p>';
+        return;
+      }
+
+      // 1) Summary
+      if (data.executive_summary) {
+        contentEl.innerHTML = '<p style="margin:0;font-size:14px;color:var(--text-primary);line-height:1.6;">' + data.executive_summary + '</p>';
+      } else {
+        contentEl.innerHTML = '<p style="margin:0;font-size:14px;color:var(--text-secondary);">Análise concluída.</p>';
+      }
+
+      // 2) Override insights section
+      if (data.insights && data.insights.length > 0) {
+        var grid = document.querySelector('.insights-grid');
+        if (grid) {
+          var html = '';
+          data.insights.forEach(function(ins) {
+            var iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
+            if (ins.icon === 'trending-up') iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>';
+            else if (ins.icon === 'trending-down') iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>';
+            else if (ins.icon === 'dollar-sign') iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>';
+            else if (ins.icon === 'alert-triangle') iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+
+            html += '<div class="insight-card ' + (ins.type || 'info') + '" onclick="this.classList.toggle(\'expanded\')">'
+              + '<div class="insight-icon">' + iconSvg + '</div>'
+              + '<div class="insight-content">'
+              + '<div class="insight-title">' + (ins.title || '') + '</div>'
+              + '<div class="insight-text">' + (ins.text || '') + '</div>'
+              + '<div class="insight-expand">Ver detalhes <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="transition:transform .2s"><polyline points="6 9 12 15 18 9"/></svg></div>'
+              + '<div class="insight-detail"><strong>Gerado por Oracli AI:</strong> ' + (ins.text || '') + '</div>'
+              + '</div></div>';
+          });
+          grid.innerHTML = html;
+        }
+      }
+
+      // 3) Override alerts
+      if (data.alerts && data.alerts.length > 0) {
+        // Update counts
+        var critical = data.alerts.filter(function(a){ return a.severity === 'critical'; });
+        var warning = data.alerts.filter(function(a){ return a.severity === 'warning'; });
+        var info = data.alerts.filter(function(a){ return a.severity === 'info'; });
+
+        var wrap = document.querySelector('.al-wrap');
+        if (wrap) {
+          function buildAlertGroup(items, label, cls) {
+            if (!items.length) return '';
+            var h = '<div class="al-group" data-group="' + cls + '"><div class="al-group-header"><div class="al-group-label ' + cls + '"><span class="al-dot al-dot-' + cls + '"></span> ' + label + '</div><div class="al-group-count">' + items.length + ' alerta' + (items.length > 1 ? 's' : '') + '</div></div><div class="al-list">';
+            items.forEach(function(a) {
+              h += '<div class="al-card ' + cls + '" data-severity="' + cls + '"><div class="al-icon ' + cls + '"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><div class="al-body"><div class="al-head"><span class="al-card-title">' + (a.title || '') + '</span><span class="al-badge ' + cls + '">' + label + '</span></div><p class="al-text">' + (a.text || '') + '</p>';
+              if (a.impact_pct) h += '<div class="al-impact"><span class="al-impact-label">Impacto estimado</span><span class="al-impact-value">-' + a.impact_pct + '% em 7 dias</span></div>';
+              h += '</div></div>';
+            });
+            h += '</div></div>';
+            return h;
+          }
+          wrap.innerHTML = buildAlertGroup(critical, 'CRÍTICO', 'critical') + buildAlertGroup(warning, 'ATENÇÃO', 'warning') + buildAlertGroup(info, 'INFORMATIVO', 'info');
+        }
+
+        // Update pill counts
+        document.querySelectorAll('.al-pill').forEach(function(p) {
+          var f = p.dataset.filter;
+          var b = p.querySelector('b');
+          if (!b) return;
+          if (f === 'all') b.textContent = data.alerts.length;
+          else if (f === 'critical') b.textContent = critical.length;
+          else if (f === 'warning') b.textContent = warning.length;
+          else if (f === 'info') b.textContent = info.length;
+        });
+      }
+
+      // 4) Override recommendations
+      if (data.recommendations && data.recommendations.length > 0) {
+        var recList = document.querySelector('.recommendations-list');
+        if (recList) {
+          var rhtml = '';
+          data.recommendations.forEach(function(rec) {
+            var pri = rec.priority || 'medium';
+            rhtml += '<div class="rec-card priority-' + pri + '">'
+              + '<div class="rec-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>'
+              + '<div class="rec-content"><div class="rec-header"><span class="rec-title">' + (rec.title || '') + '</span><span class="rec-priority ' + pri + '">' + pri + '</span></div>'
+              + '<div class="rec-text">' + (rec.text || '') + '</div>';
+            if (rec.impact) rhtml += '<div class="rec-text" style="color:#065f46;">Impacto estimado: +' + rec.impact + '% conversões</div>';
+            if (rec.confidence) rhtml += '<div class="rec-text" style="color:#334155;">Confiança: ' + rec.confidence + '%</div>';
+            if (rec.action) rhtml += '<div class="rec-action"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg> ' + rec.action + '</div>';
+            rhtml += '</div></div>';
+          });
+          recList.innerHTML = rhtml;
+        }
+      }
+    })
+    .catch(function(err) {
+      var el = document.getElementById('ai-summary-content');
+      if (el) el.innerHTML = '<p style="margin:0;font-size:14px;color:var(--text-secondary);">Análise determinística ativa.</p>';
+    });
+})();
+
 function refreshAiStatus() {
   var pill = document.getElementById('ai-status-pill');
   if (!pill) return;
@@ -2206,7 +2407,37 @@ document.getElementById('reportModal').addEventListener('click', function(e) {
   if (e.target === this) closeReport();
 });
 document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') closeReport();
+  if (e.key === 'Escape') { closeReport(); var wm = document.getElementById('webhookModal'); if (wm) wm.style.display = 'none'; }
 });
 </script>
+
+<!-- Webhook Modal -->
+<div id="webhookModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;" onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:#fff;border-radius:16px;width:90%;max-width:680px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25);">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--border-color,#e2e8f0);">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <svg width="20" height="20" fill="none" stroke="#6366f1" stroke-width="2" viewBox="0 0 24 24"><path d="M10 13a5 5 0 017.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+        <span style="font-size:16px;font-weight:700;">Webhook API — Oracli AI</span>
+        <span id="webhookCount" style="font-size:12px;color:var(--text-secondary);font-weight:600;"></span>
+      </div>
+      <button onclick="document.getElementById('webhookModal').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-secondary);line-height:1;">&times;</button>
+    </div>
+    <div style="padding:20px 24px;overflow-y:auto;flex:1;">
+      <label style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px;">Endpoint URL</label>
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <input id="webhookUrl" readonly style="flex:1;padding:10px 14px;border:1px solid var(--border-color,#e2e8f0);border-radius:10px;font-size:13px;font-family:monospace;background:var(--surface,#f8fafc);color:var(--text-primary);">
+        <button onclick="navigator.clipboard.writeText(document.getElementById('webhookUrl').value);_showToast('URL copiada!')" style="padding:10px 16px;border-radius:10px;border:1px solid var(--accent,#6366f1);background:none;color:var(--accent,#6366f1);font-size:12px;font-weight:700;cursor:pointer;">Copiar</button>
+      </div>
+      <label style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px;">Preview do payload (JSON)</label>
+      <pre id="webhookPreview" style="background:#1e293b;color:#e2e8f0;padding:16px;border-radius:10px;font-size:12px;line-height:1.5;overflow-x:auto;max-height:320px;margin:0;"></pre>
+      <div style="margin-top:14px;padding:12px 16px;background:rgba(99,102,241,.05);border:1px solid rgba(99,102,241,.12);border-radius:10px;font-size:12px;color:var(--text-secondary);line-height:1.5;">
+        <strong style="color:var(--text-primary);">Como usar:</strong> Faça um GET autenticado para a URL acima. Os dados retornam em JSON com insights, alertas e recomendações gerados pela Oracli AI. Ideal para integração com Zapier, Make, n8n ou sistemas internos.
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
 {% endblock %}

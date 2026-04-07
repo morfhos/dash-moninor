@@ -96,6 +96,15 @@ else:
         }
     }
 
+# ── Cache (file-based to persist across server restarts) ──
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+        "LOCATION": str(BASE_DIR / ".cache"),
+        "TIMEOUT": 86400,  # 24h default
+    }
+}
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 8}},
@@ -108,7 +117,7 @@ _PRODUCTION = not DEBUG
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = _PRODUCTION
 SESSION_COOKIE_SAMESITE = "Lax"
-CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = False  # Must be False — JS reads csrftoken cookie for AJAX requests
 CSRF_COOKIE_SECURE = _PRODUCTION
 CSRF_COOKIE_SAMESITE = "Lax"
 SECURE_SSL_REDIRECT = os.environ.get("DJANGO_SECURE_SSL_REDIRECT", "false").lower() in ("1", "true")

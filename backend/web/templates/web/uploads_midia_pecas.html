@@ -22,13 +22,19 @@
 
   <section class="main-panel">
     {% if user_is_admin %}
-    <div class="actions-bar">
+    <div class="actions-bar" style="display:flex;gap:10px;">
       <button type="button" class="btn-nova-peca" id="btnNovaPeca">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="12" y1="5" x2="12" y2="19"></line>
           <line x1="5" y1="12" x2="19" y2="12"></line>
         </svg>
         Nova Peca
+      </button>
+      <button type="button" class="btn-nova-peca" id="btnBulkUpload" style="background:var(--accent,#6366f1);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        Upload Multiplo
       </button>
     </div>
 
@@ -811,6 +817,190 @@ document.addEventListener('DOMContentLoaded', function() {
     xhr.send(formData);
   }
 
+  // ── Bulk Upload Modal ──────────────────────────────────────────
+  const pieces = [
+    {% for item in pieces_data %}
+    {id:{{ item.piece.id }}, code:"{{ item.piece.code|escapejs }}", title:"{{ item.piece.title|escapejs }}"},
+    {% endfor %}
+  ];
+
+  const bulkBtn = document.getElementById('btnBulkUpload');
+  if (bulkBtn) {
+    bulkBtn.addEventListener('click', function() {
+      document.getElementById('bulkModal').style.display = 'flex';
+    });
+  }
+
+  window.closeBulkModal = function() {
+    document.getElementById('bulkModal').style.display = 'none';
+    document.getElementById('bulkFilesList').innerHTML = '';
+    document.getElementById('bulkDropInput').value = '';
+    document.getElementById('bulkSendBtn').style.display = 'none';
+  };
+
+  // Normalize accents for matching
+  function stripAccents(s) {
+    return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+  function normStr(s) {
+    return stripAccents(s.toLowerCase()).replace(/[_\-\.]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  window.handleBulkFiles = function(fileList) {
+    const list = document.getElementById('bulkFilesList');
+    const sendBtn = document.getElementById('bulkSendBtn');
+    list.innerHTML = '';
+    if (!fileList.length) { sendBtn.style.display = 'none'; return; }
+
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      const nameNorm = normStr(file.name.replace(/\.(mp4|mov|avi|mkv|webm|mp3|wav|aac|ogg|jpg|jpeg|png|gif|webp|svg|zip|html?)$/i, ''));
+
+      // Try to auto-match
+      let matchedId = '';
+      let matchScore = 0;
+      pieces.forEach(function(p) {
+        const codeNorm = normStr(p.code);
+        const titleNorm = normStr(p.title);
+
+        // 1. Code contained in filename
+        if (codeNorm.length > 1 && nameNorm.indexOf(codeNorm) !== -1 && codeNorm.length > matchScore) {
+          matchedId = p.id;
+          matchScore = codeNorm.length + 100; // high priority for code match
+        }
+        // 2. Title contained in filename
+        if (titleNorm.length > 2 && nameNorm.indexOf(titleNorm) !== -1 && titleNorm.length + 50 > matchScore) {
+          matchedId = p.id;
+          matchScore = titleNorm.length + 50;
+        }
+        // 3. Key words from title found in filename (e.g. "jornal" in "veiculacao-jornal.mp4" matches "Veiculação Jornal")
+        var titleWords = titleNorm.split(/\s+/).filter(function(w){ return w.length > 2; });
+        var nameWords = nameNorm.split(/\s+/);
+        var overlap = titleWords.filter(function(tw){
+          return nameWords.some(function(nw){ return nw.indexOf(tw) !== -1 || tw.indexOf(nw) !== -1; });
+        }).length;
+        var overlapScore = overlap * 10;
+        if (overlap >= 1 && titleWords.length <= 3 && overlap === titleWords.length && overlapScore > matchScore) {
+          // All title words found = strong match
+          matchedId = p.id;
+          matchScore = overlapScore + 30;
+        } else if (overlap >= 2 && overlapScore > matchScore) {
+          matchedId = p.id;
+          matchScore = overlapScore;
+        }
+      });
+
+      // File type icon
+      var ext = file.name.split('.').pop().toLowerCase();
+      var typeIcon = '📄';
+      if (['mp4','mov','avi','mkv','webm'].indexOf(ext) !== -1) typeIcon = '🎬';
+      else if (['mp3','wav','aac','ogg'].indexOf(ext) !== -1) typeIcon = '🎵';
+      else if (['jpg','jpeg','png','gif','webp','svg'].indexOf(ext) !== -1) typeIcon = '🖼';
+
+      var size = file.size < 1048576 ? (file.size/1024).toFixed(0) + ' KB' : (file.size/1048576).toFixed(1) + ' MB';
+
+      var row = document.createElement('div');
+      row.className = 'bulk-file-row';
+      row.dataset.index = i;
+      row.innerHTML = '<div class="bulk-file-info">'
+        + '<span class="bulk-file-icon">' + typeIcon + '</span>'
+        + '<div class="bulk-file-name">'
+        + '<strong>' + file.name + '</strong>'
+        + '<span class="bulk-file-size">' + size + '</span>'
+        + '</div></div>'
+        + '<div class="bulk-file-match">'
+        + '<select class="bulk-piece-select" data-file-idx="' + i + '">'
+        + '<option value="">-- Selecionar peca --</option>'
+        + pieces.map(function(p){ return '<option value="' + p.id + '"' + (p.id == matchedId ? ' selected' : '') + '>' + p.code + ' - ' + p.title + '</option>'; }).join('')
+        + '</select>'
+        + (matchedId ? '<span class="bulk-match-badge">Auto</span>' : '<span class="bulk-nomatch-badge">Manual</span>')
+        + '</div>';
+      list.appendChild(row);
+    }
+    sendBtn.style.display = 'flex';
+  };
+
+  window.sendBulkUpload = function() {
+    const list = document.getElementById('bulkFilesList');
+    const fileInput = document.getElementById('bulkDropInput');
+    const files = fileInput.files;
+    const rows = list.querySelectorAll('.bulk-file-row');
+    const sendBtn = document.getElementById('bulkSendBtn');
+    const progressEl = document.getElementById('bulkProgress');
+
+    // Group files by piece_id
+    var groups = {};
+    var unmatched = [];
+    rows.forEach(function(row) {
+      var idx = parseInt(row.dataset.index);
+      var sel = row.querySelector('.bulk-piece-select');
+      var pieceId = sel ? sel.value : '';
+      if (!pieceId) {
+        unmatched.push(files[idx].name);
+        return;
+      }
+      if (!groups[pieceId]) groups[pieceId] = [];
+      groups[pieceId].push(files[idx]);
+    });
+
+    if (unmatched.length > 0) {
+      if (!confirm('Os seguintes arquivos nao foram associados a nenhuma peca e serao ignorados:\n\n' + unmatched.join('\n') + '\n\nDeseja continuar?')) return;
+    }
+
+    var pieceIds = Object.keys(groups);
+    if (!pieceIds.length) { showToast('Nenhum arquivo associado.', 'error'); return; }
+
+    sendBtn.disabled = true;
+    sendBtn.textContent = 'Enviando...';
+    progressEl.style.display = 'block';
+
+    var totalFiles = pieceIds.reduce(function(sum, pid) { return sum + groups[pid].length; }, 0);
+    var uploaded = 0;
+    var errors = 0;
+
+    function updateProgress() {
+      var pct = Math.round((uploaded / totalFiles) * 100);
+      progressEl.querySelector('.progress-fill').style.width = pct + '%';
+      progressEl.querySelector('.progress-text').textContent = uploaded + '/' + totalFiles + ' enviados';
+    }
+
+    function uploadNext(idx) {
+      if (idx >= pieceIds.length) {
+        // Done
+        showToast(uploaded + ' arquivo(s) enviado(s)!' + (errors > 0 ? ' (' + errors + ' erros)' : ''), errors > 0 ? 'error' : 'success');
+        setTimeout(function() { location.reload(); }, 800);
+        return;
+      }
+      var pid = pieceIds[idx];
+      var fd = new FormData();
+      groups[pid].forEach(function(f) { fd.append('files', f); });
+
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/pieces/' + pid + '/upload/');
+      xhr.setRequestHeader('X-CSRFToken', csrfToken);
+      xhr.upload.onprogress = function(e) {
+        if (e.lengthComputable) updateProgress();
+      };
+      xhr.onload = function() {
+        if (xhr.status === 200) {
+          var resp = JSON.parse(xhr.responseText);
+          uploaded += resp.created || groups[pid].length;
+        } else {
+          errors += groups[pid].length;
+        }
+        updateProgress();
+        uploadNext(idx + 1);
+      };
+      xhr.onerror = function() {
+        errors += groups[pid].length;
+        updateProgress();
+        uploadNext(idx + 1);
+      };
+      xhr.send(fd);
+    }
+    uploadNext(0);
+  };
+
   dropZones.forEach(dropZone => {
     const pieceId = dropZone.dataset.pieceId;
     const fileInput = dropZone.querySelector('.file-input');
@@ -840,4 +1030,80 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 </script>
+<!-- ══════════════════════════════════════════════════ -->
+<!-- BULK UPLOAD MODAL                                  -->
+<!-- ══════════════════════════════════════════════════ -->
+<div id="bulkModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;" onclick="if(event.target===this)closeBulkModal()">
+  <div style="background:#fff;border-radius:16px;width:92%;max-width:800px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25);">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--border-color,#e2e8f0);">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <svg width="20" height="20" fill="none" stroke="var(--accent,#6366f1)" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <span style="font-size:16px;font-weight:700;">Upload Multiplo</span>
+        <span style="font-size:12px;color:var(--text-secondary);font-weight:500;">Envie varios arquivos de uma vez</span>
+      </div>
+      <button onclick="closeBulkModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-secondary);line-height:1;">&times;</button>
+    </div>
+    <div style="padding:20px 24px;overflow-y:auto;flex:1;">
+
+      <!-- Drop zone -->
+      <div id="bulkDropZone"
+        style="border:2px dashed var(--border,#e2e8f0);border-radius:14px;padding:32px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:16px;"
+        onclick="document.getElementById('bulkDropInput').click()"
+        ondragover="event.preventDefault();this.style.borderColor='var(--accent,#6366f1)';this.style.background='rgba(99,102,241,.04)'"
+        ondragleave="this.style.borderColor='var(--border,#e2e8f0)';this.style.background='none'"
+        ondrop="event.preventDefault();this.style.borderColor='var(--border,#e2e8f0)';this.style.background='none';document.getElementById('bulkDropInput').files=event.dataTransfer.files;handleBulkFiles(event.dataTransfer.files)">
+        <svg width="40" height="40" fill="none" stroke="var(--text-secondary)" stroke-width="1.5" viewBox="0 0 24 24" style="margin-bottom:10px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <p style="margin:0;font-size:14px;font-weight:600;color:var(--text-primary);">Arraste videos, audios e imagens aqui</p>
+        <p style="margin:4px 0 0;font-size:12px;color:var(--text-secondary);">ou clique para selecionar</p>
+      </div>
+      <input type="file" id="bulkDropInput" multiple accept="video/*,audio/*,image/*,.zip" style="display:none;" onchange="handleBulkFiles(this.files)">
+
+      <!-- Files list -->
+      <div id="bulkFilesList" style="display:flex;flex-direction:column;gap:8px;"></div>
+
+      <!-- Progress -->
+      <div id="bulkProgress" style="display:none;margin-top:16px;">
+        <div style="height:8px;background:var(--border,#e2e8f0);border-radius:4px;overflow:hidden;">
+          <div class="progress-fill" style="height:100%;background:var(--accent,#6366f1);border-radius:4px;width:0%;transition:width .3s;"></div>
+        </div>
+        <span class="progress-text" style="font-size:12px;color:var(--text-secondary);font-weight:600;margin-top:4px;display:block;"></span>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:14px 24px;border-top:1px solid var(--border-color,#e2e8f0);background:#f8fafc;border-radius:0 0 16px 16px;">
+      <button type="button" onclick="closeBulkModal()" style="padding:8px 18px;border:1px solid var(--border,#e2e8f0);border-radius:10px;background:none;font-size:13px;font-weight:600;cursor:pointer;color:var(--text-secondary);">Cancelar</button>
+      <button type="button" id="bulkSendBtn" onclick="sendBulkUpload()" style="display:none;padding:8px 20px;border:none;border-radius:10px;background:var(--accent,#6366f1);color:#fff;font-size:13px;font-weight:700;cursor:pointer;align-items:center;gap:6px;">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Enviar todos
+      </button>
+    </div>
+  </div>
+</div>
+<style>
+.bulk-file-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 10px 14px;
+  background: var(--surface,#f8fafc); border: 1px solid var(--border,#e2e8f0);
+  border-radius: 10px;
+}
+.bulk-file-info { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.bulk-file-icon { font-size: 20px; flex-shrink: 0; }
+.bulk-file-name { min-width: 0; }
+.bulk-file-name strong { display: block; font-size: 13px; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
+.bulk-file-size { font-size: 11px; color: var(--text-secondary); }
+.bulk-file-match { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.bulk-piece-select {
+  padding: 6px 10px; border: 1px solid var(--border,#e2e8f0); border-radius: 8px;
+  font-size: 12px; background: #fff; color: var(--text-primary);
+  max-width: 240px; cursor: pointer;
+}
+.bulk-piece-select:focus { border-color: var(--accent,#6366f1); outline: none; }
+.bulk-match-badge {
+  padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 700;
+  background: rgba(34,197,94,.1); color: #16a34a; text-transform: uppercase;
+}
+.bulk-nomatch-badge {
+  padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 700;
+  background: rgba(245,158,11,.1); color: #d97706; text-transform: uppercase;
+}
+</style>
 {% endblock %}

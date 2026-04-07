@@ -17,7 +17,9 @@
       "Bash(grep -E \"html$\")",
       "Bash(grep -n \"load humanize\" /c/projetos/monitor/dashmonitor/backend/web/templates/web/*.html)",
       "Bash(pip list:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(C:UsersMarcioanaconda3python.exe -m pip install anthropic)",
+      "Bash(\"C:/Users/Marcio/anaconda3/python.exe\" -m pip install anthropic)"
     ]
   }
 }

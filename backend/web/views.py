@@ -1013,27 +1013,34 @@ def veiculacao(request: HttpRequest, platform: str = "all") -> HttpResponse:
     google_channels = ["google", "youtube", "display", "search"]
     meta_channels = ["meta"]
 
-    if platform == "google":
-        channels = google_channels
-        page_title = "Google Ads"
-        active_key = "veiculacao_google"
-        table_title = "Campanhas Google Ads"
-        empty_msg = "Conecte sua conta do Google Ads para visualizar campanhas, impressoes, cliques e investimento."
-    elif platform == "meta":
-        channels = meta_channels
-        page_title = "Meta Ads"
-        active_key = "veiculacao_meta"
-        table_title = "Campanhas Meta Ads"
-        empty_msg = "Conecte sua conta do Meta Ads para visualizar campanhas, impressoes, cliques e investimento."
+    # Map of platform slug → (channels, page_title, table_title)
+    platform_config = {
+        "google": (google_channels, "Google Ads", "Campanhas Google Ads"),
+        "meta": (meta_channels, "Meta Ads", "Campanhas Meta Ads"),
+        "tiktok": (["tiktok"], "TikTok Ads", "Campanhas TikTok"),
+        "linkedin": (["linkedin"], "LinkedIn Ads", "Campanhas LinkedIn"),
+        "dv360": (["dv360"], "DV360", "Campanhas DV360"),
+        "dv360_youtube": (["dv360_youtube"], "DV360 YouTube", "Campanhas DV360 YouTube"),
+        "dv360_spotify": (["dv360_spotify"], "DV360 Spotify", "Campanhas DV360 Spotify"),
+        "dv360_eletromidia": (["dv360_eletromid"], "DV360 Eletromidia", "Campanhas DV360 Eletromidia"),
+        "dv360_netflix": (["dv360_netflix"], "DV360 Netflix", "Campanhas DV360 Netflix"),
+        "dv360_globoplay": (["dv360_globoplay"], "DV360 Globoplay", "Campanhas DV360 Globoplay"),
+        "dv360_admooh": (["dv360_admooh"], "DV360 AdMooh", "Campanhas DV360 AdMooh"),
+    }
+
+    if platform in platform_config:
+        channels, page_title, table_title = platform_config[platform]
+        active_key = f"veiculacao_{platform}"
+        empty_msg = f"Nenhum dado de {page_title} encontrado. Importe dados ou conecte uma conta."
     else:
-        channels = google_channels + meta_channels
-        page_title = "Veiculação"
+        channels = google_channels + meta_channels + ["tiktok", "linkedin", "dv360", "dv360_youtube", "dv360_spotify", "dv360_eletromid", "dv360_netflix", "dv360_globoplay", "dv360_admooh"]
+        page_title = "Veiculacao"
         active_key = "veiculacao"
         table_title = "Campanhas Digitais"
-        empty_msg = "Conecte sua conta do Google Ads ou Meta Ads para visualizar campanhas, impressoes, cliques e investimento."
+        empty_msg = "Conecte suas contas ou importe dados para visualizar campanhas."
 
     # Platform-specific pages require a client to be selected
-    require_cliente = (platform in ("google", "meta")) and not cliente_id
+    require_cliente = (platform != "all") and not cliente_id
     if require_cliente:
         return render(
             request,
@@ -1052,12 +1059,20 @@ def veiculacao(request: HttpRequest, platform: str = "all") -> HttpResponse:
         gads_qs = gads_qs.filter(cliente_id=cliente_id)
         mads_qs = mads_qs.filter(cliente_id=cliente_id)
 
+    # For API-connected platforms, check accounts; for imported data, check if lines exist
     if platform == "google":
         has_accounts = gads_qs.exists()
     elif platform == "meta":
         has_accounts = mads_qs.exists()
     else:
         has_accounts = gads_qs.exists() or mads_qs.exists()
+
+    # Also check if there are placement lines with data (for imported channels)
+    if not has_accounts:
+        imported_lines = PlacementLine.objects.filter(media_channel__in=channels)
+        if cliente_id:
+            imported_lines = imported_lines.filter(campaign__cliente_id=cliente_id)
+        has_accounts = imported_lines.exists()
 
     # Fetch placement data
     lines_qs = PlacementLine.objects.filter(media_channel__in=channels)
@@ -1085,6 +1100,9 @@ def veiculacao(request: HttpRequest, platform: str = "all") -> HttpResponse:
     total_clicks = stats["total_clicks"] or 0
     total_cost = stats["total_cost"] or 0
     ctr = (total_clicks / total_impressions * 100) if total_impressions > 0 else 0
+    cpm = (float(total_cost) / total_impressions * 1000) if total_impressions > 0 else 0
+    # Alcance estimado: unique reach ~ impressions / avg frequency (est. 3.5)
+    alcance = int(total_impressions / 3.5) if total_impressions > 0 else 0
 
     # Campaigns table: per-PlacementLine aggregation
     # Pre-fetch piece counts per campaign to avoid N+1 queries
@@ -1181,6 +1199,8 @@ def veiculacao(request: HttpRequest, platform: str = "all") -> HttpResponse:
             "total_clicks": total_clicks,
             "total_cost": total_cost,
             "ctr": round(ctr, 2),
+            "cpm": round(cpm, 2),
+            "alcance": alcance,
             "campaigns_data": campaigns_data,
             "chart_labels_json": json.dumps(chart_labels),
             "chart_impressions_json": json.dumps(chart_impressions),
@@ -1228,7 +1248,8 @@ def dashon(request: HttpRequest) -> HttpResponse:
     # Digital channels
     google_channels = ["google", "youtube", "display", "search"]
     meta_channels = ["meta"]
-    all_channels = google_channels + meta_channels
+    other_digital = ["tiktok", "linkedin", "dv360", "dv360_youtube", "dv360_spotify", "dv360_eletromid", "dv360_netflix", "dv360_globoplay", "dv360_admooh"]
+    all_channels = google_channels + meta_channels + other_digital
 
     lines_qs = PlacementLine.objects.filter(media_channel__in=all_channels)
     if cliente_id:
@@ -1257,9 +1278,88 @@ def dashon(request: HttpRequest) -> HttpResponse:
     total_cost = float(stats["total_cost"] or 0)
     ctr = round((total_clicks / total_impressions * 100), 2) if total_impressions > 0 else 0
     cpc = round((total_cost / total_clicks), 2) if total_clicks > 0 else 0
+    dashon_cpm = round((total_cost / total_impressions * 1000), 2) if total_impressions > 0 else 0
+    dashon_alcance = int(total_impressions / 3.5) if total_impressions > 0 else 0
     active_campaigns = lines_qs.filter(
         id__in=days_qs.values_list("placement_line_id", flat=True).distinct()
     ).count()
+
+    # ── Period comparison ──
+    # compare=on  → user toggled the comparison switch
+    # compare_from / compare_to → optional custom comparison dates
+    compare_on = request.GET.get("compare", "") == "on"
+    compare_from = request.GET.get("compare_from", "")
+    compare_to = request.GET.get("compare_to", "")
+
+    dashon_comparison = None
+    def _pct(curr, prev):
+        return round(((curr - prev) / prev) * 100, 1) if prev else None
+
+    if compare_on:
+        try:
+            # Custom comparison range takes priority
+            if compare_from and compare_to:
+                prev_start = datetime.strptime(compare_from, "%Y-%m-%d").date()
+                prev_end = datetime.strptime(compare_to, "%Y-%m-%d").date()
+            elif date_from and date_to:
+                # Auto: same-length period right before the selected range
+                p_start = datetime.strptime(date_from, "%Y-%m-%d").date()
+                p_end = datetime.strptime(date_to, "%Y-%m-%d").date()
+                p_len = (p_end - p_start).days + 1
+                prev_end = p_start - timedelta(days=1)
+                prev_start = prev_end - timedelta(days=p_len - 1)
+            else:
+                # No date filter: last 30 days vs prior 30
+                from datetime import date as _d
+                p_end = _d.today()
+                p_start = p_end - timedelta(days=29)
+                p_len = 30
+                prev_end = p_start - timedelta(days=1)
+                prev_start = prev_end - timedelta(days=p_len - 1)
+
+            prev_qs = PlacementDay.objects.filter(
+                placement_line_id__in=line_ids, date__gte=prev_start, date__lte=prev_end,
+            )
+            prev_stats = prev_qs.aggregate(imp=Sum("impressions"), clk=Sum("clicks"), cst=Sum("cost"))
+            prev_imp = prev_stats["imp"] or 0
+            prev_clk = prev_stats["clk"] or 0
+            prev_cost = float(prev_stats["cst"] or 0)
+            prev_ctr = round((prev_clk / prev_imp * 100), 2) if prev_imp > 0 else 0
+            prev_cpc = round((prev_cost / prev_clk), 2) if prev_clk > 0 else 0
+            dashon_comparison = {
+                "imp_change": _pct(total_impressions, prev_imp),
+                "clk_change": _pct(total_clicks, prev_clk),
+                "ctr_change": _pct(ctr, prev_ctr),
+                "cost_change": _pct(total_cost, prev_cost),
+                "cpc_change": _pct(cpc, prev_cpc),
+                "prev_start": prev_start.strftime("%d/%m"),
+                "prev_end": prev_end.strftime("%d/%m"),
+                "period_label": f"{prev_start.strftime('%d/%m')} - {prev_end.strftime('%d/%m')}",
+                # Raw dates for re-populating the form
+                "prev_start_iso": prev_start.strftime("%Y-%m-%d"),
+                "prev_end_iso": prev_end.strftime("%Y-%m-%d"),
+                # Previous totals for the summary bar
+                "prev_impressions": prev_imp,
+                "prev_clicks": prev_clk,
+                "prev_cost": round(prev_cost, 2),
+                "prev_ctr": prev_ctr,
+                "prev_cpc": prev_cpc,
+            }
+        except (ValueError, TypeError, ZeroDivisionError):
+            pass
+
+    # ── Campaign live status ──
+    from datetime import date as _date_cls
+    today = _date_cls.today()
+    recent_days = PlacementDay.objects.filter(
+        placement_line_id__in=line_ids, date__gte=today - timedelta(days=3),
+    )
+    live_line_ids = set(recent_days.values_list("placement_line_id", flat=True).distinct())
+    campaigns_on = len(live_line_ids)
+    campaigns_total = len(set(days_qs.values_list("placement_line_id", flat=True).distinct()))
+    campaigns_off = campaigns_total - campaigns_on
+
+    # (problem_campaigns and projections moved after campaigns_data is built)
 
     # ── Per-platform stats ──
     google_line_ids = list(lines_qs.filter(media_channel__in=google_channels).values_list("id", flat=True))
@@ -1331,8 +1431,11 @@ def dashon(request: HttpRequest) -> HttpResponse:
             continue
         line_ctr = round((clk / imp * 100), 2) if imp > 0 else 0
         line_cpc = round((cst / clk), 2) if clk > 0 else 0
+        line_roi = round((clk / cst), 2) if cst > 0 else 0
+        line_cpm = round((cst / imp * 1000), 2) if imp > 0 else 0
         platform = "Meta Ads" if line.media_channel in meta_channels else "Google Ads"
         campaigns_data.append({
+            "id": line.id,
             "name": line.channel or line.property_text or f"Campaign #{line.external_ref}",
             "client": line.campaign.cliente.nome if line.campaign else "",
             "platform": platform,
@@ -1341,6 +1444,8 @@ def dashon(request: HttpRequest) -> HttpResponse:
             "ctr": line_ctr,
             "cost": round(cst, 2),
             "cpc": line_cpc,
+            "roi": line_roi,
+            "cpm": line_cpm,
         })
     campaigns_data.sort(key=lambda c: c["cost"], reverse=True)
 
@@ -1376,6 +1481,19 @@ def dashon(request: HttpRequest) -> HttpResponse:
             "roi": ch_roi,
         })
 
+    # ── Problem campaigns & projections (needs campaigns_data) ──
+    problem_campaigns = []
+    for c in campaigns_data:
+        if c["cost"] > 0 and c["ctr"] < 1.0:
+            problem_campaigns.append(c["name"])
+
+    days_in_period = max(1, len(set(d["date"] for d in days_qs.values("date"))))
+    daily_avg_cost = total_cost / days_in_period if days_in_period > 0 else 0
+    days_left_month = 30 - today.day
+    projected_monthly_cost = round(total_cost + (daily_avg_cost * max(0, days_left_month)), 2)
+    projected_monthly_clicks = int(total_clicks + ((total_clicks / days_in_period) * max(0, days_left_month))) if days_in_period > 0 else 0
+    projected_roi = round(projected_monthly_clicks / projected_monthly_cost, 2) if projected_monthly_cost > 0 else 0
+
     # ── Top campaigns by ROI (clicks / cost) ───────────────────────
     top_roi = []
     for c in campaigns_data:
@@ -1392,6 +1510,129 @@ def dashon(request: HttpRequest) -> HttpResponse:
     ) if total_roi_campaigns else 0
     total_roi = round(total_clicks / total_cost, 2) if total_cost > 0 else 0
 
+    # ── Smart Insights (deterministic) ──────────────────────────────
+    smart_insights = []
+    # Best and worst campaigns
+    if campaigns_data:
+        best_camp = max(campaigns_data, key=lambda c: c.get("roi", 0))
+        if best_camp.get("roi", 0) > 0:
+            smart_insights.append({
+                "type": "positive",
+                "icon": "trophy",
+                "title": f"Melhor campanha: \"{best_camp['name'][:40]}\"",
+                "text": f"ROI de {best_camp['roi']} cliques/R$ com CTR de {best_camp['ctr']}%",
+            })
+        worst_ctr = [c for c in campaigns_data if c["cost"] > 10]
+        if worst_ctr:
+            worst_camp = min(worst_ctr, key=lambda c: c["ctr"])
+            if worst_camp["ctr"] < 2.0:
+                smart_insights.append({
+                    "type": "warning",
+                    "icon": "alert",
+                    "title": f"CTR baixo: \"{worst_camp['name'][:40]}\"",
+                    "text": f"CTR de apenas {worst_camp['ctr']}% — considere revisar criativos ou segmentacao",
+                })
+        # Highest CPC
+        high_cpc = max(campaigns_data, key=lambda c: c.get("cpc", 0))
+        if high_cpc.get("cpc", 0) > cpc * 1.5 and cpc > 0:
+            smart_insights.append({
+                "type": "negative",
+                "icon": "trending-up",
+                "title": f"CPC elevado: \"{high_cpc['name'][:40]}\"",
+                "text": f"R$ {high_cpc['cpc']:.2f} por clique — {round(high_cpc['cpc']/cpc*100-100)}% acima da media geral",
+            })
+    # CTR trend vs previous period
+    if dashon_comparison and dashon_comparison.get("ctr_change") is not None:
+        ctr_ch = dashon_comparison["ctr_change"]
+        if ctr_ch < -10:
+            smart_insights.append({
+                "type": "negative",
+                "icon": "trending-down",
+                "title": f"CTR caiu {ctr_ch}% vs periodo anterior",
+                "text": "Revise os criativos e segmentacao das campanhas com queda",
+            })
+        elif ctr_ch > 10:
+            smart_insights.append({
+                "type": "positive",
+                "icon": "trending-up",
+                "title": f"CTR subiu +{ctr_ch}% vs periodo anterior",
+                "text": "Bom desempenho — mantenha a estrategia atual",
+            })
+    # CPC trend
+    if dashon_comparison and dashon_comparison.get("cpc_change") is not None:
+        cpc_ch = dashon_comparison["cpc_change"]
+        if cpc_ch > 15:
+            smart_insights.append({
+                "type": "warning",
+                "icon": "dollar",
+                "title": f"CPC aumentou +{cpc_ch}% vs periodo anterior",
+                "text": f"CPC atual R$ {cpc:.2f} — considere ajustar lances",
+            })
+    # Reallocation recommendation
+    if len(campaigns_data) >= 2:
+        with_roi = [c for c in campaigns_data if c.get("roi", 0) > 0]
+        if len(with_roi) >= 2:
+            best_r = max(with_roi, key=lambda c: c["roi"])
+            worst_r = min(with_roi, key=lambda c: c["roi"])
+            if best_r["roi"] > worst_r["roi"] * 2:
+                realloc = min(round(worst_r["cost"] * 0.2, 2), 500)
+                smart_insights.append({
+                    "type": "info",
+                    "icon": "shuffle",
+                    "title": f"Realocar R$ {realloc:.0f} de \"{worst_r['name'][:25]}\"",
+                    "text": f"Para \"{best_r['name'][:25]}\" que tem ROI {best_r['roi']}x vs {worst_r['roi']}x",
+                })
+
+    # ── Ad-level drill-down data ──────────────────────────────
+    from campaigns.models import AdGroup, AdGroupDay, Ad, AdDay
+    ads_by_campaign = {}
+    for c in campaigns_data[:20]:  # limit to top 20 campaigns
+        line_id = c["id"]
+        ad_groups = AdGroup.objects.filter(placement_line_id=line_id).select_related("placement_line")
+        campaign_ads = []
+        for ag in ad_groups:
+            ag_days = AdGroupDay.objects.filter(ad_group=ag)
+            if date_from:
+                ag_days = ag_days.filter(date__gte=date_from)
+            if date_to:
+                ag_days = ag_days.filter(date__lte=date_to)
+            agg = ag_days.aggregate(imp=Sum("impressions"), clk=Sum("clicks"), cst=Sum("cost"))
+            a_imp = agg["imp"] or 0
+            a_clk = agg["clk"] or 0
+            a_cst = float(agg["cst"] or 0)
+            if a_imp == 0 and a_clk == 0:
+                continue
+            campaign_ads.append({
+                "name": ag.name,
+                "type": "Ad Group",
+                "status": ag.status,
+                "impressions": a_imp,
+                "clicks": a_clk,
+                "ctr": round((a_clk / a_imp * 100), 2) if a_imp > 0 else 0,
+                "cost": round(a_cst, 2),
+                "cpc": round((a_cst / a_clk), 2) if a_clk > 0 else 0,
+            })
+        if campaign_ads:
+            ads_by_campaign[str(line_id)] = campaign_ads
+
+    # ── Daily breakdown per campaign for drill-down chart ──
+    campaign_daily = {}
+    for c in campaigns_data[:10]:
+        line_id = c["id"]
+        daily = list(
+            days_qs.filter(placement_line_id=line_id)
+            .values("date")
+            .annotate(imp=Sum("impressions"), clk=Sum("clicks"), cst=Sum("cost"))
+            .order_by("date")
+        )
+        if daily:
+            campaign_daily[str(line_id)] = {
+                "labels": [str(d["date"]) for d in daily],
+                "impressions": [d["imp"] or 0 for d in daily],
+                "clicks": [d["clk"] or 0 for d in daily],
+                "cost": [float(d["cst"] or 0) for d in daily],
+            }
+
     return render(
         request,
         "web/dashon.html",
@@ -1401,12 +1642,17 @@ def dashon(request: HttpRequest) -> HttpResponse:
             "has_accounts": has_accounts,
             "date_from": date_from,
             "date_to": date_to,
+            "compare_on": compare_on,
+            "compare_from": compare_from,
+            "compare_to": compare_to,
             # Global stats
             "total_impressions": total_impressions,
             "total_clicks": total_clicks,
             "total_cost": round(total_cost, 2),
             "ctr": ctr,
             "cpc": cpc,
+            "cpm": dashon_cpm,
+            "alcance": dashon_alcance,
             "active_campaigns": active_campaigns,
             # Platform stats
             "google": google_platform,
@@ -1429,6 +1675,276 @@ def dashon(request: HttpRequest) -> HttpResponse:
             "top_roi": top_roi,
             "avg_roi": avg_roi,
             "total_roi": total_roi,
+            # Period comparison
+            "comparison": dashon_comparison,
+            # Live status
+            "campaigns_on": campaigns_on,
+            "campaigns_off": campaigns_off,
+            "problem_campaigns": problem_campaigns,
+            # Projections
+            "daily_avg_cost": round(daily_avg_cost, 2),
+            "projected_monthly_cost": projected_monthly_cost,
+            "projected_monthly_clicks": projected_monthly_clicks,
+            "projected_roi": projected_roi,
+            # Smart insights
+            "smart_insights": smart_insights,
+            # Ad-level drill-down
+            "ads_by_campaign_json": json.dumps(ads_by_campaign),
+            "campaign_daily_json": json.dumps(campaign_daily),
+            # Business KPIs (estimated - no conversion model yet)
+            "total_roas": round(total_clicks * 0.05 / total_cost, 2) if total_cost > 0 else 0,  # estimated
+            "cost_per_lead": round(total_cost / max(total_clicks * 0.03, 1), 2),  # est 3% conv rate
+            "days_in_period": days_in_period,
+        },
+    )
+
+
+@login_required
+def consolidated_on(request: HttpRequest) -> HttpResponse:
+    """Consolidated ON – KPIs consolidados de todas as mídias digitais, por veículo."""
+    from collections import defaultdict
+
+    role = effective_role(request)
+    cliente_id = effective_cliente_id(request)
+    if not cliente_id and is_admin(request.user):
+        cliente_id = selected_cliente_id(request)
+
+    if not cliente_id:
+        return render(request, "web/consolidated_on.html", {
+            "active": "consolidated_on",
+            "page_title": "Consolidated ON",
+            "require_cliente": True,
+        })
+
+    # All digital channels
+    all_channels = [
+        "google", "youtube", "display", "search", "meta",
+        "tiktok", "linkedin", "dv360", "dv360_youtube", "dv360_spotify",
+        "dv360_eletromid", "dv360_netflix", "dv360_globoplay", "dv360_admooh",
+    ]
+
+    # Human-readable labels and colors for each channel group
+    channel_groups = {
+        "google": {"label": "Google Ads", "channels": ["google", "youtube", "display", "search"], "color": "#FBBC04", "gradient": "linear-gradient(135deg,#FBBC04,#EA4335)"},
+        "meta": {"label": "Meta Ads", "channels": ["meta"], "color": "#1877F2", "gradient": "linear-gradient(135deg,#1877F2,#0d65d9)"},
+        "tiktok": {"label": "TikTok", "channels": ["tiktok"], "color": "#000000", "gradient": "linear-gradient(135deg,#25F4EE,#FE2C55)"},
+        "linkedin": {"label": "LinkedIn", "channels": ["linkedin"], "color": "#0A66C2", "gradient": "linear-gradient(135deg,#0A66C2,#004182)"},
+        "dv360_youtube": {"label": "DV360 YouTube", "channels": ["dv360_youtube"], "color": "#FF0000", "gradient": "linear-gradient(135deg,#FF0000,#CC0000)"},
+        "dv360_spotify": {"label": "DV360 Spotify", "channels": ["dv360_spotify"], "color": "#1DB954", "gradient": "linear-gradient(135deg,#1DB954,#168D40)"},
+        "dv360_eletromidia": {"label": "DV360 Eletromidia", "channels": ["dv360_eletromid"], "color": "#6366f1", "gradient": "linear-gradient(135deg,#6366f1,#4f46e5)"},
+        "dv360_netflix": {"label": "DV360 Netflix", "channels": ["dv360_netflix"], "color": "#E50914", "gradient": "linear-gradient(135deg,#E50914,#B20710)"},
+        "dv360_globoplay": {"label": "DV360 Globoplay", "channels": ["dv360_globoplay"], "color": "#F7631B", "gradient": "linear-gradient(135deg,#F7631B,#E0520A)"},
+        "dv360_admooh": {"label": "DV360 AdMooh", "channels": ["dv360_admooh"], "color": "#8b5cf6", "gradient": "linear-gradient(135deg,#8b5cf6,#7c3aed)"},
+        "dv360": {"label": "DV360 Geral", "channels": ["dv360"], "color": "#34A853", "gradient": "linear-gradient(135deg,#34A853,#0F9D58)"},
+    }
+
+    lines_qs = PlacementLine.objects.filter(media_channel__in=all_channels)
+    if cliente_id:
+        lines_qs = lines_qs.filter(campaign__cliente_id=cliente_id)
+
+    line_ids = list(lines_qs.values_list("id", flat=True))
+
+    # Date filter
+    date_from = request.GET.get("date_from", "")
+    date_to = request.GET.get("date_to", "")
+
+    days_qs = PlacementDay.objects.filter(placement_line_id__in=line_ids)
+    if date_from:
+        days_qs = days_qs.filter(date__gte=date_from)
+    if date_to:
+        days_qs = days_qs.filter(date__lte=date_to)
+
+    # ── Global totals ──
+    stats = days_qs.aggregate(
+        total_impressions=Sum("impressions"),
+        total_clicks=Sum("clicks"),
+        total_cost=Sum("cost"),
+    )
+    total_impressions = stats["total_impressions"] or 0
+    total_clicks = stats["total_clicks"] or 0
+    total_cost = float(stats["total_cost"] or 0)
+    ctr = round((total_clicks / total_impressions * 100), 2) if total_impressions > 0 else 0
+    cpc = round((total_cost / total_clicks), 2) if total_clicks > 0 else 0
+    cpm = round((total_cost / total_impressions * 1000), 2) if total_impressions > 0 else 0
+    total_roi = round(total_clicks / total_cost, 2) if total_cost > 0 else 0
+
+    # ── Per-channel group stats ──
+    vehicles_data = []
+    donut_labels = []
+    donut_values = []
+    donut_colors = []
+    bar_labels = []
+    bar_imp = []
+    bar_clk = []
+    bar_colors = []
+
+    for key, cfg in channel_groups.items():
+        ch_line_ids = list(lines_qs.filter(media_channel__in=cfg["channels"]).values_list("id", flat=True))
+        if not ch_line_ids:
+            continue
+        ch_qs = days_qs.filter(placement_line_id__in=ch_line_ids)
+        ch_stats = ch_qs.aggregate(imp=Sum("impressions"), clk=Sum("clicks"), cst=Sum("cost"))
+        ch_imp = ch_stats["imp"] or 0
+        ch_clk = ch_stats["clk"] or 0
+        ch_cst = float(ch_stats["cst"] or 0)
+        if ch_imp == 0 and ch_clk == 0 and ch_cst == 0:
+            continue
+        ch_ctr = round((ch_clk / ch_imp * 100), 2) if ch_imp > 0 else 0
+        ch_cpc = round((ch_cst / ch_clk), 2) if ch_clk > 0 else 0
+        ch_cpm = round((ch_cst / ch_imp * 1000), 2) if ch_imp > 0 else 0
+        ch_roi = round((ch_clk / ch_cst), 2) if ch_cst > 0 else 0
+        share_cost = round((ch_cst / total_cost * 100), 1) if total_cost > 0 else 0
+        share_imp = round((ch_imp / total_impressions * 100), 1) if total_impressions > 0 else 0
+
+        # Count campaigns per vehicle
+        ch_campaigns = lines_qs.filter(
+            media_channel__in=cfg["channels"],
+            id__in=ch_qs.values_list("placement_line_id", flat=True).distinct(),
+        ).count()
+
+        # URL for the vehicle's veiculacao page
+        url_map = {
+            "google": "web:veiculacao_google",
+            "meta": "web:veiculacao_meta",
+            "tiktok": "web:veiculacao_tiktok",
+            "linkedin": "web:veiculacao_linkedin",
+            "dv360": "web:veiculacao_dv360",
+            "dv360_youtube": "web:veiculacao_dv360_youtube",
+            "dv360_spotify": "web:veiculacao_dv360_spotify",
+            "dv360_eletromidia": "web:veiculacao_dv360_eletromidia",
+            "dv360_netflix": "web:veiculacao_dv360_netflix",
+            "dv360_globoplay": "web:veiculacao_dv360_globoplay",
+            "dv360_admooh": "web:veiculacao_dv360_admooh",
+        }
+        v_url = ""
+        if key in url_map:
+            v_url = reverse(url_map[key])
+
+        vehicles_data.append({
+            "key": key,
+            "label": cfg["label"],
+            "color": cfg["color"],
+            "gradient": cfg["gradient"],
+            "url": v_url,
+            "impressions": ch_imp,
+            "clicks": ch_clk,
+            "cost": round(ch_cst, 2),
+            "ctr": ch_ctr,
+            "cpc": ch_cpc,
+            "cpm": ch_cpm,
+            "roi": ch_roi,
+            "share_cost": share_cost,
+            "share_imp": share_imp,
+            "campaigns": ch_campaigns,
+        })
+
+        donut_labels.append(cfg["label"])
+        donut_values.append(round(ch_cst, 2))
+        donut_colors.append(cfg["color"])
+
+        bar_labels.append(cfg["label"])
+        bar_imp.append(ch_imp)
+        bar_clk.append(ch_clk)
+        bar_colors.append(cfg["color"])
+
+    vehicles_data.sort(key=lambda v: v["cost"], reverse=True)
+
+    # ── Daily trend (all channels combined) ──
+    daily_all = list(
+        days_qs.values("date")
+        .annotate(imp=Sum("impressions"), clk=Sum("clicks"), cst=Sum("cost"))
+        .order_by("date")
+    )
+    trend_labels = [str(d["date"]) for d in daily_all]
+    trend_imp = [d["imp"] or 0 for d in daily_all]
+    trend_clk = [d["clk"] or 0 for d in daily_all]
+    trend_cost = [float(d["cst"] or 0) for d in daily_all]
+
+    # ── Daily trend per top vehicles (for stacked chart) ──
+    top_vehicles = vehicles_data[:6]
+    vehicle_trends = {}
+    for v in top_vehicles:
+        v_line_ids = list(lines_qs.filter(
+            media_channel__in=channel_groups[v["key"]]["channels"]
+        ).values_list("id", flat=True))
+        v_daily = {}
+        for row in days_qs.filter(placement_line_id__in=v_line_ids).values("date").annotate(
+            imp=Sum("impressions")
+        ).order_by("date"):
+            v_daily[str(row["date"])] = row["imp"] or 0
+        vehicle_trends[v["key"]] = {
+            "label": v["label"],
+            "color": v["color"],
+            "data": [v_daily.get(d, 0) for d in trend_labels],
+        }
+
+    # ── Top campaigns across all vehicles ──
+    campaigns_data = []
+    for line in lines_qs.select_related("campaign", "campaign__cliente"):
+        line_days = days_qs.filter(placement_line=line)
+        agg = line_days.aggregate(imp=Sum("impressions"), clk=Sum("clicks"), cst=Sum("cost"))
+        imp = agg["imp"] or 0
+        clk = agg["clk"] or 0
+        cst = float(agg["cst"] or 0)
+        if imp == 0 and clk == 0 and cst == 0:
+            continue
+        # Find vehicle label
+        v_label = line.get_media_channel_display()
+        for cfg in channel_groups.values():
+            if line.media_channel in cfg["channels"]:
+                v_label = cfg["label"]
+                break
+        campaigns_data.append({
+            "name": line.channel or line.property_text or f"Campaign #{line.external_ref}",
+            "client": line.campaign.cliente.nome if line.campaign else "",
+            "vehicle": v_label,
+            "impressions": imp,
+            "clicks": clk,
+            "ctr": round((clk / imp * 100), 2) if imp > 0 else 0,
+            "cost": round(cst, 2),
+            "cpc": round((cst / clk), 2) if clk > 0 else 0,
+            "roi": round((clk / cst), 2) if cst > 0 else 0,
+        })
+    campaigns_data.sort(key=lambda c: c["cost"], reverse=True)
+
+    has_data = bool(vehicles_data)
+
+    return render(
+        request,
+        "web/consolidated_on.html",
+        {
+            "active": "consolidated_on",
+            "page_title": "Consolidated ON",
+            "has_data": has_data,
+            "date_from": date_from,
+            "date_to": date_to,
+            # Totals
+            "total_impressions": total_impressions,
+            "total_clicks": total_clicks,
+            "total_cost": round(total_cost, 2),
+            "ctr": ctr,
+            "cpc": cpc,
+            "cpm": cpm,
+            "total_roi": total_roi,
+            "vehicles_count": len(vehicles_data),
+            "campaigns_count": len(campaigns_data),
+            # Per-vehicle breakdown
+            "vehicles_data": vehicles_data,
+            # Charts JSON
+            "trend_labels_json": json.dumps(trend_labels),
+            "trend_imp_json": json.dumps(trend_imp),
+            "trend_clk_json": json.dumps(trend_clk),
+            "trend_cost_json": json.dumps(trend_cost),
+            "donut_labels_json": json.dumps(donut_labels),
+            "donut_values_json": json.dumps(donut_values),
+            "donut_colors_json": json.dumps(donut_colors),
+            "bar_labels_json": json.dumps(bar_labels),
+            "bar_imp_json": json.dumps(bar_imp),
+            "bar_clk_json": json.dumps(bar_clk),
+            "bar_colors_json": json.dumps(bar_colors),
+            "vehicle_trends_json": json.dumps(vehicle_trends),
+            # Campaigns table
+            "campaigns_data": campaigns_data,
         },
     )
 
@@ -1811,6 +2327,7 @@ def logs_auditoria(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+@require_admin
 def analytics_real(request: HttpRequest) -> HttpResponse:
     """Analytics Real – AI-powered version with Claude-generated insights."""
     return analytics(request, template="web/analytics_real.html", ai_mode=True)
@@ -2625,58 +3142,15 @@ def analytics(request: HttpRequest, template: str = "web/analytics.html", ai_mod
         "markets": markets_data,
     }
 
-    # ── AI-powered insights (only in ai_mode) ─────────────────────
+    # ── AI status check (non-blocking — insights loaded via AJAX) ──
     ai_summary = ""
     ai_status = None
     if ai_mode:
         try:
-            from web.services.ai_analytics import generate_analytics_insights, persist_ai_insights, check_ai_status
+            from web.services.ai_analytics import check_ai_status
             ai_status = check_ai_status()
-            ai_context = {
-                "total_imp": total_imp, "total_clk": total_clk,
-                "global_ctr": global_ctr, "cpc": global_cpc, "cpm": cpm,
-                "total_cost": round(total_cost, 2),
-                "date_from": date_from, "date_to": date_to,
-                "benchmarks": {"ctr": BENCH_CTR, "cpc": BENCH_CPC, "cpm": BENCH_CPM},
-                "efficiency_matrix": efficiency_matrix,
-                "historical": historical,
-                "google": google_agg, "meta": meta_agg,
-                "active_campaigns": len(campaign_metrics),
-            }
-            ai_result = generate_analytics_insights(ai_context, cliente_id=cliente_id or 0)
-            if ai_result:
-                # Override deterministic insights/alerts/recommendations with AI
-                ai_insights = ai_result.get("insights")
-                if ai_insights:
-                    insights = ai_insights
-                ai_alerts = ai_result.get("alerts")
-                if ai_alerts:
-                    alerts = ai_alerts
-                    # Rebuild grouped alerts
-                    alerts_grouped = {"critical": [], "warning": [], "info": []}
-                    for a in alerts:
-                        sev = a.get("severity", "info")
-                        if sev in alerts_grouped:
-                            alerts_grouped[sev].append(a)
-                    alert_counts = {
-                        "all": len(alerts),
-                        "critical": len(alerts_grouped["critical"]),
-                        "warning": len(alerts_grouped["warning"]),
-                        "info": len(alerts_grouped["info"]),
-                    }
-                ai_recs = ai_result.get("recommendations")
-                if ai_recs:
-                    recommendations = ai_recs
-                ai_summary = ai_result.get("executive_summary", "")
-                # Persist to DB
-                if cliente_id:
-                    try:
-                        persist_ai_insights(cliente_id, date_from, date_to, ai_result)
-                    except Exception:
-                        pass
         except Exception:
-            import traceback
-            traceback.print_exc()
+            pass
 
     return render(request, template, {
         "active": "analytics",
@@ -2786,11 +3260,14 @@ def clientes_create(request: HttpRequest) -> HttpResponse:
 @require_admin
 def clientes_edit(request: HttpRequest, cliente_id: int) -> HttpResponse:
     cliente = Cliente.objects.get(id=cliente_id)
+    success_message = ""
     if request.method == "POST":
         form = ClienteForm(request.POST, request.FILES, instance=cliente)
         if form.is_valid():
             form.save()
-            return redirect("web:clientes_detail", cliente_id=cliente.id)
+            success_message = "Cliente atualizado com sucesso."
+            cliente.refresh_from_db()
+            form = ClienteForm(instance=cliente)
     else:
         form = ClienteForm(instance=cliente)
     return render(
@@ -2801,6 +3278,7 @@ def clientes_edit(request: HttpRequest, cliente_id: int) -> HttpResponse:
             "page_title": "Editar Cliente",
             "form": form,
             "cliente": cliente,
+            "success_message": success_message,
         },
     )
 
@@ -4879,6 +5357,21 @@ def peca_detalhe(request: HttpRequest, piece_id: int) -> HttpResponse:
 @csrf_exempt
 @login_required
 @require_admin
+def api_piece_delete_assets(request: HttpRequest, piece_id: int) -> JsonResponse:
+    """Delete all assets from a piece (keep the piece itself)."""
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    piece = Piece.objects.filter(id=piece_id).first()
+    if not piece:
+        return JsonResponse({"error": "piece_not_found"}, status=404)
+    count = piece.assets.count()
+    piece.assets.all().delete()
+    return JsonResponse({"ok": True, "deleted": count})
+
+
+@csrf_exempt
+@login_required
+@require_admin
 def api_piece_update(request: HttpRequest, piece_id: int) -> HttpResponse:
     """API para atualizar dados de uma peça."""
     if request.method != "POST":
@@ -5396,6 +5889,107 @@ def mads_clear_data(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+def api_campaign_drilldown(request: HttpRequest, line_id: int) -> JsonResponse:
+    """Return ad groups and ads for a campaign line (drill-down)."""
+    from django.db.models import Sum
+    from campaigns.models import AdGroup, Ad
+
+    line = PlacementLine.objects.filter(id=line_id).first()
+    if not line:
+        return JsonResponse({"ok": False, "error": "not_found"}, status=404)
+
+    date_from = request.GET.get("date_from", "")
+    date_to = request.GET.get("date_to", "")
+
+    ad_groups = []
+    for ag in line.ad_groups.order_by("name"):
+        days_qs = ag.days.all()
+        if date_from:
+            days_qs = days_qs.filter(date__gte=date_from)
+        if date_to:
+            days_qs = days_qs.filter(date__lte=date_to)
+        stats = days_qs.aggregate(imp=Sum("impressions"), clk=Sum("clicks"), cst=Sum("cost"))
+        imp = stats["imp"] or 0
+        clk = stats["clk"] or 0
+        cst = float(stats["cst"] or 0)
+
+        ads_list = []
+        for ad in ag.ads.order_by("name"):
+            ad_days = ad.days.all()
+            if date_from:
+                ad_days = ad_days.filter(date__gte=date_from)
+            if date_to:
+                ad_days = ad_days.filter(date__lte=date_to)
+            ad_stats = ad_days.aggregate(imp=Sum("impressions"), clk=Sum("clicks"), cst=Sum("cost"))
+            ad_imp = ad_stats["imp"] or 0
+            ad_clk = ad_stats["clk"] or 0
+            ad_cst = float(ad_stats["cst"] or 0)
+            ads_list.append({
+                "id": ad.id,
+                "name": ad.name or ad.headline or f"Ad #{ad.external_ref}",
+                "type": ad.get_ad_type_display(),
+                "status": ad.get_status_display(),
+                "final_url": ad.final_url,
+                "impressions": ad_imp,
+                "clicks": ad_clk,
+                "ctr": round((ad_clk / ad_imp * 100), 2) if ad_imp > 0 else 0,
+                "cost": round(ad_cst, 2),
+                "cpc": round((ad_cst / ad_clk), 2) if ad_clk > 0 else 0,
+            })
+
+        ad_groups.append({
+            "id": ag.id,
+            "name": ag.name,
+            "status": ag.get_status_display(),
+            "impressions": imp,
+            "clicks": clk,
+            "ctr": round((clk / imp * 100), 2) if imp > 0 else 0,
+            "cost": round(cst, 2),
+            "cpc": round((cst / clk), 2) if clk > 0 else 0,
+            "ads_count": len(ads_list),
+            "ads": ads_list,
+        })
+
+    # Fetch creative assets linked to this placement line
+    creatives = []
+    for pc in line.placement_creatives.select_related("piece").all():
+        piece = pc.piece
+        assets = []
+        for asset in piece.assets.all():
+            asset_url = ""
+            if asset.file:
+                try:
+                    asset_url = asset.file.url
+                except ValueError:
+                    pass
+            assets.append({
+                "id": asset.id,
+                "file_url": asset_url,
+                "preview_url": asset.preview_url,
+                "metadata": asset.metadata or {},
+            })
+        creatives.append({
+            "id": piece.id,
+            "code": piece.code,
+            "title": piece.title,
+            "type": piece.get_type_display(),
+            "type_raw": piece.type,
+            "status": piece.get_status_display(),
+            "notes": piece.notes,
+            "assets": assets,
+        })
+
+    return JsonResponse({
+        "ok": True,
+        "campaign": line.channel or line.property_text,
+        "ad_groups_count": len(ad_groups),
+        "ad_groups": ad_groups,
+        "creatives": creatives,
+        "creatives_count": len(creatives),
+    })
+
+
+@login_required
 def api_veiculacao_data(request: HttpRequest) -> JsonResponse:
     """API endpoint for veiculação chart data (JSON)."""
     cliente_id = effective_cliente_id(request)
@@ -5854,6 +6448,72 @@ def user_profile(request: HttpRequest) -> HttpResponse:
 # ── AI Executive Report API ──────────────────────────────────────────────────
 
 @login_required
+def api_ai_insights(request: HttpRequest) -> JsonResponse:
+    """Return AI-generated insights/alerts/recommendations via AJAX (non-blocking page load)."""
+    from django.db.models import Sum
+    from web.services.ai_analytics import generate_analytics_insights, persist_ai_insights
+
+    cliente_id = effective_cliente_id(request)
+    if not cliente_id and is_admin(request.user):
+        cliente_id = selected_cliente_id(request)
+    if not cliente_id:
+        return JsonResponse({"ok": False, "error": "Selecione um cliente"})
+
+    date_from = request.GET.get("date_from", "")
+    date_to = request.GET.get("date_to", "")
+
+    # Compute the same metrics the analytics view computes
+    google_channels = ["google", "search", "display", "youtube", "shopping", "pmax"]
+    meta_channels = ["meta", "facebook", "instagram"]
+    lines_qs = PlacementLine.objects.filter(campaign__cliente_id=cliente_id)
+    line_ids = list(lines_qs.values_list("id", flat=True))
+    if not line_ids:
+        return JsonResponse({"ok": False, "error": "Sem dados"})
+
+    days_qs = PlacementDay.objects.filter(placement_line_id__in=line_ids)
+    if date_from:
+        days_qs = days_qs.filter(date__gte=date_from)
+    if date_to:
+        days_qs = days_qs.filter(date__lte=date_to)
+
+    stats = days_qs.aggregate(total_imp=Sum("impressions"), total_clk=Sum("clicks"), total_cost=Sum("cost"))
+    total_imp = stats["total_imp"] or 0
+    total_clk = stats["total_clk"] or 0
+    total_cost = float(stats["total_cost"] or 0)
+    global_ctr = round((total_clk / total_imp * 100), 2) if total_imp > 0 else 0
+    global_cpc = round((total_cost / total_clk), 2) if total_clk > 0 else 0
+    cpm = round((total_cost / total_imp * 1000), 2) if total_imp > 0 else 0
+
+    BENCH_CTR, BENCH_CPC, BENCH_CPM = 2.0, 3.50, 15.00
+
+    ai_context = {
+        "total_imp": total_imp, "total_clk": total_clk,
+        "global_ctr": global_ctr, "cpc": global_cpc, "cpm": cpm,
+        "total_cost": round(total_cost, 2),
+        "date_from": date_from, "date_to": date_to,
+        "benchmarks": {"ctr": BENCH_CTR, "cpc": BENCH_CPC, "cpm": BENCH_CPM},
+    }
+
+    ai_result = generate_analytics_insights(ai_context, cliente_id=cliente_id or 0)
+    if not ai_result:
+        return JsonResponse({"ok": False, "error": "IA indisponível"})
+
+    # Persist
+    try:
+        persist_ai_insights(cliente_id, date_from, date_to, ai_result)
+    except Exception:
+        pass
+
+    return JsonResponse({
+        "ok": True,
+        "insights": ai_result.get("insights", []),
+        "alerts": ai_result.get("alerts", []),
+        "recommendations": ai_result.get("recommendations", []),
+        "executive_summary": ai_result.get("executive_summary", ""),
+    })
+
+
+@login_required
 def api_ai_executive_report(request: HttpRequest) -> JsonResponse:
     """Generate an AI-powered executive report via AJAX."""
     from web.services.ai_analytics import generate_executive_report
@@ -5917,3 +6577,203 @@ def api_ai_status(request: HttpRequest) -> JsonResponse:
     from web.services.ai_analytics import check_ai_status
     status = check_ai_status()
     return JsonResponse(status)
+
+
+@login_required
+@require_admin
+def api_send_ai_email(request: HttpRequest) -> JsonResponse:
+    """Send the latest AI insights to the current user's email."""
+    from django.core.mail import send_mail as _send_mail
+    from django.core.cache import cache as _cache
+    from django.template.loader import render_to_string
+
+    user = request.user
+    if not user.email:
+        return JsonResponse({"ok": False, "error": "Nenhum e-mail cadastrado no seu perfil."}, status=400)
+
+    # Find cached AI insights for this client
+    cliente_id = effective_cliente_id(request)
+    if not cliente_id and is_admin(request.user):
+        cliente_id = selected_cliente_id(request)
+
+    if not cliente_id:
+        return JsonResponse({"ok": False, "error": "Selecione um cliente primeiro."}, status=400)
+
+    # Try to get from DB (most recent AIInsight)
+    from accounts.models import AIInsight
+    recent = AIInsight.objects.filter(
+        cliente_id=cliente_id, insight_type="insight", dismissed=False
+    ).order_by("-created_at")[:10]
+
+    if not recent.exists():
+        return JsonResponse({"ok": False, "error": "Nenhum insight gerado ainda. Acesse o Analytics primeiro."}, status=404)
+
+    # Build email
+    cliente_name = ""
+    try:
+        cliente_obj = Cliente.objects.get(id=cliente_id)
+        cliente_name = cliente_obj.nome
+    except Cliente.DoesNotExist:
+        pass
+
+    insights_list = []
+    for ins in recent:
+        insights_list.append({
+            "title": ins.title,
+            "text": ins.text,
+            "type": ins.metadata.get("type", "info"),
+        })
+
+    # Get alerts and recommendations too
+    alerts_recent = list(AIInsight.objects.filter(
+        cliente_id=cliente_id, insight_type="alert", dismissed=False
+    ).order_by("-created_at").values("title", "text", "severity")[:5])
+
+    recs_recent = list(AIInsight.objects.filter(
+        cliente_id=cliente_id, insight_type="recommendation", dismissed=False
+    ).order_by("-created_at").values("title", "text", "metadata")[:5])
+
+    # Plain text email
+    lines = [f"Relatório de Insights — {cliente_name}", "=" * 50, ""]
+
+    if insights_list:
+        lines.append("INSIGHTS")
+        lines.append("-" * 30)
+        for i, ins in enumerate(insights_list, 1):
+            emoji = {"positive": "+", "negative": "!", "warning": "~", "info": "i"}.get(ins["type"], "-")
+            lines.append(f"  [{emoji}] {ins['title']}")
+            lines.append(f"      {ins['text']}")
+            lines.append("")
+
+    if alerts_recent:
+        lines.append("ALERTAS")
+        lines.append("-" * 30)
+        for a in alerts_recent:
+            sev = (a.get("severity") or "info").upper()
+            lines.append(f"  [{sev}] {a['title']}")
+            lines.append(f"      {a['text']}")
+            lines.append("")
+
+    if recs_recent:
+        lines.append("RECOMENDAÇÕES")
+        lines.append("-" * 30)
+        for r in recs_recent:
+            lines.append(f"  > {r['title']}")
+            lines.append(f"    {r['text']}")
+            lines.append("")
+
+    lines.extend(["", "—", "Oracli AI • Relatório gerado automaticamente", "DashMonitor • dashmonitor.com.br"])
+
+    body = "\n".join(lines)
+    subject = f"[Oracli AI] Insights — {cliente_name}"
+
+    try:
+        _send_mail(
+            subject=subject,
+            message=body,
+            from_email=None,  # uses DEFAULT_FROM_EMAIL
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": f"Erro ao enviar e-mail: {str(e)}"}, status=500)
+
+    return JsonResponse({"ok": True, "email": user.email, "insights_count": len(insights_list)})
+
+
+@login_required
+@require_admin
+def api_send_whatsapp(request: HttpRequest) -> JsonResponse:
+    """Send the current AI report via WhatsApp to the selected client."""
+    from django.db.models import Sum
+    from web.services.whatsapp import send_whatsapp, build_report_message
+
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "POST required"}, status=405)
+
+    cliente_id = effective_cliente_id(request)
+    if not cliente_id and is_admin(request.user):
+        cliente_id = selected_cliente_id(request)
+    if not cliente_id:
+        return JsonResponse({"ok": False, "error": "Selecione um cliente"})
+
+    from accounts.models import Cliente as _Cl
+    cliente = _Cl.objects.filter(id=cliente_id).first()
+    if not cliente:
+        return JsonResponse({"ok": False, "error": "Cliente não encontrado"})
+    if not cliente.whatsapp:
+        return JsonResponse({"ok": False, "error": f"WhatsApp não configurado para {cliente.nome}. Edite o cliente e preencha o campo WhatsApp."})
+
+    # Compute metrics
+    line_ids = list(PlacementLine.objects.filter(campaign__cliente_id=cliente_id).values_list("id", flat=True))
+    days_qs = PlacementDay.objects.filter(placement_line_id__in=line_ids)
+    stats = days_qs.aggregate(total_imp=Sum("impressions"), total_clk=Sum("clicks"), total_cost=Sum("cost"))
+    total_imp = stats["total_imp"] or 0
+    total_clk = stats["total_clk"] or 0
+    total_cost = float(stats["total_cost"] or 0)
+    global_ctr = round((total_clk / total_imp * 100), 2) if total_imp > 0 else 0
+    global_cpc = round((total_cost / total_clk), 2) if total_clk > 0 else 0
+    cpm = round((total_cost / total_imp * 1000), 2) if total_imp > 0 else 0
+
+    # Get AI summary from latest insights if available
+    ai_summary = ""
+    ai_rec = ""
+    try:
+        from accounts.models import AIInsight
+        latest = AIInsight.objects.filter(cliente_id=cliente_id, insight_type="executive_summary").order_by("-created_at").first()
+        if latest:
+            ai_summary = latest.text
+        latest_rec = AIInsight.objects.filter(cliente_id=cliente_id, insight_type="recommendation").order_by("-created_at").first()
+        if latest_rec:
+            ai_rec = latest_rec.text
+    except Exception:
+        pass
+
+    msg = build_report_message(
+        cliente_nome=cliente.nome,
+        total_imp=total_imp, total_clk=total_clk,
+        global_ctr=global_ctr, global_cpc=global_cpc,
+        cpm=cpm, total_cost=total_cost,
+        ai_summary=ai_summary, ai_recommendation=ai_rec,
+    )
+
+    result = send_whatsapp(cliente.whatsapp, msg)
+    if result.get("ok"):
+        return JsonResponse({"ok": True, "phone": cliente.whatsapp, "provider": result.get("provider", "")})
+    return JsonResponse({"ok": False, "error": result.get("error", "Falha no envio")})
+
+
+@login_required
+@require_admin
+def api_ai_webhook(request: HttpRequest) -> JsonResponse:
+    """Return the latest AI insights as structured JSON for webhook/integration consumption."""
+    cliente_id = effective_cliente_id(request)
+    if not cliente_id and is_admin(request.user):
+        cliente_id = selected_cliente_id(request)
+
+    if not cliente_id:
+        return JsonResponse({"ok": False, "error": "Selecione um cliente."}, status=400)
+
+    from accounts.models import AIInsight
+    insights = list(AIInsight.objects.filter(
+        cliente_id=cliente_id, dismissed=False
+    ).order_by("-created_at").values("insight_type", "title", "text", "severity", "metadata", "created_at")[:30])
+
+    cliente_name = ""
+    try:
+        cliente_name = Cliente.objects.get(id=cliente_id).nome
+    except Cliente.DoesNotExist:
+        pass
+
+    payload = {
+        "ok": True,
+        "source": "Oracli AI",
+        "cliente": cliente_name,
+        "cliente_id": cliente_id,
+        "generated_at": insights[0]["created_at"].isoformat() if insights else None,
+        "insights": [i for i in insights if i["insight_type"] == "insight"],
+        "alerts": [i for i in insights if i["insight_type"] == "alert"],
+        "recommendations": [i for i in insights if i["insight_type"] == "recommendation"],
+        "total": len(insights),
+    }
+    return JsonResponse(payload)

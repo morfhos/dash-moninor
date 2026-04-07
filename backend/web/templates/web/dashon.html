@@ -5,6 +5,7 @@
 <style>
   .dashon-container { padding: 0 0 1px; }
 
+  /* ── Filters ── */
   .dashon-filters {
     display: flex;
     align-items: flex-end;
@@ -43,23 +44,145 @@
   }
   .btn-filter:hover { background: #4c2bc2; }
 
-  /* Stat cards */
+  /* ── Compare toggle ── */
+  .compare-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 8px;
+  }
+  .compare-toggle-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+  }
+  .compare-switch {
+    position: relative;
+    width: 40px;
+    height: 22px;
+    flex-shrink: 0;
+  }
+  .compare-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+  }
+  .compare-switch .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: #cbd5e1;
+    border-radius: 22px;
+    transition: background 0.25s;
+  }
+  .compare-switch .slider::before {
+    content: '';
+    position: absolute;
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.25s;
+    box-shadow: 0 1px 3px rgba(0,0,0,.15);
+  }
+  .compare-switch input:checked + .slider {
+    background: var(--brand-primary, #6366f1);
+  }
+  .compare-switch input:checked + .slider::before {
+    transform: translateX(18px);
+  }
+  .compare-dates {
+    display: none;
+    align-items: flex-end;
+    gap: 8px;
+    margin-left: 4px;
+    animation: countUp 0.2s ease;
+  }
+  .compare-dates.active { display: flex; }
+  .compare-dates .filter-group label {
+    color: #6366f1;
+  }
+  .compare-dates input[type="date"] {
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 12px;
+    font-family: inherit;
+    background: #fff;
+    color: var(--text-primary);
+  }
+  .compare-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    margin-bottom: 16px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(99,102,241,.06), rgba(139,92,246,.06));
+    border: 1px solid rgba(99,102,241,.15);
+    font-size: 12px;
+    color: var(--text-secondary);
+    flex-wrap: wrap;
+  }
+  .compare-banner strong { color: var(--text-primary); }
+  .compare-banner .compare-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .compare-badge.up { background: rgba(34,197,94,.1); color: #16a34a; }
+  .compare-badge.down { background: rgba(239,68,68,.08); color: #dc2626; }
+  .compare-badge.neutral { background: rgba(107,114,128,.08); color: var(--text-secondary); }
+
+  /* ── Stat cards (enhanced) ── */
   .dashon-stats {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
     margin-bottom: 24px;
   }
   .dashon-stat-card {
     background: var(--surface);
-    border-radius: 14px;
+    border-radius: 16px;
     border: 1px solid var(--border-color);
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.03);
     padding: 20px;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 14px;
+    transition: transform 0.2s, box-shadow 0.2s;
+    position: relative;
+    overflow: hidden;
   }
+  .dashon-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,.08);
+  }
+  .dashon-stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    border-radius: 16px 16px 0 0;
+  }
+  .dashon-stat-card.card-blue::before { background: linear-gradient(90deg, #2563eb, #3b82f6); }
+  .dashon-stat-card.card-green::before { background: linear-gradient(90deg, #16a34a, #22c55e); }
+  .dashon-stat-card.card-amber::before { background: linear-gradient(90deg, #d97706, #f59e0b); }
+  .dashon-stat-card.card-purple::before { background: linear-gradient(90deg, #7c3aed, #8b5cf6); }
+  .dashon-stat-card.card-pink::before { background: linear-gradient(90deg, #db2777, #ec4899); }
+  .dashon-stat-card.card-teal::before { background: linear-gradient(90deg, #0d9488, #14b8a6); }
+  .dashon-stat-card.card-indigo::before { background: linear-gradient(90deg, #4f46e5, #6366f1); }
+  .dashon-stat-card.card-rose::before { background: linear-gradient(90deg, #e11d48, #f43f5e); }
+
   .dashon-stat-icon {
     width: 44px;
     height: 44px;
@@ -75,20 +198,60 @@
   .dashon-stat-icon.cost { background: linear-gradient(135deg, #ede9fe, #ddd6fe); color: #7c3aed; }
   .dashon-stat-icon.campaigns { background: linear-gradient(135deg, #fce7f3, #fbcfe8); color: #db2777; }
   .dashon-stat-icon.cpc { background: linear-gradient(135deg, #ccfbf1, #99f6e4); color: #0d9488; }
+
+  .dashon-stat-info { flex: 1; min-width: 0; }
   .dashon-stat-value {
-    font-size: 22px;
+    font-size: 15px;
     font-weight: 800;
     color: var(--text-primary);
     line-height: 1.1;
+    letter-spacing: -0.02em;
   }
   .dashon-stat-label {
     font-size: 12px;
     color: var(--text-secondary);
-    font-weight: 500;
-    margin-top: 2px;
+    font-weight: 600;
+    margin-top: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .dashon-stat-change {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 11px;
+    font-weight: 700;
+    margin-top: 6px;
+    padding: 2px 8px;
+    border-radius: 20px;
+  }
+  .dashon-stat-change.up { background: rgba(34,197,94,.1); color: #16a34a; }
+  .dashon-stat-change.down { background: rgba(239,68,68,.08); color: #dc2626; }
+  .dashon-stat-change.cost-up { background: rgba(245,158,11,.1); color: #d97706; }
+  .dashon-stat-change.cost-down { background: rgba(34,197,94,.1); color: #16a34a; }
+  .dashon-stat-change.neutral { background: rgba(107,114,128,.08); color: var(--text-secondary); }
+
+  /* ── Section cards ── */
+  .dashon-section {
+    background: var(--surface);
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.03);
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+  .dashon-section-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
 
-  /* Platform comparison cards */
+  /* ── Platform comparison cards ── */
   .platform-cards {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -100,9 +263,11 @@
     background: var(--surface);
     border-radius: 16px;
     border: 1px solid var(--border-color);
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.03);
     padding: 24px;
+    transition: transform 0.2s;
   }
+  .platform-card:hover { transform: translateY(-2px); }
   .platform-card-header {
     display: flex;
     align-items: center;
@@ -133,8 +298,10 @@
   .plat-metric {
     padding: 12px;
     border-radius: 10px;
-    background: var(--surface-2);
+    background: var(--surface-2, #f8fafc);
+    transition: background 0.2s;
   }
+  .plat-metric:hover { background: var(--border-color); }
   .plat-metric-value {
     font-size: 20px;
     font-weight: 800;
@@ -150,7 +317,7 @@
     margin-top: 2px;
   }
 
-  /* Charts */
+  /* ── Charts ── */
   .charts-grid {
     display: grid;
     grid-template-columns: 2fr 1fr;
@@ -162,10 +329,10 @@
     background: var(--surface);
     border-radius: 16px;
     border: 1px solid var(--border-color);
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.03);
     padding: 24px;
     position: relative;
-    height: 340px;
+    height: 420px;
   }
   .chart-title {
     font-size: 16px;
@@ -178,32 +345,14 @@
     background: var(--surface);
     border-radius: 16px;
     border: 1px solid var(--border-color);
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.03);
     padding: 24px;
     margin-bottom: 24px;
     position: relative;
-    height: 380px;
+    height: 440px;
   }
 
-  /* Table */
-  .dashon-section {
-    background: var(--surface);
-    border-radius: 16px;
-    border: 1px solid var(--border-color);
-    box-shadow: var(--shadow-sm);
-    overflow: hidden;
-    margin-bottom: 24px;
-  }
-  .dashon-section-header {
-    padding: 20px 24px;
-    border-bottom: 1px solid var(--border-color);
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--text-primary);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
+  /* ── Tables ── */
   .dashon-table {
     width: 100%;
     border-collapse: collapse;
@@ -216,7 +365,7 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: var(--text-secondary);
-    background: var(--surface-2);
+    background: var(--surface-2, #f8fafc);
     border-bottom: 1px solid var(--border-color);
   }
   .dashon-table td {
@@ -226,7 +375,7 @@
     border-bottom: 1px solid var(--border-color);
   }
   .dashon-table tr:last-child td { border-bottom: none; }
-  .dashon-table tr:hover { background: var(--surface-2); }
+  .dashon-table tr:hover { background: var(--surface-2, #f8fafc); }
   .dashon-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 
   .platform-badge {
@@ -265,6 +414,268 @@
     transition: background 0.2s;
   }
   .empty-state .btn-link:hover { background: #4c2bc2; }
+
+  /* ── Insights grid ── */
+  .insights-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 14px;
+  }
+  .insight-card {
+    padding: 16px 18px;
+    border-radius: 12px;
+    border-left: 4px solid;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .insight-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,.06);
+  }
+  .insight-card.positive { background: rgba(34,197,94,.05); border-left-color: #22c55e; }
+  .insight-card.negative { background: rgba(239,68,68,.05); border-left-color: #ef4444; }
+  .insight-card.warning { background: rgba(245,158,11,.05); border-left-color: #f59e0b; }
+  .insight-card.info { background: rgba(99,102,241,.05); border-left-color: #6366f1; }
+  .insight-card-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .insight-card-text {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  /* ── ROI cards ── */
+  .roi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .roi-card {
+    border-radius: 16px;
+    padding: 22px 24px;
+    color: #fff;
+    transition: transform 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .roi-card:hover { transform: translateY(-2px); }
+  .roi-card::after {
+    content: '';
+    position: absolute;
+    top: -20px; right: -20px;
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.08);
+  }
+  .roi-card-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    opacity: .85;
+    margin-bottom: 6px;
+  }
+  .roi-card-value {
+    font-size: 32px;
+    font-weight: 800;
+    line-height: 1;
+  }
+  .roi-card-sub {
+    font-size: 12px;
+    opacity: .7;
+    margin-top: 4px;
+  }
+
+  /* ── Live status section ── */
+  .live-status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    padding: 20px;
+  }
+  .status-item {
+    padding: 12px 16px;
+    border-radius: 10px;
+    text-align: center;
+    min-width: 100px;
+    transition: transform 0.15s;
+  }
+  .status-item:hover { transform: scale(1.03); }
+
+  /* ── Drill-down modal ── */
+  .drilldown-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,.5);
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    backdrop-filter: blur(4px);
+  }
+  .drilldown-overlay.active { display: flex; }
+  .drilldown-modal {
+    background: var(--surface);
+    border-radius: 20px;
+    max-width: 900px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,.2);
+    animation: modalIn 0.25s ease;
+  }
+  @keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+  .drilldown-header {
+    padding: 24px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .drilldown-header h2 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+  }
+  .drilldown-close {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    border: none;
+    background: var(--surface-2, #f1f5f9);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    transition: background 0.2s;
+    font-size: 18px;
+  }
+  .drilldown-close:hover { background: var(--border-color); }
+  .drilldown-body { padding: 24px; }
+  .drilldown-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .drilldown-stat {
+    padding: 14px;
+    border-radius: 12px;
+    background: var(--surface-2, #f8fafc);
+    border: 1px solid var(--border-color);
+    text-align: center;
+  }
+  .drilldown-stat-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text-primary);
+  }
+  .drilldown-stat-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  /* ── Animations ── */
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.4;} }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes countUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .animate-in { animation: countUp 0.4s ease both; }
+
+  /* ── Tooltip ── */
+  [data-tooltip] {
+    position: relative;
+    cursor: help;
+  }
+  [data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 6px 12px;
+    background: #1e293b;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 500;
+    border-radius: 6px;
+    white-space: nowrap;
+    z-index: 100;
+    pointer-events: none;
+    animation: countUp 0.15s ease;
+  }
+
+  /* ── Table search filter ── */
+  .table-search {
+    padding: 0 24px 16px;
+  }
+  .table-search-input {
+    width: 100%;
+    max-width: 400px;
+    padding: 9px 14px 9px 36px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--surface);
+    color: var(--text-primary);
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .table-search-input:focus {
+    outline: none;
+    border-color: var(--brand-primary, #6366f1);
+    box-shadow: 0 0 0 3px rgba(99,102,241,.1);
+  }
+  .table-search-wrap {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+    max-width: 400px;
+  }
+  .table-search-wrap svg {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    pointer-events: none;
+  }
+  .table-no-results {
+    padding: 24px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 13px;
+    display: none;
+  }
+
+  /* ── Campaign row clickable ── */
+  .campaign-row { cursor: pointer; transition: background 0.15s; }
+  .campaign-row:hover { background: rgba(99,102,241,.04) !important; }
+  .campaign-row td:first-child { position: relative; padding-left: 24px; }
+  .campaign-row td:first-child::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 24px;
+    border-radius: 2px;
+    background: transparent;
+    transition: background 0.15s;
+  }
+  .campaign-row:hover td:first-child::before { background: var(--brand-primary); }
 </style>
 
 <div class="topbar">
@@ -273,7 +684,6 @@
 
 <div class="dashon-container">
   {% if require_cliente %}
-  <!-- Select Client State -->
   <div class="dashon-section">
     <div class="empty-state">
       <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -285,7 +695,6 @@
     </div>
   </div>
   {% elif not has_accounts and not campaigns_data %}
-  <!-- Empty State -->
   <div class="dashon-section">
     <div class="empty-state">
       <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -304,8 +713,10 @@
   </div>
   {% else %}
 
-  <!-- Date Filters -->
-  <form class="dashon-filters" method="get">
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- DATE FILTERS                                           -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <form class="dashon-filters" method="get" id="dashonForm">
     <div class="filter-group">
       <label for="dateFrom">Data inicio</label>
       <input type="date" id="dateFrom" name="date_from" value="{{ date_from }}">
@@ -316,58 +727,136 @@
     </div>
     <button type="submit" class="btn-filter">Filtrar</button>
     <a href="{{ request.path }}" class="btn-filter" style="background:#e5e7eb;color:#111827;text-decoration:none;display:inline-flex;align-items:center;">Limpar</a>
+
+    <!-- Compare toggle -->
+    <div class="compare-toggle">
+      <label class="compare-switch" title="Comparar com periodo anterior">
+        <input type="checkbox" name="compare" value="on" id="compareToggle" {% if compare_on %}checked{% endif %}>
+        <span class="slider"></span>
+      </label>
+      <span class="compare-toggle-label" id="compareLabel">Comparar</span>
+    </div>
+
+    <!-- Compare date inputs (shown when toggle is ON) -->
+    <div class="compare-dates {% if compare_on %}active{% endif %}" id="compareDates">
+      <div class="filter-group">
+        <label for="compareFrom">Comparar de</label>
+        <input type="date" id="compareFrom" name="compare_from" value="{{ compare_from }}">
+      </div>
+      <div class="filter-group">
+        <label for="compareTo">Comparar ate</label>
+        <input type="date" id="compareTo" name="compare_to" value="{{ compare_to }}">
+      </div>
+      <span style="font-size:10px;color:var(--text-secondary);max-width:140px;line-height:1.3;">Deixe vazio para usar o periodo anterior automaticamente</span>
+    </div>
+
     <div style="flex-basis:100%;margin-top:4px;">{% include "web/_date_presets.html" %}</div>
   </form>
 
-  <!-- Stat Cards -->
+  <!-- Comparison banner (shown when compare is active and data exists) -->
+  {% if comparison %}
+  <div class="compare-banner">
+    <svg width="16" height="16" fill="none" stroke="#6366f1" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+    <span>Comparando com <strong>{{ comparison.period_label }}</strong></span>
+    <span class="compare-badge {% if comparison.imp_change and comparison.imp_change > 0 %}up{% elif comparison.imp_change and comparison.imp_change < 0 %}down{% else %}neutral{% endif %}">
+      Imp: {% if comparison.imp_change is not None %}{% if comparison.imp_change > 0 %}+{% endif %}{{ comparison.imp_change }}%{% else %}—{% endif %}
+    </span>
+    <span class="compare-badge {% if comparison.clk_change and comparison.clk_change > 0 %}up{% elif comparison.clk_change and comparison.clk_change < 0 %}down{% else %}neutral{% endif %}">
+      Clk: {% if comparison.clk_change is not None %}{% if comparison.clk_change > 0 %}+{% endif %}{{ comparison.clk_change }}%{% else %}—{% endif %}
+    </span>
+    <span class="compare-badge {% if comparison.ctr_change and comparison.ctr_change > 0 %}up{% elif comparison.ctr_change and comparison.ctr_change < 0 %}down{% else %}neutral{% endif %}">
+      CTR: {% if comparison.ctr_change is not None %}{% if comparison.ctr_change > 0 %}+{% endif %}{{ comparison.ctr_change }}%{% else %}—{% endif %}
+    </span>
+    <span class="compare-badge {% if comparison.cost_change and comparison.cost_change > 0 %}down{% elif comparison.cost_change and comparison.cost_change < 0 %}up{% else %}neutral{% endif %}">
+      Custo: {% if comparison.cost_change is not None %}{% if comparison.cost_change > 0 %}+{% endif %}{{ comparison.cost_change }}%{% else %}—{% endif %}
+    </span>
+  </div>
+  {% endif %}
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- STAT CARDS (with comparison)                           -->
+  <!-- ═══════════════════════════════════════════════════════ -->
   <div class="dashon-stats">
-    <div class="dashon-stat-card">
+    <!-- Impressoes -->
+    <div class="dashon-stat-card card-blue animate-in" data-tooltip="Total de vezes que seus anuncios foram exibidos">
       <div class="dashon-stat-icon impressions">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
           <circle cx="12" cy="12" r="3"></circle>
         </svg>
       </div>
-      <div>
-        <div class="dashon-stat-value">{{ total_impressions|floatformat:0|intcomma }}</div>
-        <div class="dashon-stat-label">Impressões</div>
+      <div class="dashon-stat-info">
+        <div class="dashon-stat-value" data-counter="{{ total_impressions }}">{{ total_impressions|floatformat:0|intcomma }}</div>
+        <div class="dashon-stat-label">Impressoes</div>
+        {% if comparison and comparison.imp_change is not None %}
+        <div class="dashon-stat-change {% if comparison.imp_change > 0 %}up{% elif comparison.imp_change < 0 %}down{% else %}neutral{% endif %}">
+          {% if comparison.imp_change > 0 %}&#9650;{% elif comparison.imp_change < 0 %}&#9660;{% else %}&#8212;{% endif %}
+          {% if comparison.imp_change > 0 %}+{% endif %}{{ comparison.imp_change }}% vs anterior
+        </div>
+        {% endif %}
       </div>
     </div>
-    <div class="dashon-stat-card">
+
+    <!-- Cliques -->
+    <div class="dashon-stat-card card-green animate-in" style="animation-delay:.05s" data-tooltip="Cliques nos seus anuncios">
       <div class="dashon-stat-icon clicks">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"></path>
         </svg>
       </div>
-      <div>
-        <div class="dashon-stat-value">{{ total_clicks|floatformat:0|intcomma }}</div>
+      <div class="dashon-stat-info">
+        <div class="dashon-stat-value" data-counter="{{ total_clicks }}">{{ total_clicks|floatformat:0|intcomma }}</div>
         <div class="dashon-stat-label">Cliques</div>
+        {% if comparison and comparison.clk_change is not None %}
+        <div class="dashon-stat-change {% if comparison.clk_change > 0 %}up{% elif comparison.clk_change < 0 %}down{% else %}neutral{% endif %}">
+          {% if comparison.clk_change > 0 %}&#9650;{% elif comparison.clk_change < 0 %}&#9660;{% else %}&#8212;{% endif %}
+          {% if comparison.clk_change > 0 %}+{% endif %}{{ comparison.clk_change }}% vs anterior
+        </div>
+        {% endif %}
       </div>
     </div>
-    <div class="dashon-stat-card">
+
+    <!-- CTR -->
+    <div class="dashon-stat-card card-amber animate-in" style="animation-delay:.1s" data-tooltip="Taxa de cliques: cliques / impressoes x 100">
       <div class="dashon-stat-icon ctr">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
         </svg>
       </div>
-      <div>
+      <div class="dashon-stat-info">
         <div class="dashon-stat-value">{{ ctr }}%</div>
         <div class="dashon-stat-label">CTR Medio</div>
+        {% if comparison and comparison.ctr_change is not None %}
+        <div class="dashon-stat-change {% if comparison.ctr_change > 0 %}up{% elif comparison.ctr_change < 0 %}down{% else %}neutral{% endif %}">
+          {% if comparison.ctr_change > 0 %}&#9650;{% elif comparison.ctr_change < 0 %}&#9660;{% else %}&#8212;{% endif %}
+          {% if comparison.ctr_change > 0 %}+{% endif %}{{ comparison.ctr_change }}% vs anterior
+        </div>
+        {% endif %}
       </div>
     </div>
-    <div class="dashon-stat-card">
+
+    <!-- Investimento -->
+    <div class="dashon-stat-card card-purple animate-in" style="animation-delay:.15s" data-tooltip="Total gasto em anuncios no periodo">
       <div class="dashon-stat-icon cost">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="12" y1="1" x2="12" y2="23"></line>
           <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
         </svg>
       </div>
-      <div>
+      <div class="dashon-stat-info">
         <div class="dashon-stat-value">R$ {{ total_cost|floatformat:2|intcomma }}</div>
         <div class="dashon-stat-label">Investimento</div>
+        {% if comparison and comparison.cost_change is not None %}
+        <div class="dashon-stat-change {% if comparison.cost_change > 0 %}cost-up{% elif comparison.cost_change < 0 %}cost-down{% else %}neutral{% endif %}">
+          {% if comparison.cost_change > 0 %}&#9650;{% elif comparison.cost_change < 0 %}&#9660;{% else %}&#8212;{% endif %}
+          {% if comparison.cost_change > 0 %}+{% endif %}{{ comparison.cost_change }}% vs anterior
+        </div>
+        {% endif %}
       </div>
     </div>
-    <div class="dashon-stat-card">
+
+    <!-- Campanhas Ativas -->
+    <div class="dashon-stat-card card-pink animate-in" style="animation-delay:.2s" data-tooltip="Campanhas com dados no periodo">
       <div class="dashon-stat-icon campaigns">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="3" y="3" width="18" height="18" rx="2"></rect>
@@ -375,12 +864,14 @@
           <path d="M9 21V9"></path>
         </svg>
       </div>
-      <div>
+      <div class="dashon-stat-info">
         <div class="dashon-stat-value">{{ active_campaigns }}</div>
         <div class="dashon-stat-label">Campanhas Ativas</div>
       </div>
     </div>
-    <div class="dashon-stat-card">
+
+    <!-- CPC -->
+    <div class="dashon-stat-card card-teal animate-in" style="animation-delay:.25s" data-tooltip="Custo por clique medio: investimento / cliques">
       <div class="dashon-stat-icon cpc">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="10"></circle>
@@ -388,14 +879,177 @@
           <path d="M8 8h8v8"></path>
         </svg>
       </div>
-      <div>
+      <div class="dashon-stat-info">
         <div class="dashon-stat-value">R$ {{ cpc|floatformat:2|intcomma }}</div>
         <div class="dashon-stat-label">CPC Medio</div>
+        {% if comparison and comparison.cpc_change is not None %}
+        <div class="dashon-stat-change {% if comparison.cpc_change > 0 %}cost-up{% elif comparison.cpc_change < 0 %}cost-down{% else %}neutral{% endif %}">
+          {% if comparison.cpc_change > 0 %}&#9650;{% elif comparison.cpc_change < 0 %}&#9660;{% else %}&#8212;{% endif %}
+          {% if comparison.cpc_change > 0 %}+{% endif %}{{ comparison.cpc_change }}% vs anterior
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- CPM -->
+    <div class="dashon-stat-card card-indigo animate-in" style="animation-delay:.3s" data-tooltip="Custo por mil impressoes">
+      <div class="dashon-stat-icon" style="background:linear-gradient(135deg,#e0e7ff,#c7d2fe);color:#4f46e5;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/></svg>
+      </div>
+      <div class="dashon-stat-info">
+        <div class="dashon-stat-value">R$ {{ cpm|floatformat:2|intcomma }}</div>
+        <div class="dashon-stat-label">CPM</div>
+      </div>
+    </div>
+
+    <!-- Alcance Estimado -->
+    <div class="dashon-stat-card card-rose animate-in" style="animation-delay:.35s" data-tooltip="Alcance estimado: impressoes / frequencia media (3.5)">
+      <div class="dashon-stat-icon" style="background:linear-gradient(135deg,#fce7f3,#fbcfe8);color:#db2777;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+      </div>
+      <div class="dashon-stat-info">
+        <div class="dashon-stat-value">{{ alcance|floatformat:0|intcomma }}</div>
+        <div class="dashon-stat-label">Alcance Estimado</div>
       </div>
     </div>
   </div>
 
-  <!-- Platform Comparison -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- SMART INSIGHTS (deterministic)                         -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  {% if smart_insights %}
+  <div class="dashon-section" style="margin-bottom:24px;">
+    <div class="dashon-section-header">
+      <svg width="20" height="20" fill="none" stroke="#6366f1" stroke-width="2" viewBox="0 0 24 24"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+      <span>Insights Inteligentes</span>
+      <span style="padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;margin-left:4px;">AUTOMATICO</span>
+    </div>
+    <div style="padding:16px 20px;">
+      <div class="insights-grid">
+        {% for ins in smart_insights %}
+        <div class="insight-card {{ ins.type }}">
+          <div class="insight-card-title">
+            {% if ins.type == 'positive' %}
+              <svg width="16" height="16" fill="none" stroke="#22c55e" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            {% elif ins.type == 'negative' %}
+              <svg width="16" height="16" fill="none" stroke="#ef4444" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
+            {% elif ins.type == 'warning' %}
+              <svg width="16" height="16" fill="none" stroke="#f59e0b" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            {% else %}
+              <svg width="16" height="16" fill="none" stroke="#6366f1" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            {% endif %}
+            {{ ins.title }}
+          </div>
+          <div class="insight-card-text">{{ ins.text }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- LIVE STATUS + PROJECTION + EXECUTIVE SUMMARY           -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="dashon-section" style="margin-bottom:24px;">
+    <div class="live-status-grid">
+      <!-- Status ao vivo -->
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+          <div style="width:10px;height:10px;border-radius:50%;background:#22c55e;animation:pulse 2s infinite;"></div>
+          <span style="font-size:15px;font-weight:700;color:var(--text-primary);">Status ao Vivo</span>
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <div class="status-item" style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.15);">
+            <div style="font-size:26px;font-weight:800;color:#16a34a;">{{ campaigns_on }}</div>
+            <div style="font-size:11px;color:#16a34a;font-weight:600;">ON agora</div>
+          </div>
+          <div class="status-item" style="background:rgba(107,114,128,.06);border:1px solid rgba(107,114,128,.12);">
+            <div style="font-size:26px;font-weight:800;color:var(--text-secondary);">{{ campaigns_off }}</div>
+            <div style="font-size:11px;color:var(--text-secondary);font-weight:600;">Pausadas</div>
+          </div>
+          {% if problem_campaigns %}
+          <div class="status-item" style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.12);">
+            <div style="font-size:26px;font-weight:800;color:#dc2626;">{{ problem_campaigns|length }}</div>
+            <div style="font-size:11px;color:#dc2626;font-weight:600;">Com problema</div>
+          </div>
+          {% endif %}
+        </div>
+        {% if problem_campaigns %}
+        <div style="margin-top:10px;padding:10px 14px;background:#fff1f2;border:1px solid #fecdd3;border-radius:8px;font-size:12px;color:#b91c1c;">
+          <strong>CTR abaixo de 1%:</strong> {{ problem_campaigns|join:", " }}
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Projecao mensal -->
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+          <svg width="18" height="18" fill="none" stroke="var(--text-secondary)" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          <span style="font-size:15px;font-weight:700;color:var(--text-primary);">Projecao Mensal</span>
+          <span style="font-size:10px;color:var(--text-secondary);background:var(--surface-2,#f1f5f9);padding:2px 8px;border-radius:12px;border:1px solid var(--border-color);">ESTIMATIVA</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div style="padding:14px;background:var(--surface-2,#f8fafc);border:1px solid var(--border-color);border-radius:10px;">
+            <div style="font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.03em;">Gasto projetado</div>
+            <div style="font-size:20px;font-weight:800;color:var(--text-primary);margin-top:4px;">R$ {{ projected_monthly_cost|floatformat:2|intcomma }}</div>
+            <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">R$ {{ daily_avg_cost|floatformat:2 }}/dia</div>
+          </div>
+          <div style="padding:14px;background:var(--surface-2,#f8fafc);border:1px solid var(--border-color);border-radius:10px;">
+            <div style="font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.03em;">Cliques projetados</div>
+            <div style="font-size:20px;font-weight:800;color:var(--text-primary);margin-top:4px;">{{ projected_monthly_clicks|intcomma }}</div>
+            <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">ROI estimado: {{ projected_roi }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resumo Executivo -->
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+          <svg width="18" height="18" fill="none" stroke="#6366f1" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          <span style="font-size:15px;font-weight:700;color:#6366f1;">Resumo Executivo</span>
+        </div>
+        <div id="dashon-exec-summary" style="padding:16px;background:linear-gradient(135deg,rgba(99,102,241,.04),rgba(139,92,246,.04));border:1px solid rgba(99,102,241,.12);border-radius:12px;border-left:4px solid #6366f1;">
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary);">
+            <div style="width:14px;height:14px;border:2px solid #6366f1;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;flex-shrink:0;"></div>
+            Oracli AI analisando dados...
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- ROI + BUSINESS KPI CARDS                               -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="roi-grid">
+    <div class="roi-card" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);">
+      <div class="roi-card-label">ROI Global</div>
+      <div class="roi-card-value">{{ total_roi }}</div>
+      <div class="roi-card-sub">cliques por R$ investido</div>
+    </div>
+    <div class="roi-card" style="background:linear-gradient(135deg,#0ea5e9,#38bdf8);">
+      <div class="roi-card-label">ROI Medio por Campanha</div>
+      <div class="roi-card-value">{{ avg_roi }}</div>
+      <div class="roi-card-sub">media entre campanhas ativas</div>
+    </div>
+    <div class="roi-card" style="background:linear-gradient(135deg,#059669,#34d399);">
+      <div class="roi-card-label">Custo por Lead (est.)</div>
+      <div class="roi-card-value" style="font-size:26px;">R$ {{ cost_per_lead|floatformat:2 }}</div>
+      <div class="roi-card-sub">baseado em 3% de conversao</div>
+    </div>
+    {% for cp in channel_perf %}
+    <div class="roi-card" style="background:{% if cp.channel == 'Google Ads' %}linear-gradient(135deg,#f59e0b,#fbbf24){% else %}linear-gradient(135deg,#3b82f6,#60a5fa){% endif %};">
+      <div class="roi-card-label">ROI {{ cp.channel }}</div>
+      <div class="roi-card-value">{{ cp.roi }}</div>
+      <div class="roi-card-sub">cliques/R$ &middot; CPM R$ {{ cp.cpm }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- PLATFORM COMPARISON                                    -->
+  <!-- ═══════════════════════════════════════════════════════ -->
   <div class="platform-cards">
     <div class="platform-card">
       <div class="platform-card-header">
@@ -405,7 +1059,7 @@
       <div class="platform-metrics">
         <div class="plat-metric">
           <div class="plat-metric-value">{{ google.impressions|floatformat:0|intcomma }}</div>
-          <div class="plat-metric-label">Impressões</div>
+          <div class="plat-metric-label">Impressoes</div>
         </div>
         <div class="plat-metric">
           <div class="plat-metric-value">{{ google.clicks|floatformat:0|intcomma }}</div>
@@ -429,7 +1083,7 @@
       <div class="platform-metrics">
         <div class="plat-metric">
           <div class="plat-metric-value">{{ meta.impressions|floatformat:0|intcomma }}</div>
-          <div class="plat-metric-label">Impressões</div>
+          <div class="plat-metric-label">Impressoes</div>
         </div>
         <div class="plat-metric">
           <div class="plat-metric-value">{{ meta.clicks|floatformat:0|intcomma }}</div>
@@ -447,25 +1101,84 @@
     </div>
   </div>
 
-  <!-- Charts: Trend + Donut -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- CHARTS: Trend + Donut                                  -->
+  <!-- ═══════════════════════════════════════════════════════ -->
   <div class="charts-grid">
     <div class="chart-container">
       <div class="chart-title">Tendencia de Impressoes</div>
-      <canvas id="trendChart" height="280"></canvas>
+      <div style="position:relative;width:100%;height:calc(100% - 36px);">
+        <canvas id="trendChart"></canvas>
+      </div>
     </div>
     <div class="chart-container">
       <div class="chart-title">Investimento por Plataforma</div>
-      <canvas id="donutChart" height="280"></canvas>
+      <div style="position:relative;width:100%;height:calc(100% - 36px);">
+        <canvas id="donutChart"></canvas>
+      </div>
     </div>
   </div>
 
   <!-- Bar Chart: Top Campaigns -->
   <div class="bar-chart-section">
     <div class="chart-title">Top 10 Campanhas por Investimento</div>
-    <canvas id="barChart" height="300"></canvas>
+    <div style="position:relative;width:100%;height:calc(100% - 36px);">
+      <canvas id="barChart"></canvas>
+    </div>
   </div>
 
-  <!-- Campaigns Table -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- CHANNEL PERFORMANCE COMPARISON                         -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  {% if channel_perf|length > 1 %}
+  <div class="dashon-section" style="margin-bottom:24px;">
+    <div class="dashon-section-header">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Performance Comparativa entre Canais
+    </div>
+    <table class="dashon-table">
+      <thead>
+        <tr>
+          <th>Canal</th>
+          <th class="num">Impressoes</th>
+          <th class="num">Cliques</th>
+          <th class="num">CTR</th>
+          <th class="num">CPC</th>
+          <th class="num">CPM</th>
+          <th class="num">Investimento</th>
+          <th class="num">ROI</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cp in channel_perf %}
+        <tr>
+          <td style="font-weight:600;">
+            <span style="display:inline-flex;align-items:center;gap:8px;">
+              <span style="width:8px;height:8px;border-radius:50%;background:{% if cp.channel == 'Google Ads' %}#f59e0b{% else %}#3b82f6{% endif %};"></span>
+              {{ cp.channel }}
+            </span>
+          </td>
+          <td class="num">{{ cp.impressions|intcomma }}</td>
+          <td class="num">{{ cp.clicks|intcomma }}</td>
+          <td class="num" style="font-weight:600;">{{ cp.ctr }}%</td>
+          <td class="num">R$ {{ cp.cpc }}</td>
+          <td class="num">R$ {{ cp.cpm }}</td>
+          <td class="num" style="font-weight:700;">R$ {{ cp.cost|floatformat:2|intcomma }}</td>
+          <td class="num">
+            <span style="padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;{% if cp.roi > avg_roi %}background:rgba(34,197,94,.1);color:#16a34a;{% else %}background:rgba(239,68,68,.08);color:#dc2626;{% endif %}">
+              {{ cp.roi }}
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- CAMPAIGNS TABLE (clickable for drill-down)             -->
+  <!-- ═══════════════════════════════════════════════════════ -->
   <div class="dashon-section">
     <div class="dashon-section-header">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -473,10 +1186,80 @@
         <path d="M3 9h18"></path>
         <path d="M9 21V9"></path>
       </svg>
-      Campanhas Ativas
+      Campanhas Ativas ({{ campaigns_data|length }})
+      <span style="font-size:11px;color:var(--text-secondary);font-weight:500;margin-left:auto;">Clique para ver detalhes</span>
     </div>
     {% if campaigns_data %}
-    <table class="dashon-table">
+    <div class="table-search">
+      <div class="table-search-wrap">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" class="table-search-input" id="searchCampaigns" placeholder="Buscar campanha, cliente, plataforma..." autocomplete="off">
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+    <table class="dashon-table" id="tableCampaigns">
+      <thead>
+        <tr>
+          <th>Plataforma</th>
+          <th>Campanha</th>
+          <th>Cliente</th>
+          <th class="num">Impressoes</th>
+          <th class="num">Cliques</th>
+          <th class="num">CTR</th>
+          <th class="num">CPC</th>
+          <th class="num">Investimento</th>
+          <th class="num">ROI</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in campaigns_data %}
+        <tr class="campaign-row" data-line-id="{{ c.id }}" data-name="{{ c.name }}" data-platform="{{ c.platform }}" data-imp="{{ c.impressions }}" data-clk="{{ c.clicks }}" data-ctr="{{ c.ctr }}" data-cpc="{{ c.cpc }}" data-cost="{{ c.cost }}" data-roi="{{ c.roi }}" data-cpm="{{ c.cpm }}">
+          <td><span class="platform-badge {% if c.platform == 'Meta Ads' %}meta{% else %}google{% endif %}">{{ c.platform }}</span></td>
+          <td><strong>{{ c.name }}</strong></td>
+          <td>{{ c.client }}</td>
+          <td class="num">{{ c.impressions|floatformat:0|intcomma }}</td>
+          <td class="num">{{ c.clicks|floatformat:0|intcomma }}</td>
+          <td class="num">
+            <span style="{% if c.ctr >= 2 %}color:#16a34a;{% elif c.ctr < 1 %}color:#dc2626;{% endif %}font-weight:600;">{{ c.ctr }}%</span>
+          </td>
+          <td class="num">R$ {{ c.cpc|floatformat:2|intcomma }}</td>
+          <td class="num" style="font-weight:600;">R$ {{ c.cost|floatformat:2|intcomma }}</td>
+          <td class="num">
+            <span style="padding:3px 10px;border-radius:12px;font-size:12px;font-weight:800;{% if c.roi > avg_roi %}background:rgba(34,197,94,.1);color:#16a34a;{% elif c.roi > 0 %}background:rgba(245,158,11,.1);color:#d97706;{% else %}background:rgba(239,68,68,.08);color:#dc2626;{% endif %}">
+              {{ c.roi }}
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <div class="empty-state" style="padding:40px;">
+      <p>Nenhum dado de campanha encontrado para o periodo selecionado.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- TOP CAMPAIGNS BY ROI                                   -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  {% if top_roi %}
+  <div class="dashon-section">
+    <div class="dashon-section-header">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2L15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26z"/>
+      </svg>
+      Top Campanhas por ROI
+    </div>
+    <div class="table-search">
+      <div class="table-search-wrap">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" class="table-search-input" id="searchROI" placeholder="Buscar campanha..." autocomplete="off">
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+    <table class="dashon-table" id="tableROI">
       <thead>
         <tr>
           <th>Plataforma</th>
@@ -487,10 +1270,11 @@
           <th class="num">CTR</th>
           <th class="num">Investimento</th>
           <th class="num">CPC</th>
+          <th class="num">ROI</th>
         </tr>
       </thead>
       <tbody>
-        {% for c in campaigns_data %}
+        {% for c in top_roi %}
         <tr>
           <td><span class="platform-badge {% if c.platform == 'Meta Ads' %}meta{% else %}google{% endif %}">{{ c.platform }}</span></td>
           <td><strong>{{ c.name }}</strong></td>
@@ -499,144 +1283,69 @@
           <td class="num">{{ c.clicks|floatformat:0|intcomma }}</td>
           <td class="num">{{ c.ctr }}%</td>
           <td class="num">R$ {{ c.cost|floatformat:2|intcomma }}</td>
-          <td class="num">R$ {{ c.cpc|floatformat:2|intcomma }}</td>
+          <td class="num">R$ {{ c.cpc|floatformat:2 }}</td>
+          <td class="num">
+            <span style="padding:3px 12px;border-radius:12px;font-size:12px;font-weight:800;
+              {% if c.roi > avg_roi %}background:rgba(34,197,94,.1);color:#16a34a;
+              {% elif c.roi > 0 %}background:rgba(245,158,11,.1);color:#d97706;
+              {% else %}background:rgba(239,68,68,.08);color:#dc2626;{% endif %}">
+              {{ c.roi }}
+            </span>
+          </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
-    {% else %}
-    <div class="empty-state" style="padding:40px;">
-      <p>Nenhum dado de campanha encontrado para o periodo selecionado.</p>
     </div>
-    {% endif %}
   </div>
+  {% endif %}
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- AI INSIGHTS (async via AJAX)                           -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="dashon-section" style="margin-top:0;" id="dashon-insights-section">
+    <div class="dashon-section-header">
+      <svg width="20" height="20" fill="none" stroke="#6366f1" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1.27c.34-.6.99-1 1.73-1a2 2 0 010 4c-.74 0-1.39-.4-1.73-1H20a7 7 0 01-7 7v1.27c.6.34 1 .99 1 1.73a2 2 0 01-4 0c0-.74.4-1.39 1-1.73V23a7 7 0 01-7-7H2.73c-.34.6-.99 1-1.73 1a2 2 0 010-4c.74 0 1.39.4 1.73 1H4a7 7 0 017-7V5.73c-.6-.34-1-.99-1-1.73a2 2 0 012-2z"/></svg>
+      <span>Analise por IA</span>
+      <span style="padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;">ORACLI AI</span>
+    </div>
+    <div id="dashon-insights-grid" style="padding:16px 20px;">
+      <div class="insights-grid">
+        <div class="insight-card info" style="border-left-color:#6366f1;">
+          <div class="insight-card-title">
+            <div style="width:14px;height:14px;border:2px solid #6366f1;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;flex-shrink:0;"></div>
+            Carregando insights da IA...
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   {% endif %}
 </div>
 
-<!-- ══════════════════════════════════════════════════════ -->
-<!-- ROI OVERVIEW + CHANNEL COMPARISON + TOP ROI            -->
-<!-- ══════════════════════════════════════════════════════ -->
-{% if channel_perf or top_roi %}
-
-<!-- ROI Cards -->
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-top:20px;">
-  <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:14px;padding:22px 24px;color:#fff;">
-    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.8;margin-bottom:6px;">ROI Global</div>
-    <div style="font-size:32px;font-weight:800;line-height:1;">{{ total_roi }}</div>
-    <div style="font-size:12px;opacity:.7;margin-top:4px;">cliques por R$ investido</div>
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- DRILL-DOWN MODAL                                       -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="drilldown-overlay" id="drilldownOverlay">
+  <div class="drilldown-modal">
+    <div class="drilldown-header">
+      <h2 id="drilldownTitle">Detalhes da Campanha</h2>
+      <button class="drilldown-close" id="drilldownClose">&times;</button>
+    </div>
+    <div class="drilldown-body">
+      <div class="drilldown-stats" id="drilldownStats"></div>
+      <div style="height:250px;margin-bottom:20px;position:relative;">
+        <canvas id="drilldownChart"></canvas>
+      </div>
+      <div id="drilldownAds"></div>
+    </div>
   </div>
-  <div style="background:linear-gradient(135deg,#0ea5e9,#38bdf8);border-radius:14px;padding:22px 24px;color:#fff;">
-    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.8;margin-bottom:6px;">ROI Médio por Campanha</div>
-    <div style="font-size:32px;font-weight:800;line-height:1;">{{ avg_roi }}</div>
-    <div style="font-size:12px;opacity:.7;margin-top:4px;">média entre campanhas ativas</div>
-  </div>
-  {% for cp in channel_perf %}
-  <div style="background:{% if cp.channel == 'Google Ads' %}linear-gradient(135deg,#f59e0b,#fbbf24){% else %}linear-gradient(135deg,#3b82f6,#60a5fa){% endif %};border-radius:14px;padding:22px 24px;color:#fff;">
-    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.8;margin-bottom:6px;">ROI {{ cp.channel }}</div>
-    <div style="font-size:32px;font-weight:800;line-height:1;">{{ cp.roi }}</div>
-    <div style="font-size:12px;opacity:.7;margin-top:4px;">cliques/R$ · CPM R$ {{ cp.cpm }}</div>
-  </div>
-  {% endfor %}
 </div>
 
-<!-- Channel Performance Comparison -->
-{% if channel_perf|length > 1 %}
-<div class="dashon-card" style="margin-top:20px;">
-  <div style="display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--border);">
-    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-    <strong style="font-size:14px;">Performance Comparativa entre Canais</strong>
-  </div>
-  <table class="dashon-table" style="width:100%;border-collapse:collapse;font-size:13px;">
-    <thead>
-      <tr>
-        <th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-secondary);letter-spacing:.04em;">Canal</th>
-        <th style="padding:10px 16px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-secondary);">Impressões</th>
-        <th style="padding:10px 16px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-secondary);">Cliques</th>
-        <th style="padding:10px 16px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-secondary);">CTR</th>
-        <th style="padding:10px 16px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-secondary);">CPC</th>
-        <th style="padding:10px 16px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-secondary);">CPM</th>
-        <th style="padding:10px 16px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-secondary);">Investimento</th>
-        <th style="padding:10px 16px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-secondary);">ROI</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for cp in channel_perf %}
-      <tr style="border-top:1px solid var(--border);">
-        <td style="padding:14px 16px;font-weight:600;">
-          <span style="display:inline-flex;align-items:center;gap:8px;">
-            <span style="width:8px;height:8px;border-radius:50%;background:{% if cp.channel == 'Google Ads' %}#f59e0b{% else %}#3b82f6{% endif %};"></span>
-            {{ cp.channel }}
-          </span>
-        </td>
-        <td style="padding:14px 16px;text-align:right;">{{ cp.impressions|intcomma }}</td>
-        <td style="padding:14px 16px;text-align:right;">{{ cp.clicks|intcomma }}</td>
-        <td style="padding:14px 16px;text-align:right;font-weight:600;">{{ cp.ctr }}%</td>
-        <td style="padding:14px 16px;text-align:right;">R$ {{ cp.cpc }}</td>
-        <td style="padding:14px 16px;text-align:right;">R$ {{ cp.cpm }}</td>
-        <td style="padding:14px 16px;text-align:right;font-weight:700;">R$ {{ cp.cost|floatformat:2|intcomma }}</td>
-        <td style="padding:14px 16px;text-align:right;">
-          <span style="padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;{% if cp.roi > avg_roi %}background:rgba(34,197,94,.1);color:#16a34a;{% else %}background:rgba(239,68,68,.08);color:#dc2626;{% endif %}">
-            {{ cp.roi }}
-          </span>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% endif %}
-
-<!-- Top Campaigns by ROI -->
-{% if top_roi %}
-<div class="dashon-section" style="margin-top:20px;">
-  <div class="dashon-section-header">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M12 2L15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26z"/>
-    </svg>
-    Top Campanhas por ROI
-  </div>
-  <table class="dashon-table">
-    <thead>
-      <tr>
-        <th>Plataforma</th>
-        <th>Campanha</th>
-        <th>Cliente</th>
-        <th class="num">Impressoes</th>
-        <th class="num">Cliques</th>
-        <th class="num">CTR</th>
-        <th class="num">Investimento</th>
-        <th class="num">CPC</th>
-        <th class="num">ROI</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for c in top_roi %}
-      <tr>
-        <td><span class="platform-badge {% if c.platform == 'Meta Ads' %}meta{% else %}google{% endif %}">{{ c.platform }}</span></td>
-        <td><strong>{{ c.name }}</strong></td>
-        <td>{{ c.client }}</td>
-        <td class="num">{{ c.impressions|floatformat:0|intcomma }}</td>
-        <td class="num">{{ c.clicks|floatformat:0|intcomma }}</td>
-        <td class="num">{{ c.ctr }}%</td>
-        <td class="num">R$ {{ c.cost|floatformat:2|intcomma }}</td>
-        <td class="num">R$ {{ c.cpc|floatformat:2 }}</td>
-        <td class="num">
-          <span style="padding:3px 12px;border-radius:12px;font-size:12px;font-weight:800;
-            {% if c.roi > avg_roi %}background:rgba(34,197,94,.1);color:#16a34a;
-            {% elif c.roi > 0 %}background:rgba(245,158,11,.1);color:#d97706;
-            {% else %}background:rgba(239,68,68,.08);color:#dc2626;{% endif %}">
-            {{ c.roi }}
-          </span>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% endif %}
-
-{% endif %}
-
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SCRIPTS                                                -->
+<!-- ═══════════════════════════════════════════════════════ -->
 {% if has_accounts or campaigns_data %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
@@ -650,7 +1359,11 @@
   var barValues = {{ bar_values_json|safe }};
   var barColors = {{ bar_colors_json|safe }};
 
-  // Trend Chart (line – Google vs Meta impressions)
+  // ── Chart defaults ──
+  Chart.defaults.font.family = 'inherit';
+  Chart.defaults.color = getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim() || '#64748b';
+
+  // Trend Chart
   var trendCtx = document.getElementById('trendChart');
   if (trendCtx && trendLabels.length > 0) {
     new Chart(trendCtx, {
@@ -662,17 +1375,23 @@
             label: 'Google Ads',
             data: trendGoogleImp,
             borderColor: '#FBBC04',
-            backgroundColor: 'rgba(251,188,4,0.1)',
+            backgroundColor: 'rgba(251,188,4,0.08)',
             fill: true,
-            tension: 0.3,
+            tension: 0.4,
+            pointRadius: 2,
+            pointHoverRadius: 6,
+            borderWidth: 2.5,
           },
           {
             label: 'Meta Ads',
             data: trendMetaImp,
             borderColor: '#1877F2',
-            backgroundColor: 'rgba(24,119,242,0.1)',
+            backgroundColor: 'rgba(24,119,242,0.08)',
             fill: true,
-            tension: 0.3,
+            tension: 0.4,
+            pointRadius: 2,
+            pointHoverRadius: 6,
+            borderWidth: 2.5,
           }
         ]
       },
@@ -681,17 +1400,28 @@
         maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
         plugins: {
-          legend: { position: 'top', labels: { usePointStyle: true, padding: 16 } }
+          legend: { position: 'top', labels: { usePointStyle: true, padding: 16, font: { weight: '600' } } },
+          tooltip: {
+            backgroundColor: '#1e293b',
+            titleColor: '#fff',
+            bodyColor: '#e2e8f0',
+            padding: 12,
+            cornerRadius: 8,
+            displayColors: true,
+            callbacks: {
+              label: function(ctx) { return ctx.dataset.label + ': ' + ctx.parsed.y.toLocaleString('pt-BR') + ' impressoes'; }
+            }
+          }
         },
         scales: {
-          y: { beginAtZero: true, title: { display: true, text: 'Impressoes' } },
-          x: { ticks: { maxTicksLimit: 15 } }
+          y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,.04)' }, ticks: { callback: function(v) { return v >= 1000 ? (v/1000).toFixed(0) + 'k' : v; } } },
+          x: { ticks: { maxTicksLimit: 15 }, grid: { display: false } }
         }
       }
     });
   }
 
-  // Donut Chart (investment by platform)
+  // Donut Chart
   var donutCtx = document.getElementById('donutChart');
   if (donutCtx && donutLabels.length > 0) {
     new Chart(donutCtx, {
@@ -701,21 +1431,26 @@
         datasets: [{
           data: donutValues,
           backgroundColor: ['#FBBC04', '#1877F2'],
-          borderWidth: 2,
-          borderColor: '#fff',
+          borderWidth: 3,
+          borderColor: getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#fff',
+          hoverOffset: 8,
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        cutout: '65%',
         plugins: {
-          legend: { position: 'bottom', labels: { usePointStyle: true, padding: 12, font: { size: 12 } } },
+          legend: { position: 'bottom', labels: { usePointStyle: true, padding: 14, font: { size: 12, weight: '600' } } },
           tooltip: {
+            backgroundColor: '#1e293b',
+            padding: 12,
+            cornerRadius: 8,
             callbacks: {
               label: function(ctx) {
                 var total = ctx.dataset.data.reduce(function(a, b) { return a + b; }, 0);
                 var pct = total > 0 ? ((ctx.parsed / total) * 100).toFixed(1) : 0;
-                return ctx.label + ': R$ ' + ctx.parsed.toFixed(2) + ' (' + pct + '%)';
+                return ctx.label + ': R$ ' + ctx.parsed.toLocaleString('pt-BR', {minimumFractionDigits: 2}) + ' (' + pct + '%)';
               }
             }
           }
@@ -724,7 +1459,7 @@
     });
   }
 
-  // Bar Chart (top 10 campaigns)
+  // Bar Chart
   var barCtx = document.getElementById('barChart');
   if (barCtx && barLabels.length > 0) {
     new Chart(barCtx, {
@@ -735,7 +1470,7 @@
           label: 'Investimento (R$)',
           data: barValues,
           backgroundColor: barColors,
-          borderRadius: 6,
+          borderRadius: 8,
           borderSkipped: false,
         }]
       },
@@ -746,19 +1481,273 @@
         plugins: {
           legend: { display: false },
           tooltip: {
+            backgroundColor: '#1e293b',
+            padding: 12,
+            cornerRadius: 8,
             callbacks: {
-              label: function(ctx) { return 'R$ ' + ctx.parsed.x.toFixed(2); }
+              label: function(ctx) { return 'R$ ' + ctx.parsed.x.toLocaleString('pt-BR', {minimumFractionDigits: 2}); }
             }
           }
         },
         scales: {
-          x: { beginAtZero: true, title: { display: true, text: 'Investimento (R$)' } },
-          y: { ticks: { font: { size: 11 } } }
+          x: { beginAtZero: true, grid: { color: 'rgba(0,0,0,.04)' }, ticks: { callback: function(v) { return 'R$ ' + (v >= 1000 ? (v/1000).toFixed(1) + 'k' : v); } } },
+          y: { ticks: { font: { size: 11, weight: '500' } }, grid: { display: false } }
         }
       }
     });
   }
+
+  // ── Drill-down ──
+  var adsByC = {{ ads_by_campaign_json|safe }};
+  var dailyByC = {{ campaign_daily_json|safe }};
+  var drillChart = null;
+
+  document.querySelectorAll('.campaign-row').forEach(function(row) {
+    row.addEventListener('click', function() {
+      var id = this.dataset.lineId;
+      var name = this.dataset.name;
+      var platform = this.dataset.platform;
+      var imp = parseInt(this.dataset.imp);
+      var clk = parseInt(this.dataset.clk);
+      var ctr = this.dataset.ctr;
+      var cpc = this.dataset.cpc;
+      var cost = this.dataset.cost;
+      var roi = this.dataset.roi;
+      var cpm = this.dataset.cpm;
+
+      document.getElementById('drilldownTitle').textContent = name;
+
+      // Stats
+      document.getElementById('drilldownStats').innerHTML =
+        '<div class="drilldown-stat"><div class="drilldown-stat-value">' + imp.toLocaleString('pt-BR') + '</div><div class="drilldown-stat-label">Impressoes</div></div>' +
+        '<div class="drilldown-stat"><div class="drilldown-stat-value">' + clk.toLocaleString('pt-BR') + '</div><div class="drilldown-stat-label">Cliques</div></div>' +
+        '<div class="drilldown-stat"><div class="drilldown-stat-value">' + ctr + '%</div><div class="drilldown-stat-label">CTR</div></div>' +
+        '<div class="drilldown-stat"><div class="drilldown-stat-value">R$ ' + parseFloat(cost).toLocaleString('pt-BR', {minimumFractionDigits:2}) + '</div><div class="drilldown-stat-label">Investimento</div></div>' +
+        '<div class="drilldown-stat"><div class="drilldown-stat-value">R$ ' + parseFloat(cpc).toLocaleString('pt-BR', {minimumFractionDigits:2}) + '</div><div class="drilldown-stat-label">CPC</div></div>' +
+        '<div class="drilldown-stat"><div class="drilldown-stat-value">' + roi + '</div><div class="drilldown-stat-label">ROI</div></div>';
+
+      // Daily chart
+      if (drillChart) drillChart.destroy();
+      var daily = dailyByC[id];
+      var chartEl = document.getElementById('drilldownChart');
+      if (daily && daily.labels.length > 0) {
+        drillChart = new Chart(chartEl, {
+          type: 'line',
+          data: {
+            labels: daily.labels,
+            datasets: [
+              { label: 'Impressoes', data: daily.impressions, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.08)', fill: true, tension: 0.3, yAxisID: 'y', pointRadius: 2, borderWidth: 2 },
+              { label: 'Cliques', data: daily.clicks, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,.08)', fill: true, tension: 0.3, yAxisID: 'y', pointRadius: 2, borderWidth: 2 },
+              { label: 'Custo (R$)', data: daily.cost, borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,.08)', fill: false, tension: 0.3, yAxisID: 'y1', pointRadius: 2, borderWidth: 2 },
+            ]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: { legend: { position: 'top', labels: { usePointStyle: true, padding: 12, font: { size: 11 } } } },
+            scales: {
+              y: { beginAtZero: true, position: 'left', grid: { color: 'rgba(0,0,0,.04)' } },
+              y1: { beginAtZero: true, position: 'right', grid: { display: false }, ticks: { callback: function(v) { return 'R$' + v.toFixed(0); } } },
+              x: { grid: { display: false }, ticks: { maxTicksLimit: 12 } }
+            }
+          }
+        });
+      } else {
+        chartEl.getContext('2d').clearRect(0, 0, chartEl.width, chartEl.height);
+      }
+
+      // Ads / Ad Groups
+      var ads = adsByC[id];
+      var adsHtml = '';
+      if (ads && ads.length > 0) {
+        adsHtml = '<div style="margin-top:8px;"><strong style="font-size:14px;color:var(--text-primary);">Grupos de Anuncios</strong></div>';
+        adsHtml += '<table class="dashon-table" style="margin-top:8px;font-size:12px;"><thead><tr><th>Nome</th><th>Status</th><th class="num">Impressoes</th><th class="num">Cliques</th><th class="num">CTR</th><th class="num">CPC</th><th class="num">Custo</th></tr></thead><tbody>';
+        ads.forEach(function(ad) {
+          var statusBg = ad.status === 'enabled' ? '#dcfce7' : '#fef3c7';
+          var statusClr = ad.status === 'enabled' ? '#16a34a' : '#d97706';
+          adsHtml += '<tr><td><strong>' + ad.name + '</strong></td>'
+            + '<td><span style="padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;background:' + statusBg + ';color:' + statusClr + ';">' + (ad.status === 'enabled' ? 'Ativo' : 'Pausado') + '</span></td>'
+            + '<td class="num">' + ad.impressions.toLocaleString('pt-BR') + '</td>'
+            + '<td class="num">' + ad.clicks.toLocaleString('pt-BR') + '</td>'
+            + '<td class="num">' + ad.ctr + '%</td>'
+            + '<td class="num">R$ ' + ad.cpc.toFixed(2) + '</td>'
+            + '<td class="num">R$ ' + ad.cost.toFixed(2) + '</td></tr>';
+        });
+        adsHtml += '</tbody></table>';
+      } else {
+        adsHtml = '<p style="font-size:13px;color:var(--text-secondary);padding:12px 0;">Nenhum grupo de anuncios sincronizado para esta campanha.</p>';
+      }
+      document.getElementById('drilldownAds').innerHTML = adsHtml;
+
+      document.getElementById('drilldownOverlay').classList.add('active');
+    });
+  });
+
+  document.getElementById('drilldownClose').addEventListener('click', function() {
+    document.getElementById('drilldownOverlay').classList.remove('active');
+  });
+  document.getElementById('drilldownOverlay').addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('active');
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') document.getElementById('drilldownOverlay').classList.remove('active');
+  });
 })();
 </script>
 {% endif %}
+
+<!-- Compare toggle logic -->
+<script>
+(function() {
+  var toggle = document.getElementById('compareToggle');
+  var dates = document.getElementById('compareDates');
+  var label = document.getElementById('compareLabel');
+  if (!toggle || !dates) return;
+
+  function updateUI() {
+    if (toggle.checked) {
+      dates.classList.add('active');
+      label.style.color = 'var(--brand-primary, #6366f1)';
+      label.style.fontWeight = '700';
+
+      // Auto-fill compare dates based on current date range
+      var df = document.getElementById('dateFrom');
+      var dt = document.getElementById('dateTo');
+      var cf = document.getElementById('compareFrom');
+      var ct = document.getElementById('compareTo');
+      if (df && dt && cf && ct && df.value && dt.value && !cf.value && !ct.value) {
+        var start = new Date(df.value + 'T00:00:00');
+        var end = new Date(dt.value + 'T00:00:00');
+        var len = Math.round((end - start) / 86400000) + 1;
+        var prevEnd = new Date(start.getTime() - 86400000);
+        var prevStart = new Date(prevEnd.getTime() - (len - 1) * 86400000);
+        function iso(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+        cf.value = iso(prevStart);
+        ct.value = iso(prevEnd);
+      }
+    } else {
+      dates.classList.remove('active');
+      label.style.color = '';
+      label.style.fontWeight = '';
+    }
+  }
+
+  toggle.addEventListener('change', updateUI);
+
+  // Also listen for clicks on the label text
+  label.addEventListener('click', function() {
+    toggle.checked = !toggle.checked;
+    toggle.dispatchEvent(new Event('change'));
+  });
+})();
+</script>
+
+<!-- AI Insights (async) -->
+<script>
+(function() {
+  var summaryEl = document.getElementById('dashon-exec-summary');
+  var gridEl = document.getElementById('dashon-insights-grid');
+  if (!summaryEl || !gridEl) return;
+
+  var params = new URLSearchParams();
+  var df = document.getElementById('dateFrom');
+  var dt = document.getElementById('dateTo');
+  if (df && df.value) params.set('date_from', df.value);
+  if (dt && dt.value) params.set('date_to', dt.value);
+
+  fetch('/api/ai-insights/?' + params.toString())
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      // Executive summary
+      if (data.ok && data.executive_summary) {
+        summaryEl.innerHTML = '<div style="font-size:13px;color:var(--text-primary);line-height:1.7;">' + data.executive_summary + '</div>';
+      } else {
+        summaryEl.innerHTML = '<div style="font-size:13px;line-height:1.7;color:var(--text-primary);">'
+          + '<strong>Investimento:</strong> R$ {{ total_cost|floatformat:2|intcomma }}<br>'
+          + '<strong>Campanhas:</strong> {{ active_campaigns }} ativas<br>'
+          + '<strong>ROI Global:</strong> {{ total_roi }} cliques/R$<br>'
+          + '<strong>CTR:</strong> {{ ctr }}% {% if ctr >= 2 %}(acima do benchmark){% else %}(abaixo do benchmark de 2%){% endif %}'
+          + '</div>';
+      }
+
+      // Insights grid
+      if (data.ok && data.insights && data.insights.length > 0) {
+        var html = '<div class="insights-grid">';
+        data.insights.forEach(function(ins) {
+          var type = ins.type || 'info';
+          html += '<div class="insight-card ' + type + '">'
+            + '<div class="insight-card-title">' + (ins.title || '') + '</div>'
+            + '<div class="insight-card-text">' + (ins.text || '') + '</div>'
+            + '</div>';
+        });
+        if (data.recommendations && data.recommendations.length > 0) {
+          data.recommendations.slice(0, 3).forEach(function(rec) {
+            html += '<div class="insight-card info">'
+              + '<div class="insight-card-title" style="color:#6366f1;">Recomendacao: ' + (rec.title || '') + '</div>'
+              + '<div class="insight-card-text">' + (rec.text || '') + '</div>'
+              + '</div>';
+          });
+        }
+        html += '</div>';
+        gridEl.innerHTML = html;
+      } else {
+        gridEl.innerHTML = '<div class="insights-grid">'
+          + '<div class="insight-card positive"><div class="insight-card-title">ROI Global: {{ total_roi }}</div><div class="insight-card-text">{{ total_clicks|intcomma }} cliques por R$ {{ total_cost|floatformat:2|intcomma }} investidos</div></div>'
+          + '<div class="insight-card ' + ({{ ctr }} >= 2 ? 'positive' : 'warning') + '"><div class="insight-card-title">CTR: {{ ctr }}%</div><div class="insight-card-text">' + ({{ ctr }} >= 2 ? 'Acima do benchmark de 2%' : 'Abaixo do benchmark de 2% — revise criativos') + '</div></div>'
+          + '<div class="insight-card info"><div class="insight-card-title">CPM: R$ {{ cpm|floatformat:2 }}</div><div class="insight-card-text">Custo por mil impressoes</div></div>'
+          + '</div>';
+      }
+    })
+    .catch(function() {
+      summaryEl.innerHTML = '<div style="font-size:13px;line-height:1.7;color:var(--text-primary);">'
+        + '<strong>Investimento:</strong> R$ {{ total_cost|floatformat:2|intcomma }}<br>'
+        + '<strong>Campanhas:</strong> {{ active_campaigns }} ativas<br>'
+        + '<strong>ROI Global:</strong> {{ total_roi }} cliques/R$'
+        + '</div>';
+      gridEl.innerHTML = '<div class="insights-grid">'
+        + '<div class="insight-card info"><div class="insight-card-title">Insights baseados em regras ativas</div><div class="insight-card-text">A analise por IA esta temporariamente indisponivel.</div></div>'
+        + '</div>';
+    });
+})();
+</script>
+<!-- Table search filter -->
+<script>
+(function() {
+  function setupSearch(inputId, tableId) {
+    var input = document.getElementById(inputId);
+    var table = document.getElementById(tableId);
+    if (!input || !table) return;
+
+    var tbody = table.querySelector('tbody');
+    if (!tbody) return;
+    var rows = tbody.querySelectorAll('tr:not(.drilldown-row)');
+
+    // Create no-results message
+    var noResults = document.createElement('div');
+    noResults.className = 'table-no-results';
+    noResults.textContent = 'Nenhuma campanha encontrada';
+    table.parentNode.insertBefore(noResults, table.nextSibling);
+
+    input.addEventListener('input', function() {
+      var q = this.value.toLowerCase().trim();
+      var visible = 0;
+      rows.forEach(function(row) {
+        var text = row.textContent.toLowerCase();
+        var match = !q || text.indexOf(q) !== -1;
+        row.style.display = match ? '' : 'none';
+        // Also hide associated drilldown row
+        var next = row.nextElementSibling;
+        if (next && next.classList.contains('drilldown-row')) {
+          next.style.display = 'none';
+        }
+        if (match) visible++;
+      });
+      noResults.style.display = visible === 0 ? 'block' : 'none';
+    });
+  }
+
+  setupSearch('searchCampaigns', 'tableCampaigns');
+  setupSearch('searchROI', 'tableROI');
+})();
+</script>
 {% endblock %}

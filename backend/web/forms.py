@@ -13,11 +13,19 @@ class LoginForm(forms.Form):
 class ClienteForm(forms.ModelForm):
     class Meta:
         model = Cliente
-        fields = ["nome", "slug", "cnpj", "ativo", "logo"]
+        fields = ["nome", "slug", "cnpj", "report_emails", "email_reports", "whatsapp", "whatsapp_reports", "ativo", "logo"]
         widgets = {
             "nome": forms.TextInput(attrs={"class": "input", "placeholder": "Nome"}),
             "slug": forms.TextInput(attrs={"class": "input", "placeholder": "Slug (ex: sabesp)"}),
             "cnpj": forms.TextInput(attrs={"class": "input", "placeholder": "CNPJ"}),
+            "report_emails": forms.Textarea(attrs={"class": "input", "placeholder": "gestor@empresa.com\ndiretoria@empresa.com", "rows": 3, "style": "resize:vertical;min-height:60px;"}),
+            "whatsapp": forms.TextInput(attrs={"class": "input", "placeholder": "5511999999999"}),
+        }
+        labels = {
+            "report_emails": "E-mails para Relatórios",
+            "email_reports": "Ativar envio de relatórios por e-mail",
+            "whatsapp": "WhatsApp",
+            "whatsapp_reports": "Ativar envio de relatórios via WhatsApp",
         }
 
 

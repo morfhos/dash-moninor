@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 MODEL = "claude-sonnet-4-20250514"
-CACHE_TTL = 3600  # 1 hour
+CACHE_TTL = 86400  # 24 hours
 
 
 def check_ai_status() -> dict:
@@ -393,10 +393,11 @@ def generate_analytics_insights(context: dict, cliente_id: int = 0) -> Optional[
         logger.info("ANTHROPIC_API_KEY not set, skipping AI insights")
         return None
 
-    date_from = context.get("date_from", "")
-    date_to = context.get("date_to", "")
-    fingerprint = _data_fingerprint(context)
-    cache_key = _build_cache_key("insights", cliente_id, date_from, date_to, fingerprint)
+    date_from = context.get("date_from", "") or "all"
+    date_to = context.get("date_to", "") or "all"
+    # Simple cache key: cliente + dates only (no data fingerprint)
+    # This ensures cache persists for 24h even if page is reloaded
+    cache_key = f"ai:insights:{cliente_id}:{date_from}:{date_to}"
 
     cached = cache.get(cache_key)
     if cached:

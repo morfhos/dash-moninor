@@ -19,7 +19,7 @@
 | **Fase 3** — Importação de Dados | Semana 2 | D8 – D11 | Campanhas reais, integrações Google/Meta |
 | **Fase 4** — Frontend e UX | Semana 3 | D12 – D15 | Refinamento de interface, responsividade |
 | **Fase 5** — QA e Homologação | Semana 4 | D16 – D18 | Testes, ajustes, validação com cliente |
-| **Fase 6** — Go-Live e Handoff | Semana 4 | D19 – D20 | Deploy final, treinamento, documentação |
+| **Fase 6** — Go-Live e Handoff | Semana 4 | D19 – D20 | Deploy final |
 
 ---
 

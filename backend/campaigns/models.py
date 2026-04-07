@@ -139,6 +139,15 @@ class PlacementLine(models.Model):
         DISPLAY = "display", "DISPLAY"
         SEARCH = "search", "SEARCH"
         SOCIAL = "social", "SOCIAL"
+        TIKTOK = "tiktok", "TIKTOK"
+        LINKEDIN = "linkedin", "LINKEDIN"
+        DV360 = "dv360", "DV360"
+        DV360_YOUTUBE = "dv360_youtube", "DV360_YOUTUBE"
+        DV360_SPOTIFY = "dv360_spotify", "DV360_SPOTIFY"
+        DV360_ELETROMIDIA = "dv360_eletromid", "DV360_ELETROMIDIA"
+        DV360_NETFLIX = "dv360_netflix", "DV360_NETFLIX"
+        DV360_GLOBOPLAY = "dv360_globoplay", "DV360_GLOBOPLAY"
+        DV360_ADMOOH = "dv360_admooh", "DV360_ADMOOH"
         OTHER = "other", "OTHER"
 
     campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name="placement_lines")
@@ -184,6 +193,102 @@ class PlacementDay(models.Model):
 
     def __str__(self) -> str:
         return f"{self.placement_line_id} {self.date}"
+
+
+class AdGroup(models.Model):
+    """Grupo de anúncios — nível intermediário entre Campaign e Ad."""
+    class Status(models.TextChoices):
+        ENABLED = "enabled", "Ativo"
+        PAUSED = "paused", "Pausado"
+        REMOVED = "removed", "Removido"
+
+    placement_line = models.ForeignKey(PlacementLine, on_delete=models.CASCADE, related_name="ad_groups")
+    name = models.CharField(max_length=250)
+    external_ref = models.CharField(max_length=120, db_index=True)
+    platform = models.CharField(max_length=20, default="google")  # google, meta
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ENABLED)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Grupo de Anúncios"
+        verbose_name_plural = "Grupos de Anúncios"
+        unique_together = ("placement_line", "external_ref")
+        indexes = [
+            models.Index(fields=["platform", "external_ref"], name="adgroup_plat_ref_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.external_ref})"
+
+
+class AdGroupDay(models.Model):
+    """Métricas diárias por grupo de anúncios."""
+    ad_group = models.ForeignKey(AdGroup, on_delete=models.CASCADE, related_name="days")
+    date = models.DateField()
+    impressions = models.PositiveIntegerField(default=0)
+    clicks = models.PositiveIntegerField(default=0)
+    cost = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+
+    class Meta:
+        unique_together = ("ad_group", "date")
+        indexes = [
+            models.Index(fields=["date"], name="adgroupday_date_idx"),
+        ]
+
+
+class Ad(models.Model):
+    """Anúncio individual dentro de um grupo."""
+    class Status(models.TextChoices):
+        ENABLED = "enabled", "Ativo"
+        PAUSED = "paused", "Pausado"
+        REMOVED = "removed", "Removido"
+
+    class AdType(models.TextChoices):
+        TEXT = "text", "Texto"
+        RESPONSIVE_SEARCH = "responsive_search", "Pesquisa Responsiva"
+        RESPONSIVE_DISPLAY = "responsive_display", "Display Responsivo"
+        VIDEO = "video", "Vídeo"
+        IMAGE = "image", "Imagem"
+        SHOPPING = "shopping", "Shopping"
+        APP = "app", "App"
+        OTHER = "other", "Outro"
+
+    ad_group = models.ForeignKey(AdGroup, on_delete=models.CASCADE, related_name="ads")
+    name = models.CharField(max_length=250, blank=True, default="")
+    headline = models.CharField(max_length=250, blank=True, default="")
+    description = models.TextField(blank=True, default="")
+    final_url = models.URLField(max_length=500, blank=True, default="")
+    ad_type = models.CharField(max_length=30, choices=AdType.choices, default=AdType.OTHER)
+    external_ref = models.CharField(max_length=120, db_index=True)
+    platform = models.CharField(max_length=20, default="google")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ENABLED)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Anúncio"
+        verbose_name_plural = "Anúncios"
+        unique_together = ("ad_group", "external_ref")
+        indexes = [
+            models.Index(fields=["platform", "external_ref"], name="ad_plat_ref_idx"),
+        ]
+
+    def __str__(self):
+        return self.name or self.headline or f"Ad #{self.external_ref}"
+
+
+class AdDay(models.Model):
+    """Métricas diárias por anúncio."""
+    ad = models.ForeignKey(Ad, on_delete=models.CASCADE, related_name="days")
+    date = models.DateField()
+    impressions = models.PositiveIntegerField(default=0)
+    clicks = models.PositiveIntegerField(default=0)
+    cost = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+
+    class Meta:
+        unique_together = ("ad", "date")
+        indexes = [
+            models.Index(fields=["date"], name="adday_date_idx"),
+        ]
 
 
 class CreativeAsset(models.Model):
