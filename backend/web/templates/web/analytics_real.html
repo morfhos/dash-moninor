@@ -353,7 +353,7 @@
   }
   .stat-mini-value {
     font-size: 15px;
-    font-weight: 800;
+    font-weight: 700;
     color: var(--text-primary);
     line-height: 1.2;
   }
@@ -1809,30 +1809,41 @@ document.addEventListener('DOMContentLoaded', function() {
     metaSlider.addEventListener('input', updateSim);
     if (cpmSlider) cpmSlider.addEventListener('input', updateSim);
     if (ctrIncSlider) ctrIncSlider.addEventListener('input', updateSim);
-    resetBtn.addEventListener('click', function() {
-      googleSlider.value = 0;
-      metaSlider.value = 0;
-      if (cpmSlider) cpmSlider.value = 0;
-      if (ctrIncSlider) ctrIncSlider.value = 0;
-      updateSim();
-    });
+    if (resetBtn) {
+      resetBtn.addEventListener('click', function() {
+        googleSlider.value = 0;
+        metaSlider.value = 0;
+        if (cpmSlider) cpmSlider.value = 0;
+        if (ctrIncSlider) ctrIncSlider.value = 0;
+        updateSim();
+      });
+    }
     updateSim();
   }
 })();
-(function(){
-  const pills  = document.querySelectorAll('.al-pill');
-  const groups = document.querySelectorAll('.al-group');
+</script>
 
+<!-- Alert filter pills (isolated <script> so it can't be broken by errors above) -->
+<script>
+(function(){
+  var pills = document.querySelectorAll('.al-pill');
+  if (!pills.length) return;
+
+  // IMPORTANT: re-query .al-group on every call. The AI insights AJAX
+  // (further below) replaces the wrapper's innerHTML after the page loads,
+  // which detaches the original group nodes — a cached NodeList would point
+  // at stale elements and the filter would silently do nothing.
   function setActive(filter){
-    pills.forEach(p => p.classList.toggle('active', p.dataset.filter === filter));
-    if(filter === 'all'){
-      groups.forEach(g => g.style.display = '');
-      return;
-    }
-    groups.forEach(g => g.style.display = (g.dataset.group === filter ? '' : 'none'));
+    pills.forEach(function(p){ p.classList.toggle('active', p.dataset.filter === filter); });
+    var groups = document.querySelectorAll('.al-group');
+    groups.forEach(function(g){
+      g.style.display = (filter === 'all' || g.dataset.group === filter) ? '' : 'none';
+    });
   }
 
-  pills.forEach(p => p.addEventListener('click', () => setActive(p.dataset.filter)));
+  pills.forEach(function(p){
+    p.addEventListener('click', function(){ setActive(p.dataset.filter); });
+  });
   setActive('all');
 })();
 </script>

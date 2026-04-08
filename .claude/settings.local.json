@@ -19,7 +19,9 @@
       "Bash(pip list:*)",
       "Bash(pip install:*)",
       "Bash(C:UsersMarcioanaconda3python.exe -m pip install anthropic)",
-      "Bash(\"C:/Users/Marcio/anaconda3/python.exe\" -m pip install anthropic)"
+      "Bash(\"C:/Users/Marcio/anaconda3/python.exe\" -m pip install anthropic)",
+      "Bash(awk 'NR==717 || NR==777 || NR==918 || NR==952 || NR==1023 || NR==1051 || NR==1105 || NR==1131 || NR==1180 || NR==1245 || NR==1304 || NR==1328 || NR==1347' backend/web/templates/web/dashon.html)",
+      "Bash(git add:*)"
     ]
   }
 }

@@ -36,6 +36,7 @@ urlpatterns = [
     path("veiculacao/dv360-globoplay/", views.veiculacao, name="veiculacao_dv360_globoplay", kwargs={"platform": "dv360_globoplay"}),
     path("veiculacao/dv360-admooh/", views.veiculacao, name="veiculacao_dv360_admooh", kwargs={"platform": "dv360_admooh"}),
     path("dashon/", views.dashon, name="dashon"),
+    path("dashboard/toggle-module/", views.dashboard_toggle_module, name="dashboard_toggle_module"),
     path("consolidated-on/", views.consolidated_on, name="consolidated_on"),
     path("relatorios/", views.relatorios, name="relatorios"),
     path("relatorios/clientes/", views.relatorios_clientes, name="relatorios_clientes"),

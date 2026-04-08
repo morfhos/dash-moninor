@@ -15,10 +15,44 @@
   </div>
 
   <section class="main-panel">
-    <div class="campaigns-grid">
+    <!-- Filtros por tipo de mídia -->
+    {% if campaigns_with_stats %}
+    <div class="media-filter-bar">
+      <div class="media-filter-pills">
+        <button type="button" class="media-pill active" data-filter="all">
+          <span class="pill-dot pill-dot-all"></span>
+          Todas <b>{{ media_counts.all }}</b>
+        </button>
+        <button type="button" class="media-pill" data-filter="on">
+          <span class="pill-dot pill-dot-on"></span>
+          Online <b>{{ media_counts.on }}</b>
+        </button>
+        <button type="button" class="media-pill" data-filter="off">
+          <span class="pill-dot pill-dot-off"></span>
+          Offline <b>{{ media_counts.off }}</b>
+        </button>
+        <button type="button" class="media-pill" data-filter="mixed">
+          <span class="pill-dot pill-dot-mixed"></span>
+          Misto <b>{{ media_counts.mixed }}</b>
+        </button>
+      </div>
+      <div class="media-search-wrap">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" class="media-search-input" id="searchCampaigns" placeholder="Buscar campanha..." autocomplete="off">
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="campaigns-grid" id="campaignsGrid">
       {% for item in campaigns_with_stats %}
-        <a href="{{ item.link_url }}" class="campaign-card">
+        <a href="{{ item.link_url }}" class="campaign-card kind-{{ item.media_kind }}" data-media-kind="{{ item.media_kind }}" data-name="{{ item.campaign.name|lower }}">
           <div class="card-logo">
+            <span class="kind-badge kind-badge-{{ item.media_kind }}">
+              {% if item.media_kind == "on" %}ONLINE
+              {% elif item.media_kind == "off" %}OFFLINE
+              {% elif item.media_kind == "mixed" %}MISTO
+              {% else %}—{% endif %}
+            </span>
             {% if item.cliente.logo %}
               <img src="{{ item.cliente.logo.url }}" alt="{{ item.cliente.nome }}" />
             {% else %}
@@ -42,7 +76,11 @@
             </div>
             <div class="stat-row">
               <span class="stat-label">ON / OFF</span>
-              <span class="stat-value">{{ item.on_count }} : {{ item.off_count }}</span>
+              <span class="stat-value">
+                <span style="color:#16a34a;">{{ item.on_count }}</span>
+                <span style="color:var(--text-secondary);"> : </span>
+                <span style="color:#dc2626;">{{ item.off_count }}</span>
+              </span>
             </div>
           </div>
           <div class="card-footer">
@@ -60,6 +98,9 @@
           <p>Nenhuma campanha cadastrada.</p>
         </div>
       {% endfor %}
+      <div class="empty-state filter-empty" id="filterEmpty" style="display:none;">
+        <p>Nenhuma campanha encontrada com os filtros atuais.</p>
+      </div>
     </div>
   </section>
 
@@ -92,12 +133,50 @@
   .card-logo {
     width: 100%;
     height: 140px;
-    background: linear-gradient(135deg, #dbeafe 0%, #2563eb 100%);
+    background: linear-gradient(135deg, #f1f5f9 0%, #cbd5e1 100%);
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 20px;
+    position: relative;
   }
+  /* Color-coded card-logo background by media kind */
+  .campaign-card.kind-on .card-logo {
+    background: linear-gradient(135deg, #dcfce7 0%, #16a34a 100%);
+  }
+  .campaign-card.kind-off .card-logo {
+    background: linear-gradient(135deg, #fee2e2 0%, #dc2626 100%);
+  }
+  .campaign-card.kind-mixed .card-logo {
+    background: linear-gradient(135deg, #ede9fe 0%, #7c3aed 100%);
+  }
+  .campaign-card.kind-none .card-logo {
+    background: linear-gradient(135deg, #f1f5f9 0%, #94a3b8 100%);
+  }
+  /* Subtle accent border on the whole card */
+  .campaign-card.kind-on:hover { border-color: #16a34a; }
+  .campaign-card.kind-off:hover { border-color: #dc2626; }
+  .campaign-card.kind-mixed:hover { border-color: #7c3aed; }
+
+  /* Kind badge inside card-logo */
+  .kind-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: .06em;
+    padding: 4px 9px;
+    border-radius: 12px;
+    background: rgba(255,255,255,.92);
+    backdrop-filter: blur(4px);
+    text-transform: uppercase;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  }
+  .kind-badge-on { color: #15803d; }
+  .kind-badge-off { color: #b91c1c; }
+  .kind-badge-mixed { color: #6d28d9; }
+  .kind-badge-none { color: #64748b; }
 
   .card-logo img {
     max-width: 100%;
@@ -231,5 +310,145 @@
   .back-link:hover {
     color: var(--brand-primary);
   }
+
+  /* ── Filter bar (pills + search) ── */
+  .media-filter-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding: 14px 18px;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+    flex-wrap: wrap;
+  }
+  .media-filter-pills {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .media-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border-color);
+    background: white;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .15s;
+    font-family: inherit;
+  }
+  .media-pill:hover {
+    background: #f8fafc;
+    color: var(--text-primary);
+  }
+  .media-pill.active {
+    background: var(--brand-primary, #6366f1);
+    border-color: var(--brand-primary, #6366f1);
+    color: #fff;
+  }
+  .media-pill b {
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 10px;
+    background: rgba(0,0,0,.06);
+    color: inherit;
+    font-weight: 800;
+  }
+  .media-pill.active b {
+    background: rgba(255,255,255,.22);
+    color: #fff;
+  }
+  .pill-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .pill-dot-all { background: #6366f1; }
+  .pill-dot-on { background: #16a34a; }
+  .pill-dot-off { background: #dc2626; }
+  .pill-dot-mixed { background: #7c3aed; }
+
+  .media-search-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-width: 220px;
+  }
+  .media-search-wrap svg {
+    position: absolute;
+    left: 12px;
+    color: var(--text-secondary);
+    pointer-events: none;
+  }
+  .media-search-input {
+    width: 100%;
+    padding: 8px 14px 8px 34px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--surface, #fff);
+    color: var(--text-primary);
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .media-search-input:focus {
+    outline: none;
+    border-color: var(--brand-primary, #6366f1);
+    box-shadow: 0 0 0 3px rgba(99,102,241,.1);
+  }
+  .filter-empty {
+    grid-column: 1 / -1;
+  }
 </style>
+
+<script>
+(function() {
+  var pills = document.querySelectorAll('.media-pill');
+  var searchInput = document.getElementById('searchCampaigns');
+  var grid = document.getElementById('campaignsGrid');
+  var emptyMsg = document.getElementById('filterEmpty');
+  if (!grid) return;
+  var cards = Array.prototype.slice.call(grid.querySelectorAll('.campaign-card'));
+
+  var state = { kind: 'all', search: '' };
+
+  function apply() {
+    var q = state.search.toLowerCase().trim();
+    var visible = 0;
+    cards.forEach(function(card) {
+      var matchKind = state.kind === 'all' || card.dataset.mediaKind === state.kind;
+      var matchSearch = !q || (card.dataset.name || '').indexOf(q) !== -1;
+      var show = matchKind && matchSearch;
+      card.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    if (emptyMsg) emptyMsg.style.display = (visible === 0 && cards.length > 0) ? 'block' : 'none';
+  }
+
+  pills.forEach(function(pill) {
+    pill.addEventListener('click', function() {
+      pills.forEach(function(p) { p.classList.remove('active'); });
+      this.classList.add('active');
+      state.kind = this.dataset.filter;
+      apply();
+    });
+  });
+
+  if (searchInput) {
+    searchInput.addEventListener('input', function() {
+      state.search = this.value;
+      apply();
+    });
+  }
+})();
+</script>
 {% endblock %}

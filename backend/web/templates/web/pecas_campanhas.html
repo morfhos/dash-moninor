@@ -15,11 +15,46 @@
   </div>
 
   <section class="main-panel">
-    <div class="campaigns-grid">
+    {% if campaigns_with_stats %}
+    <div class="media-filter-bar">
+      <div class="media-filter-pills">
+        <button type="button" class="media-pill active" data-filter="all">
+          <span class="pill-dot pill-dot-all"></span>
+          Todas <b>{{ media_counts.all }}</b>
+        </button>
+        <button type="button" class="media-pill" data-filter="on">
+          <span class="pill-dot pill-dot-on"></span>
+          Online <b>{{ media_counts.on }}</b>
+        </button>
+        <button type="button" class="media-pill" data-filter="off">
+          <span class="pill-dot pill-dot-off"></span>
+          Offline <b>{{ media_counts.off }}</b>
+        </button>
+        <button type="button" class="media-pill" data-filter="mixed">
+          <span class="pill-dot pill-dot-mixed"></span>
+          Misto <b>{{ media_counts.mixed }}</b>
+        </button>
+      </div>
+      <div class="media-search-wrap">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" class="media-search-input" id="searchPecas" placeholder="Buscar campanha..." autocomplete="off">
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="campaigns-grid" id="pecasGrid">
       {% for item in campaigns_with_stats %}
-        <a href="{% url 'web:campanha_detalhe' item.campaign.id %}" class="campaign-card">
+        <a href="{% url 'web:campanha_detalhe' item.campaign.id %}" class="campaign-card kind-{{ item.media_kind }}" data-media-kind="{{ item.media_kind }}" data-name="{{ item.campaign.name|lower }}">
           <div class="card-header">
-            <div class="campaign-title">{{ item.campaign.name }}</div>
+            <div class="campaign-title">
+              <span class="kind-badge kind-badge-{{ item.media_kind }}">
+                {% if item.media_kind == "on" %}ONLINE
+                {% elif item.media_kind == "off" %}OFFLINE
+                {% elif item.media_kind == "mixed" %}MISTO
+                {% else %}—{% endif %}
+              </span>
+              {{ item.campaign.name }}
+            </div>
             <span class="status-badge {% if item.campaign.status == 'active' %}active{% elif item.campaign.status == 'paused' %}paused{% else %}draft{% endif %}">
               {% if item.campaign.status == 'active' %}ATIVA{% elif item.campaign.status == 'paused' %}PAUSADA{% elif item.campaign.status == 'draft' %}RASCUNHO{% else %}{{ item.campaign.status|upper }}{% endif %}
             </span>
@@ -57,6 +92,9 @@
           <p>Nenhuma campanha cadastrada.</p>
         </div>
       {% endfor %}
+      <div class="empty-state filter-empty" id="filterEmpty" style="display:none;">
+        <p>Nenhuma campanha encontrada com os filtros atuais.</p>
+      </div>
     </div>
   </section>
 
@@ -72,7 +110,7 @@
     flex-direction: column;
     background: white;
     border-radius: 16px;
-    border: 2px solid #22c55e;
+    border: 2px solid #cbd5e1;
     overflow: hidden;
     text-decoration: none;
     color: inherit;
@@ -85,6 +123,32 @@
     box-shadow: 0 12px 24px rgba(0,0,0,0.1);
     border-color: var(--brand-primary);
   }
+  /* Border + accent color per media kind */
+  .campaign-card.kind-on { border-color: #16a34a; }
+  .campaign-card.kind-off { border-color: #dc2626; }
+  .campaign-card.kind-mixed { border-color: #7c3aed; }
+  .campaign-card.kind-none { border-color: #cbd5e1; }
+  .campaign-card.kind-on:hover { border-color: #16a34a; box-shadow: 0 12px 24px rgba(22,163,74,0.18); }
+  .campaign-card.kind-off:hover { border-color: #dc2626; box-shadow: 0 12px 24px rgba(220,38,38,0.18); }
+  .campaign-card.kind-mixed:hover { border-color: #7c3aed; box-shadow: 0 12px 24px rgba(124,58,237,0.18); }
+
+  /* Inline kind badge above the campaign name */
+  .kind-badge {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: .06em;
+    padding: 3px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    margin-right: 6px;
+    vertical-align: 2px;
+  }
+  .kind-badge-on { background: rgba(34,197,94,.12); color: #15803d; }
+  .kind-badge-off { background: rgba(239,68,68,.12); color: #b91c1c; }
+  .kind-badge-mixed { background: rgba(124,58,237,.12); color: #6d28d9; }
+  .kind-badge-none { background: rgba(107,114,128,.10); color: #64748b; }
 
   .card-header {
     padding: 16px 20px;
@@ -240,5 +304,108 @@
   .back-link:hover {
     color: var(--brand-primary);
   }
+
+  /* ── Filter bar (pills + search) ── */
+  .media-filter-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding: 14px 18px;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+    flex-wrap: wrap;
+  }
+  .media-filter-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+  .media-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 20px;
+    border: 1px solid var(--border-color); background: white;
+    color: var(--text-secondary); font-size: 12px; font-weight: 700;
+    cursor: pointer; transition: all .15s; font-family: inherit;
+  }
+  .media-pill:hover { background: #f8fafc; color: var(--text-primary); }
+  .media-pill.active {
+    background: var(--brand-primary, #6366f1);
+    border-color: var(--brand-primary, #6366f1);
+    color: #fff;
+  }
+  .media-pill b {
+    font-size: 11px; padding: 1px 7px; border-radius: 10px;
+    background: rgba(0,0,0,.06); color: inherit; font-weight: 800;
+  }
+  .media-pill.active b { background: rgba(255,255,255,.22); color: #fff; }
+  .pill-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .pill-dot-all { background: #6366f1; }
+  .pill-dot-on { background: #16a34a; }
+  .pill-dot-off { background: #dc2626; }
+  .pill-dot-mixed { background: #7c3aed; }
+
+  .media-search-wrap {
+    position: relative; display: flex; align-items: center; min-width: 220px;
+  }
+  .media-search-wrap svg {
+    position: absolute; left: 12px; color: var(--text-secondary); pointer-events: none;
+  }
+  .media-search-input {
+    width: 100%; padding: 8px 14px 8px 34px;
+    border: 1px solid var(--border-color); border-radius: 10px;
+    font-size: 13px; font-family: inherit; background: var(--surface, #fff);
+    color: var(--text-primary); transition: border-color .15s, box-shadow .15s;
+  }
+  .media-search-input:focus {
+    outline: none; border-color: var(--brand-primary, #6366f1);
+    box-shadow: 0 0 0 3px rgba(99,102,241,.1);
+  }
+  .filter-empty { grid-column: 1 / -1; }
 </style>
+
+<script>
+(function() {
+  var pills = document.querySelectorAll('.media-pill');
+  var searchInput = document.getElementById('searchPecas');
+  var grid = document.getElementById('pecasGrid');
+  var emptyMsg = document.getElementById('filterEmpty');
+  if (!grid) return;
+  var cards = Array.prototype.slice.call(grid.querySelectorAll('.campaign-card'));
+
+  var state = { kind: 'all', search: '' };
+
+  function apply() {
+    var q = state.search.toLowerCase().trim();
+    var visible = 0;
+    cards.forEach(function(card) {
+      var matchKind = state.kind === 'all' || card.dataset.mediaKind === state.kind;
+      var matchSearch = !q || (card.dataset.name || '').indexOf(q) !== -1;
+      var show = matchKind && matchSearch;
+      card.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    if (emptyMsg) emptyMsg.style.display = (visible === 0 && cards.length > 0) ? 'block' : 'none';
+  }
+
+  pills.forEach(function(pill) {
+    pill.addEventListener('click', function() {
+      pills.forEach(function(p) { p.classList.remove('active'); });
+      this.classList.add('active');
+      state.kind = this.dataset.filter;
+      apply();
+    });
+  });
+
+  if (searchInput) {
+    searchInput.addEventListener('input', function() {
+      state.search = this.value;
+      apply();
+    });
+  }
+})();
+document.querySelector('.back-link').onclick = function(e) {
+    e.preventDefault();
+    history.back();
+  };
+</script>
 {% endblock %}

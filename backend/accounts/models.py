@@ -13,6 +13,16 @@ class Cliente(models.Model):
     email_reports = models.BooleanField(default=False, help_text="Enviar relatórios periódicos por e-mail")
     ativo = models.BooleanField(default=True)
     logo = models.FileField(upload_to="clientes/logos/", blank=True, null=True)
+    dashon_hidden_modules = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="IDs de modulos do DashON ocultos para usuarios nao-admin deste cliente",
+    )
+    consolidated_hidden_modules = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="IDs de modulos do Consolidated ON ocultos para usuarios nao-admin deste cliente",
+    )
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
 

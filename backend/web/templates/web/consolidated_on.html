@@ -15,6 +15,63 @@
   .btn-filter { padding: 8px 16px; background: var(--brand-primary); color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; transition: background .2s; }
   .btn-filter:hover { background: #4c2bc2; }
 
+  /* ── Compare toggle (mirrored from DashON) ── */
+  .compare-toggle { display: flex; align-items: center; gap: 8px; margin-left: 8px; }
+  .compare-toggle-label {
+    font-size: 13px; font-weight: 600; color: var(--text-secondary);
+    cursor: pointer; user-select: none;
+  }
+  .compare-switch {
+    position: relative; width: 40px; height: 22px; flex-shrink: 0;
+  }
+  .compare-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .compare-switch .slider {
+    position: absolute; cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: #cbd5e1; border-radius: 22px;
+    transition: background .25s;
+  }
+  .compare-switch .slider::before {
+    content: ''; position: absolute;
+    height: 16px; width: 16px; left: 3px; bottom: 3px;
+    background: white; border-radius: 50%;
+    transition: transform .25s;
+    box-shadow: 0 1px 3px rgba(0,0,0,.15);
+  }
+  .compare-switch input:checked + .slider { background: var(--brand-primary, #6366f1); }
+  .compare-switch input:checked + .slider::before { transform: translateX(18px); }
+  .compare-dates {
+    display: none;
+    align-items: flex-end;
+    gap: 8px;
+    margin-left: 4px;
+  }
+  .compare-dates.active { display: flex; flex-wrap: wrap; }
+  .compare-dates .filter-group label { color: #6366f1; }
+  .compare-dates input[type="date"] {
+    padding: 6px 10px; border: 1px solid var(--border-color);
+    border-radius: 8px; font-size: 12px; font-family: inherit;
+    background: #fff; color: var(--text-primary);
+  }
+  .compare-banner {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px; margin-bottom: 16px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(99,102,241,.06), rgba(139,92,246,.06));
+    border: 1px solid rgba(99,102,241,.15);
+    font-size: 12px; color: var(--text-secondary);
+    flex-wrap: wrap;
+  }
+  .compare-banner strong { color: var(--text-primary); }
+  .compare-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 12px;
+    font-size: 11px; font-weight: 700;
+  }
+  .compare-badge.up      { background: rgba(34,197,94,.1); color: #16a34a; }
+  .compare-badge.down    { background: rgba(239,68,68,.08); color: #dc2626; }
+  .compare-badge.neutral { background: rgba(107,114,128,.08); color: var(--text-secondary); }
+
   /* Hero totals */
   .con-hero {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 28px;
@@ -33,7 +90,7 @@
   .con-hero-card.teal::before { background: linear-gradient(90deg,#0d9488,#14b8a6); }
   .con-hero-card.pink::before { background: linear-gradient(90deg,#db2777,#ec4899); }
   .con-hero-card.indigo::before { background: linear-gradient(90deg,#4f46e5,#6366f1); }
-  .con-hero-value { font-size: 20px; font-weight: 800; color: var(--text-primary); line-height: 1.1; }
+  .con-hero-value { font-size: 20px; font-weight: 7analytics00; color: var(--text-primary); line-height: 1.1; }
   .con-hero-label { font-size: 12px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; margin-top: 4px; }
 
   /* Section */
@@ -42,7 +99,7 @@
     box-shadow: 0 1px 3px rgba(0,0,0,.04); overflow: hidden; margin-bottom: 24px;
   }
   .con-section-header {
-    padding: 20px 24px; border-bottom: 1px solid var(--border-color);
+    padding: 20px 24px;
     font-size: 16px; font-weight: 700; color: var(--text-primary);
     display: flex; align-items: center; gap: 10px;
   }
@@ -73,7 +130,7 @@
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
   }
   .v-metric { text-align: center; }
-  .v-metric-value { font-size: 18px; font-weight: 800; color: var(--text-primary); }
+  .v-metric-value { font-size: 18px; font-weight: 600; color: var(--text-primary); }
   .v-metric-label { font-size: 10px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; margin-top: 1px; }
   .vehicle-card-footer {
     padding: 10px 20px; border-top: 1px solid var(--border-color);
@@ -127,6 +184,86 @@
     transform: translateX(-50%); padding: 6px 12px; background: #1e293b; color: #fff;
     font-size: 11px; font-weight: 500; border-radius: 6px; white-space: nowrap; z-index: 100;
   }
+
+  /* ── Module visibility toggle (admin only) ── */
+  .module-toggle-wrap { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
+  .module-toggle-btn {
+    width: 30px; height: 30px; border-radius: 8px;
+    border: 1px solid var(--border-color); background: var(--surface);
+    color: var(--text-secondary); cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: all .15s; flex-shrink: 0;
+  }
+  .module-toggle-btn:hover { background: var(--surface-2,#f1f5f9); color: var(--brand-primary,#6366f1); border-color: var(--brand-primary,#6366f1); }
+  .module-toggle-btn.is-hidden { background: rgba(239,68,68,.08); color: #dc2626; border-color: rgba(239,68,68,.25); }
+  .module-toggle-btn.is-hidden:hover { background: rgba(239,68,68,.14); }
+  .module-hidden-badge {
+    font-size: 9px; font-weight: 800; letter-spacing: .05em; padding: 3px 8px;
+    border-radius: 10px; background: rgba(239,68,68,.1); color: #dc2626;
+    border: 1px solid rgba(239,68,68,.2); text-transform: uppercase;
+  }
+  .module-dimmed { opacity: 0.6; position: relative; }
+  .module-dimmed::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(135deg, transparent 0 12px, rgba(239,68,68,.04) 12px 13px);
+    border-radius: inherit;
+  }
+  .floating-toggle { position: relative; }
+  .floating-toggle > .module-toggle-wrap {
+    position: absolute; top: 12px; right: 14px; z-index: 5; margin-left: 0;
+  }
+
+  /* ── Table search + filter pills + show-more ── */
+  .table-filter-pills {
+    display: flex; gap: 8px; padding: 0 24px 12px; flex-wrap: wrap;
+  }
+  .filter-pill {
+    padding: 6px 14px; border-radius: 18px; border: 1px solid var(--border-color);
+    background: var(--surface); color: var(--text-secondary);
+    font-size: 12px; font-weight: 700; cursor: pointer; transition: all .15s; font-family: inherit;
+  }
+  .filter-pill:hover { background: var(--surface-2,#f8fafc); }
+  .filter-pill.active {
+    background: var(--brand-primary,#6366f1); color: #fff; border-color: var(--brand-primary,#6366f1);
+  }
+  .table-search { padding: 0 24px 16px; }
+  .table-search-input {
+    width: 100%; max-width: 400px; padding: 9px 14px 9px 36px;
+    border: 1px solid var(--border-color); border-radius: 10px;
+    font-size: 13px; font-family: inherit; background: var(--surface);
+    color: var(--text-primary); transition: border-color .2s, box-shadow .2s;
+  }
+  .table-search-input:focus { outline: none; border-color: var(--brand-primary,#6366f1); box-shadow: 0 0 0 3px rgba(99,102,241,.1); }
+  .table-search-wrap { position: relative; display: inline-block; width: 100%; max-width: 400px; }
+  .table-search-wrap svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-secondary); pointer-events: none; }
+  .table-no-results { padding: 24px; text-align: center; color: var(--text-secondary); font-size: 13px; display: none; }
+
+  .show-more-row td {
+    padding: 14px 16px !important; text-align: center; background: var(--surface-2,#f8fafc);
+  }
+  .show-more-btn {
+    background: transparent; border: 1px solid var(--border-color);
+    color: var(--brand-primary,#6366f1); padding: 7px 18px; border-radius: 20px;
+    font-size: 12px; font-weight: 700; cursor: pointer; transition: background .15s; font-family: inherit;
+  }
+  .show-more-btn:hover { background: rgba(99,102,241,.06); }
+
+  /* ── Sortable table headers ── */
+  .con-table th.sortable {
+    cursor: pointer; user-select: none; position: relative;
+    transition: background .15s, color .15s;
+  }
+  .con-table th.sortable:hover { background: #eef2ff; color: var(--brand-primary,#6366f1); }
+  .con-table th.sortable .sort-arrow {
+    display: inline-block; width: 10px; margin-left: 4px;
+    opacity: 0.3; font-size: 9px; vertical-align: middle; transition: opacity .15s;
+  }
+  .con-table th.sortable:hover .sort-arrow { opacity: 0.7; }
+  .con-table th.sort-asc .sort-arrow,
+  .con-table th.sort-desc .sort-arrow { opacity: 1; color: var(--brand-primary,#6366f1); }
+  .con-table th.sort-asc .sort-arrow::before { content: '▲'; }
+  .con-table th.sort-desc .sort-arrow::before { content: '▼'; }
+  .con-table th.sortable:not(.sort-asc):not(.sort-desc) .sort-arrow::before { content: '⇅'; font-size: 11px; }
 </style>
 
 <div class="topbar">
@@ -157,8 +294,8 @@
   </div>
   {% else %}
 
-  <!-- Filters -->
-  <form class="con-filters" method="get">
+  <!-- Filters (always visible — controls are not toggleable per client) -->
+  <form class="con-filters" method="get" id="conFiltersForm">
     <div class="filter-group">
       <label for="dateFrom">Data inicio</label>
       <input type="date" id="dateFrom" name="date_from" value="{{ date_from }}">
@@ -169,11 +306,60 @@
     </div>
     <button type="submit" class="btn-filter">Filtrar</button>
     <a href="{{ request.path }}" class="btn-filter" style="background:#e5e7eb;color:#111827;text-decoration:none;display:inline-flex;align-items:center;">Limpar</a>
+
+    <!-- Compare toggle -->
+    <div class="compare-toggle">
+      <label class="compare-switch" title="Comparar com periodo anterior">
+        <input type="checkbox" name="compare" value="on" id="compareToggle" {% if compare_on %}checked{% endif %}>
+        <span class="slider"></span>
+      </label>
+      <span class="compare-toggle-label" id="compareLabel">Comparar</span>
+    </div>
+
+    <!-- Compare date inputs (shown when toggle is ON) -->
+    <div class="compare-dates {% if compare_on %}active{% endif %}" id="compareDates">
+      <div class="filter-group">
+        <label for="compareFrom">Comparar de</label>
+        <input type="date" id="compareFrom" name="compare_from" value="{{ compare_from }}">
+      </div>
+      <div class="filter-group">
+        <label for="compareTo">Comparar ate</label>
+        <input type="date" id="compareTo" name="compare_to" value="{{ compare_to }}">
+      </div>
+      <span style="font-size:10px;color:var(--text-secondary);max-width:140px;line-height:1.3;">Deixe vazio para usar o periodo anterior automaticamente</span>
+    </div>
+
     <div style="flex-basis:100%;margin-top:4px;">{% include "web/_date_presets.html" %}</div>
   </form>
 
+  <!-- Comparison banner (shown when compare is active and data exists) -->
+  {% if comparison %}
+  <div class="compare-banner">
+    <svg width="16" height="16" fill="none" stroke="#6366f1" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+    <span>Comparando com <strong>{{ comparison.period_label }}</strong></span>
+    <span class="compare-badge {% if comparison.imp_change and comparison.imp_change > 0 %}up{% elif comparison.imp_change and comparison.imp_change < 0 %}down{% else %}neutral{% endif %}">
+      Imp: {% if comparison.imp_change is not None %}{% if comparison.imp_change > 0 %}+{% endif %}{{ comparison.imp_change }}%{% else %}—{% endif %}
+    </span>
+    <span class="compare-badge {% if comparison.clk_change and comparison.clk_change > 0 %}up{% elif comparison.clk_change and comparison.clk_change < 0 %}down{% else %}neutral{% endif %}">
+      Clk: {% if comparison.clk_change is not None %}{% if comparison.clk_change > 0 %}+{% endif %}{{ comparison.clk_change }}%{% else %}—{% endif %}
+    </span>
+    <span class="compare-badge {% if comparison.ctr_change and comparison.ctr_change > 0 %}up{% elif comparison.ctr_change and comparison.ctr_change < 0 %}down{% else %}neutral{% endif %}">
+      CTR: {% if comparison.ctr_change is not None %}{% if comparison.ctr_change > 0 %}+{% endif %}{{ comparison.ctr_change }}%{% else %}—{% endif %}
+    </span>
+    <span class="compare-badge {% if comparison.cost_change and comparison.cost_change > 0 %}down{% elif comparison.cost_change and comparison.cost_change < 0 %}up{% else %}neutral{% endif %}">
+      Custo: {% if comparison.cost_change is not None %}{% if comparison.cost_change > 0 %}+{% endif %}{{ comparison.cost_change }}%{% else %}—{% endif %}
+    </span>
+    <span class="compare-badge {% if comparison.roi_change and comparison.roi_change > 0 %}up{% elif comparison.roi_change and comparison.roi_change < 0 %}down{% else %}neutral{% endif %}">
+      ROI: {% if comparison.roi_change is not None %}{% if comparison.roi_change > 0 %}+{% endif %}{{ comparison.roi_change }}%{% else %}—{% endif %}
+    </span>
+  </div>
+  {% endif %}
+
   <!-- Hero totals -->
-  <div class="con-hero">
+  {% if can_manage_modules or "hero_totals" not in hidden_modules %}
+  <div class="floating-toggle{% if 'hero_totals' in hidden_modules %} module-dimmed{% endif %}" style="margin-bottom:28px;">
+    {% include "web/_module_toggle.html" with module_id="hero_totals" page="consolidated_on" %}
+  <div class="con-hero" style="margin-bottom:0;">
     <div class="con-hero-card purple animate-in" data-tooltip="Total investido em todas as midias ON">
       <div class="con-hero-value">R$ {{ total_cost|floatformat:2|intcomma }}</div>
       <div class="con-hero-label">Investimento Total</div>
@@ -203,9 +389,14 @@
       <div class="con-hero-label">Veiculos Ativos</div>
     </div>
   </div>
+  </div>
+  {% endif %}
 
   <!-- Vehicle Cards -->
-  <div class="vehicles-grid">
+  {% if can_manage_modules or "vehicles_grid" not in hidden_modules %}
+  <div class="floating-toggle{% if 'vehicles_grid' in hidden_modules %} module-dimmed{% endif %}" style="margin-bottom:24px;">
+    {% include "web/_module_toggle.html" with module_id="vehicles_grid" page="consolidated_on" %}
+  <div class="vehicles-grid" style="margin-bottom:0;">
     {% for v in vehicles_data %}
     <a href="{{ v.url }}" class="vehicle-card animate-in" style="animation-delay:{{ forloop.counter0 }}00ms;text-decoration:none;color:inherit;display:block;">
       <div class="vehicle-card-header" style="background:{{ v.gradient }};">
@@ -257,68 +448,88 @@
     </a>
     {% endfor %}
   </div>
+  </div>
+  {% endif %}
 
-  <!-- Charts -->
+  <!-- Charts: trend + donut (each in its own card with toggle) -->
   <div class="charts-grid">
-    <div class="chart-container">
+    {% if can_manage_modules or "trend_chart" not in hidden_modules %}
+    <div class="chart-container floating-toggle{% if 'trend_chart' in hidden_modules %} module-dimmed{% endif %}">
+      {% include "web/_module_toggle.html" with module_id="trend_chart" page="consolidated_on" %}
       <div class="chart-title">Impressoes por Dia (todas as midias)</div>
       <div style="position:relative;width:100%;height:calc(100% - 36px);">
         <canvas id="trendChart"></canvas>
       </div>
     </div>
-    <div class="chart-container">
+    {% endif %}
+    {% if can_manage_modules or "donut_chart" not in hidden_modules %}
+    <div class="chart-container floating-toggle{% if 'donut_chart' in hidden_modules %} module-dimmed{% endif %}">
+      {% include "web/_module_toggle.html" with module_id="donut_chart" page="consolidated_on" %}
       <div class="chart-title">Investimento por Veiculo</div>
       <div style="position:relative;width:100%;height:calc(100% - 36px);">
         <canvas id="donutChart"></canvas>
       </div>
     </div>
+    {% endif %}
   </div>
 
   <!-- Stacked bar: impressions by vehicle -->
-  <div class="bar-chart-section">
+  {% if can_manage_modules or "bar_chart" not in hidden_modules %}
+  <div class="bar-chart-section floating-toggle{% if 'bar_chart' in hidden_modules %} module-dimmed{% endif %}">
+    {% include "web/_module_toggle.html" with module_id="bar_chart" page="consolidated_on" %}
     <div class="chart-title">Comparativo de Impressoes por Veiculo</div>
     <div style="position:relative;width:100%;height:calc(100% - 36px);">
       <canvas id="barChart"></canvas>
     </div>
   </div>
+  {% endif %}
 
   <!-- Comparison table -->
-  <div class="con-section">
+  {% if can_manage_modules or "vehicles_table" not in hidden_modules %}
+  <div class="con-section{% if 'vehicles_table' in hidden_modules %} module-dimmed{% endif %}">
     <div class="con-section-header">
       <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-      Performance por Veiculo
+      Performance por Veiculo ({{ vehicles_data|length }})
+      {% include "web/_module_toggle.html" with module_id="vehicles_table" page="consolidated_on" %}
+    </div>
+    <div class="table-search">
+      <div class="table-search-wrap">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" class="table-search-input" id="searchVehicles" placeholder="Buscar veiculo..." autocomplete="off">
+      </div>
     </div>
     <div style="overflow-x:auto;">
-    <table class="con-table">
+    <table class="con-table sortable-table" id="tableVehicles">
       <thead>
         <tr>
-          <th>Veiculo</th>
-          <th class="num">Impressoes</th>
-          <th class="num">Cliques</th>
-          <th class="num">CTR</th>
-          <th class="num">CPC</th>
-          <th class="num">CPM</th>
-          <th class="num">Investimento</th>
-          <th class="num">% Invest.</th>
-          <th class="num">ROI</th>
+          <th class="sortable" data-sort-type="text">Veiculo<span class="sort-arrow"></span></th>
+          <th class="num sortable" data-sort-type="number">Impressoes<span class="sort-arrow"></span></th>
+          <th class="num sortable" data-sort-type="number">Cliques<span class="sort-arrow"></span></th>
+          <th class="num sortable" data-sort-type="number">CTR<span class="sort-arrow"></span></th>
+          <th class="num sortable" data-sort-type="number">CPC<span class="sort-arrow"></span></th>
+          <th class="num sortable" data-sort-type="number">CPM<span class="sort-arrow"></span></th>
+          <th class="num sortable" data-sort-type="number">Investimento<span class="sort-arrow"></span></th>
+          <th class="num sortable" data-sort-type="number">% Invest.<span class="sort-arrow"></span></th>
+          <th class="num sortable" data-sort-type="number">ROI<span class="sort-arrow"></span></th>
         </tr>
       </thead>
       <tbody>
         {% for v in vehicles_data %}
-        <tr>
-          <td>
+        <tr class="vehicle-row{% if forloop.counter > 6 %} extra-row{% endif %}"
+            {% if forloop.counter > 6 %}style="display:none;"{% endif %}>
+          <td data-sort-value="{{ v.label }}">
             <span style="display:inline-flex;align-items:center;gap:8px;">
               <span style="width:10px;height:10px;border-radius:50%;background:{{ v.color }};flex-shrink:0;"></span>
               <strong>{{ v.label }}</strong>
             </span>
           </td>
-          <td class="num">{{ v.impressions|intcomma }}</td>
-          <td class="num">{{ v.clicks|intcomma }}</td>
-          <td class="num" style="font-weight:600;{% if v.ctr >= 2 %}color:#16a34a{% elif v.ctr < 1 %}color:#dc2626{% endif %}">{{ v.ctr }}%</td>
-          <td class="num">R$ {{ v.cpc|floatformat:2 }}</td>
-          <td class="num">R$ {{ v.cpm|floatformat:2 }}</td>
-          <td class="num" style="font-weight:700;">R$ {{ v.cost|floatformat:2|intcomma }}</td>
-          <td class="num">
+          <td class="num" data-sort-value="{{ v.impressions }}">{{ v.impressions|intcomma }}</td>
+          <td class="num" data-sort-value="{{ v.clicks }}">{{ v.clicks|intcomma }}</td>
+          <td class="num" data-sort-value="{{ v.ctr }}" style="font-weight:600;{% if v.ctr >= 2 %}color:#16a34a{% elif v.ctr < 1 %}color:#dc2626{% endif %}">{{ v.ctr }}%</td>
+          <td class="num" data-sort-value="{{ v.cpc }}">R$ {{ v.cpc|floatformat:2 }}</td>
+          <td class="num" data-sort-value="{{ v.cpm }}">R$ {{ v.cpm|floatformat:2 }}</td>
+          <td class="num" data-sort-value="{{ v.cost }}" style="font-weight:700;">R$ {{ v.cost|floatformat:2|intcomma }}</td>
+          <td class="num" data-sort-value="{{ v.share_cost }}">
             <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;">
               <div style="width:60px;height:6px;border-radius:3px;background:var(--border-color);overflow:hidden;">
                 <div style="height:100%;width:{{ v.share_cost }}%;background:{{ v.color }};border-radius:3px;"></div>
@@ -326,15 +537,25 @@
               {{ v.share_cost }}%
             </div>
           </td>
-          <td class="num">
+          <td class="num" data-sort-value="{{ v.roi }}">
             <span style="padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;{% if v.roi > total_roi %}background:rgba(34,197,94,.1);color:#16a34a;{% else %}background:rgba(245,158,11,.1);color:#d97706;{% endif %}">
               {{ v.roi }}
             </span>
           </td>
         </tr>
         {% endfor %}
-        <!-- Totals row -->
-        <tr style="background:var(--surface-2,#f8fafc);font-weight:700;">
+        {% if vehicles_data|length > 6 %}
+        <tr class="show-more-row" id="showMoreVehiclesRow">
+          <td colspan="9">
+            <button type="button" class="show-more-btn" id="showMoreVehiclesBtn">
+              Mostrar todos os {{ vehicles_data|length }} veiculos
+              <svg width="12" height="12" style="vertical-align:-1px;margin-left:4px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+          </td>
+        </tr>
+        {% endif %}
+        <!-- Totals row (always visible) -->
+        <tr id="vehiclesTotalRow" style="background:var(--surface-2,#f8fafc);font-weight:700;">
           <td><strong>TOTAL</strong></td>
           <td class="num">{{ total_impressions|intcomma }}</td>
           <td class="num">{{ total_clicks|intcomma }}</td>
@@ -349,50 +570,78 @@
     </table>
     </div>
   </div>
+  {% endif %}
 
   <!-- Top Campaigns -->
-  {% if campaigns_data %}
-  <div class="con-section">
+  {% if campaigns_data %}{% if can_manage_modules or "campaigns_table" not in hidden_modules %}
+  <div class="con-section{% if 'campaigns_table' in hidden_modules %} module-dimmed{% endif %}">
     <div class="con-section-header">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
       Top Campanhas ({{ campaigns_data|length }})
+      {% include "web/_module_toggle.html" with module_id="campaigns_table" page="consolidated_on" %}
+    </div>
+    {% if vehicles_in_campaigns %}
+    <div class="table-filter-pills">
+      <button type="button" class="filter-pill active" data-filter="all">Todos</button>
+      {% for v in vehicles_in_campaigns %}
+      <button type="button" class="filter-pill" data-filter="{{ v }}">{{ v }}</button>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <div class="table-search">
+      <div class="table-search-wrap">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" class="table-search-input" id="searchCampaigns" placeholder="Buscar campanha, veiculo..." autocomplete="off">
+      </div>
     </div>
     <div style="overflow-x:auto;">
-    <table class="con-table">
+    <table class="con-table sortable-table" id="tableCampaigns">
       <thead>
         <tr>
-          <th>Veiculo</th>
-          <th>Campanha</th>
-          <th class="num">Impressoes</th>
-          <th class="num">Cliques</th>
-          <th class="num">CTR</th>
-          <th class="num">CPC</th>
-          <th class="num">Investimento</th>
-          <th class="num">ROI</th>
+          <th class="sortable" data-sort-type="text">Veiculo<span class="sort-arrow"></span></th>
+          <th class="sortable" data-sort-type="text">Campanha<span class="sort-arrow"></span></th>
+          <th class="num sortable" data-sort-type="number">Impressoes<span class="sort-arrow"></span></th>
+          <th class="num sortable" data-sort-type="number">Cliques<span class="sort-arrow"></span></th>
+          <th class="num sortable" data-sort-type="number">CTR<span class="sort-arrow"></span></th>
+          <th class="num sortable" data-sort-type="number">CPC<span class="sort-arrow"></span></th>
+          <th class="num sortable" data-sort-type="number">Investimento<span class="sort-arrow"></span></th>
+          <th class="num sortable" data-sort-type="number">ROI<span class="sort-arrow"></span></th>
         </tr>
       </thead>
       <tbody>
         {% for c in campaigns_data %}
-        <tr>
-          <td><span class="v-badge" style="background:rgba(99,102,241,.08);color:#6366f1;">{{ c.vehicle }}</span></td>
-          <td><strong>{{ c.name }}</strong></td>
-          <td class="num">{{ c.impressions|floatformat:0|intcomma }}</td>
-          <td class="num">{{ c.clicks|floatformat:0|intcomma }}</td>
-          <td class="num">{{ c.ctr }}%</td>
-          <td class="num">R$ {{ c.cpc|floatformat:2 }}</td>
-          <td class="num" style="font-weight:600;">R$ {{ c.cost|floatformat:2|intcomma }}</td>
-          <td class="num">
+        <tr class="campaign-row{% if forloop.counter > 5 %} extra-row{% endif %}"
+            data-vehicle-filter="{{ c.vehicle }}"
+            {% if forloop.counter > 5 %}style="display:none;"{% endif %}>
+          <td data-sort-value="{{ c.vehicle }}"><span class="v-badge" style="background:rgba(99,102,241,.08);color:#6366f1;">{{ c.vehicle }}</span></td>
+          <td data-sort-value="{{ c.name }}"><strong>{{ c.name }}</strong></td>
+          <td class="num" data-sort-value="{{ c.impressions }}">{{ c.impressions|floatformat:0|intcomma }}</td>
+          <td class="num" data-sort-value="{{ c.clicks }}">{{ c.clicks|floatformat:0|intcomma }}</td>
+          <td class="num" data-sort-value="{{ c.ctr }}">{{ c.ctr }}%</td>
+          <td class="num" data-sort-value="{{ c.cpc }}">R$ {{ c.cpc|floatformat:2 }}</td>
+          <td class="num" data-sort-value="{{ c.cost }}" style="font-weight:600;">R$ {{ c.cost|floatformat:2|intcomma }}</td>
+          <td class="num" data-sort-value="{{ c.roi }}">
             <span style="padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;{% if c.roi > total_roi %}background:rgba(34,197,94,.1);color:#16a34a;{% elif c.roi > 0 %}background:rgba(245,158,11,.1);color:#d97706;{% else %}background:rgba(239,68,68,.08);color:#dc2626;{% endif %}">
               {{ c.roi }}
             </span>
           </td>
         </tr>
         {% endfor %}
+        {% if campaigns_data|length > 5 %}
+        <tr class="show-more-row" id="showMoreCampaignsRow">
+          <td colspan="8">
+            <button type="button" class="show-more-btn" id="showMoreCampaignsBtn">
+              Mostrar todas as {{ campaigns_data|length }} campanhas
+              <svg width="12" height="12" style="vertical-align:-1px;margin-left:4px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+          </td>
+        </tr>
+        {% endif %}
       </tbody>
     </table>
     </div>
   </div>
-  {% endif %}
+  {% endif %}{% endif %}
 
   {% endif %}
 </div>
@@ -406,6 +655,7 @@
   // Trend Chart (stacked area by vehicle)
   var trendLabels = {{ trend_labels_json|safe }};
   var vehicleTrends = {{ vehicle_trends_json|safe }};
+  var trendPrev = {{ trend_prev_json|safe }};
   var trendCtx = document.getElementById('trendChart');
 
   if (trendCtx && trendLabels.length > 0) {
@@ -424,6 +674,23 @@
         borderWidth: 2,
       });
     });
+    // Append previous-period overlay (dashed, non-stacked, separate axis-less)
+    if (trendPrev && trendPrev.length > 0) {
+      datasets.push({
+        label: 'Período anterior (total)',
+        data: trendPrev,
+        borderColor: '#94a3b8',
+        backgroundColor: 'transparent',
+        borderDash: [6, 4],
+        fill: false,
+        tension: 0.3,
+        pointRadius: 2,
+        pointBackgroundColor: '#94a3b8',
+        borderWidth: 2,
+        // Take this dataset out of the stack so it overlays cleanly
+        stack: '_prev',
+      });
+    }
     new Chart(trendCtx, {
       type: 'line',
       data: { labels: trendLabels, datasets: datasets },
@@ -511,5 +778,275 @@
   }
 })();
 </script>
+
+<!-- Table search + filter pills + show-more for both tables -->
+<script>
+(function() {
+  // ── Vehicles table (Performance por Veiculo): search + show-more, totals row always visible ──
+  (function() {
+    var table = document.getElementById('tableVehicles');
+    if (!table) return;
+    var searchInput = document.getElementById('searchVehicles');
+    var showMoreRow = document.getElementById('showMoreVehiclesRow');
+    var showMoreBtn = document.getElementById('showMoreVehiclesBtn');
+    var totalRow = document.getElementById('vehiclesTotalRow');
+    var rows = Array.prototype.slice.call(table.querySelectorAll('tr.vehicle-row'));
+
+    var state = { search: '', expanded: false };
+
+    function apply() {
+      var q = state.search.toLowerCase().trim();
+      var filtered = q !== '';
+      var visible = 0;
+      rows.forEach(function(row, idx) {
+        var text = row.textContent.toLowerCase();
+        var matchSearch = !q || text.indexOf(q) !== -1;
+        var inDefault = idx < 6;
+        var shouldShow = matchSearch && (filtered || state.expanded || inDefault);
+        row.style.display = shouldShow ? '' : 'none';
+        if (matchSearch) visible++;
+      });
+      if (showMoreRow) {
+        showMoreRow.style.display = (!filtered && !state.expanded && rows.length > 6) ? '' : 'none';
+      }
+      if (totalRow) totalRow.style.display = filtered ? 'none' : '';
+    }
+
+    if (searchInput) searchInput.addEventListener('input', function() { state.search = this.value; apply(); });
+    if (showMoreBtn) showMoreBtn.addEventListener('click', function() { state.expanded = true; apply(); });
+    apply();
+  })();
+
+  // ── Campaigns table: search + vehicle pills + show-more ──
+  (function() {
+    var table = document.getElementById('tableCampaigns');
+    if (!table) return;
+    var searchInput = document.getElementById('searchCampaigns');
+    var showMoreRow = document.getElementById('showMoreCampaignsRow');
+    var showMoreBtn = document.getElementById('showMoreCampaignsBtn');
+    var pills = document.querySelectorAll('.table-filter-pills .filter-pill');
+    var rows = Array.prototype.slice.call(table.querySelectorAll('tr.campaign-row'));
+
+    var state = { search: '', vehicle: 'all', expanded: false };
+
+    var noResults = document.createElement('div');
+    noResults.className = 'table-no-results';
+    noResults.textContent = 'Nenhuma campanha encontrada';
+    table.parentNode.insertBefore(noResults, table.nextSibling);
+
+    function apply() {
+      var q = state.search.toLowerCase().trim();
+      var filtered = q !== '' || state.vehicle !== 'all';
+      var visible = 0;
+      rows.forEach(function(row, idx) {
+        var text = row.textContent.toLowerCase();
+        var matchSearch = !q || text.indexOf(q) !== -1;
+        var matchVehicle = state.vehicle === 'all' || row.dataset.vehicleFilter === state.vehicle;
+        var match = matchSearch && matchVehicle;
+        var inDefault = idx < 5;
+        var shouldShow = match && (filtered || state.expanded || inDefault);
+        row.style.display = shouldShow ? '' : 'none';
+        if (match) visible++;
+      });
+      if (showMoreRow) {
+        showMoreRow.style.display = (!filtered && !state.expanded && rows.length > 5) ? '' : 'none';
+      }
+      noResults.style.display = visible === 0 ? 'block' : 'none';
+    }
+
+    if (searchInput) searchInput.addEventListener('input', function() { state.search = this.value; apply(); });
+    pills.forEach(function(pill) {
+      pill.addEventListener('click', function() {
+        pills.forEach(function(p) { p.classList.remove('active'); });
+        this.classList.add('active');
+        state.vehicle = this.dataset.filter;
+        apply();
+      });
+    });
+    if (showMoreBtn) showMoreBtn.addEventListener('click', function() { state.expanded = true; apply(); });
+    apply();
+  })();
+})();
+</script>
+
+<!-- Compare toggle UX (auto-fill compare dates from current range) -->
+<script>
+(function() {
+  var toggle = document.getElementById('compareToggle');
+  var dates = document.getElementById('compareDates');
+  var label = document.getElementById('compareLabel');
+  if (!toggle || !dates) return;
+
+  function updateUI() {
+    if (toggle.checked) {
+      dates.classList.add('active');
+      label.style.color = 'var(--brand-primary, #6366f1)';
+      label.style.fontWeight = '700';
+
+      var df = document.getElementById('dateFrom');
+      var dt = document.getElementById('dateTo');
+      var cf = document.getElementById('compareFrom');
+      var ct = document.getElementById('compareTo');
+      if (df && dt && cf && ct && df.value && dt.value && !cf.value && !ct.value) {
+        var start = new Date(df.value + 'T00:00:00');
+        var end = new Date(dt.value + 'T00:00:00');
+        var len = Math.round((end - start) / 86400000) + 1;
+        var prevEnd = new Date(start.getTime() - 86400000);
+        var prevStart = new Date(prevEnd.getTime() - (len - 1) * 86400000);
+        function iso(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+        cf.value = iso(prevStart);
+        ct.value = iso(prevEnd);
+      }
+    } else {
+      dates.classList.remove('active');
+      label.style.color = '';
+      label.style.fontWeight = '';
+    }
+  }
+
+  toggle.addEventListener('change', updateUI);
+  label.addEventListener('click', function() {
+    toggle.checked = !toggle.checked;
+    toggle.dispatchEvent(new Event('change'));
+  });
+})();
+</script>
+
+<!-- Sortable tables: click any header to sort asc/desc -->
+<script>
+(function() {
+  var tables = document.querySelectorAll('table.sortable-table');
+  if (!tables.length) return;
+
+  function parseValue(td, type) {
+    var raw = td.dataset.sortValue;
+    if (raw === undefined || raw === null) raw = td.textContent;
+    if (type === 'number') {
+      var s = String(raw).replace(/[^\d\-.,]/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.');
+      var n = parseFloat(s);
+      return isNaN(n) ? -Infinity : n;
+    }
+    return String(raw).toLowerCase();
+  }
+
+  tables.forEach(function(table) {
+    var headers = table.querySelectorAll('thead th.sortable');
+    var tbody = table.querySelector('tbody');
+    if (!tbody) return;
+
+    headers.forEach(function(th, colIndex) {
+      th.addEventListener('click', function() {
+        var type = th.dataset.sortType || 'text';
+        var currentDir = th.classList.contains('sort-asc') ? 'asc'
+                       : th.classList.contains('sort-desc') ? 'desc'
+                       : null;
+        var nextDir;
+        if (currentDir === 'asc') nextDir = 'desc';
+        else if (currentDir === 'desc') nextDir = 'asc';
+        else nextDir = (type === 'number') ? 'desc' : 'asc';
+
+        headers.forEach(function(h) { h.classList.remove('sort-asc', 'sort-desc'); });
+        th.classList.add(nextDir === 'asc' ? 'sort-asc' : 'sort-desc');
+
+        // Auto-expand collapsed tables when sorting
+        if (table.id === 'tableCampaigns') {
+          var btn = document.getElementById('showMoreCampaignsBtn');
+          if (btn) btn.click();
+        } else if (table.id === 'tableVehicles') {
+          var btnV = document.getElementById('showMoreVehiclesBtn');
+          if (btnV) btnV.click();
+        }
+
+        // Collect data rows (skip show-more / total / no-results)
+        var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'))
+          .filter(function(r) {
+            return !r.classList.contains('show-more-row')
+                && r.id !== 'vehiclesTotalRow'
+                && r.cells && r.cells[colIndex];
+          });
+
+        rows.sort(function(a, b) {
+          var av = parseValue(a.cells[colIndex], type);
+          var bv = parseValue(b.cells[colIndex], type);
+          if (av < bv) return nextDir === 'asc' ? -1 : 1;
+          if (av > bv) return nextDir === 'asc' ? 1 : -1;
+          return 0;
+        });
+
+        rows.forEach(function(r) { tbody.appendChild(r); });
+        // Trailing rows back to the bottom
+        var trailing = tbody.querySelectorAll('tr.show-more-row, #vehiclesTotalRow');
+        trailing.forEach(function(r) { tbody.appendChild(r); });
+      });
+    });
+  });
+})();
+</script>
+
+{% if can_manage_modules %}
+<!-- Module visibility toggle (admin only) -->
+<script>
+(function() {
+  var buttons = document.querySelectorAll('.module-toggle-btn');
+  if (!buttons.length) return;
+
+  function getCookie(name) {
+    var v = '; ' + document.cookie;
+    var parts = v.split('; ' + name + '=');
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return '';
+  }
+
+  function toast(msg, ok) {
+    var el = document.createElement('div');
+    el.textContent = msg;
+    el.style.cssText = 'position:fixed;bottom:24px;right:24px;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:600;color:#fff;background:' + (ok ? '#16a34a' : '#dc2626') + ';box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:99999;';
+    document.body.appendChild(el);
+    setTimeout(function() { el.style.transition='opacity .3s'; el.style.opacity='0'; setTimeout(function(){ el.remove(); }, 300); }, 2200);
+  }
+
+  buttons.forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var moduleId = this.dataset.moduleId;
+      var clienteId = this.dataset.clienteId;
+      var page = this.dataset.page || 'consolidated_on';
+      var newHidden = !this.classList.contains('is-hidden');
+
+      if (!clienteId) { toast('Selecione um cliente primeiro', false); return; }
+
+      var btnRef = this;
+      btnRef.disabled = true;
+
+      var fd = new FormData();
+      fd.append('cliente_id', clienteId);
+      fd.append('module_id', moduleId);
+      fd.append('page', page);
+      fd.append('hidden', newHidden ? '1' : '0');
+
+      fetch('{% url "web:dashboard_toggle_module" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        body: fd,
+        credentials: 'same-origin'
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        btnRef.disabled = false;
+        if (!data.ok) { toast('Erro: ' + (data.error || 'desconhecido'), false); return; }
+        toast(newHidden ? 'Modulo oculto para este cliente' : 'Modulo visivel para este cliente', true);
+        setTimeout(function() { window.location.reload(); }, 600);
+      })
+      .catch(function() {
+        btnRef.disabled = false;
+        toast('Erro de rede', false);
+      });
+    });
+  });
+})();
+</script>
+{% endif %}
+
 {% endif %}
 {% endblock %}

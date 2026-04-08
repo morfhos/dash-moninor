@@ -119,6 +119,8 @@
   }
   .pill-online  { background: rgba(34,197,94,.12); color: #16a34a; }
   .pill-offline { background: rgba(239,68,68,.10); color: #dc2626; }
+  .pill-mixed   { background: rgba(124,58,237,.12); color: #6d28d9; }
+  .pill-none    { background: rgba(107,114,128,.10); color: #64748b; }
   .pill-active  { background: rgba(34,197,94,.12); color: #16a34a; }
   .pill-paused  { background: rgba(245,158,11,.12); color: #d97706; }
   .pill-draft   { background: var(--surface); color: var(--text-secondary); border: 1px solid var(--border); }
@@ -128,6 +130,8 @@
   }
   .pill-online .pill-dot  { background: #16a34a; }
   .pill-offline .pill-dot { background: #dc2626; }
+  .pill-mixed .pill-dot   { background: #7c3aed; }
+  .pill-none .pill-dot    { background: #94a3b8; }
   .pill-active .pill-dot  { background: #16a34a; }
   .pill-paused .pill-dot  { background: #d97706; }
 
@@ -248,6 +252,7 @@
     <option value="">Meio</option>
     <option value="online" {% if meio_filter == "online" %}selected{% endif %}>Online</option>
     <option value="offline" {% if meio_filter == "offline" %}selected{% endif %}>Offline</option>
+    <option value="mixed" {% if meio_filter == "mixed" %}selected{% endif %}>Misto</option>
   </select>
   {% if q or status_filter or meio_filter %}
   <a href="{% url 'web:cliente_campaigns' cliente.id %}" style="display:inline-flex;align-items:center;gap:4px;padding:7px 14px;border:1px solid var(--border);border-radius:10px;font-size:13px;color:var(--text-secondary);text-decoration:none;background:var(--surface);transition:all .15s;" onmouseover="this.style.borderColor='#ef4444';this.style.color='#ef4444'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">
@@ -277,12 +282,16 @@
           <a class="campaign-name" href="{% url 'web:contract_done' c.id %}">{{ c.name }}</a>
         </td>
 
-        <!-- Meio pill -->
+        <!-- Meio pill (computed from PlacementLine, not Campaign.media_type) -->
         <td>
-          {% if c.media_type|upper == "ONLINE" %}
+          {% if c.media_kind == "online" %}
             <span class="pill pill-online"><span class="pill-dot"></span> ONLINE</span>
-          {% else %}
+          {% elif c.media_kind == "offline" %}
             <span class="pill pill-offline"><span class="pill-dot"></span> OFFLINE</span>
+          {% elif c.media_kind == "mixed" %}
+            <span class="pill pill-mixed"><span class="pill-dot"></span> MISTO</span>
+          {% else %}
+            <span class="pill pill-none"><span class="pill-dot"></span> —</span>
           {% endif %}
         </td>
 

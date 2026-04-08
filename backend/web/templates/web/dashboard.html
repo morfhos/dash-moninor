@@ -126,21 +126,34 @@
   <!-- Row 1: Linha grande (full) -->
   <section class="charts-grid one-col">
     <div class="chart-card chart-lg">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
-        <h3 style="margin:0;">Evolucao de Insercoes (Periodo selecionado)</h3>
-        <form method="get" style="display:flex;gap:8px;align-items:center;">
-          <input type="date" name="cmp_from" value="{{ cmp_from }}" style="padding:6px 8px;border:1px solid var(--border-color);border-radius:8px;font-size:12px;">
-          <span style="color:var(--text-secondary);font-size:12px;">a</span>
-          <input type="date" name="cmp_to" value="{{ cmp_to }}" style="padding:6px 8px;border:1px solid var(--border-color);border-radius:8px;font-size:12px;">
-          {% if selected_cliente_id %}<input type="hidden" name="cliente_id" value="{{ selected_cliente_id }}">{% endif %}
-          <button type="submit" class="btn-filter" style="padding:6px 10px;font-size:12px;border-radius:8px;">Comparar</button>
-          <a href="{% if selected_cliente_id %}{% url 'web:dashboard' %}?cliente_id={{ selected_cliente_id }}{% else %}{% url 'web:dashboard' %}{% endif %}" class="btn-filter" style="padding:6px 10px;font-size:12px;border-radius:8px;">Limpar</a>
-          {% if cmp_summary %}
-          <span style="padding:6px 10px;border-radius:999px; font-size:12px; font-weight:800; {% if cmp_summary.dir == 'up' %}background:rgba(34,197,94,.12);color:#166534;{% elif cmp_summary.dir == 'down' %}background:rgba(239,68,68,.12);color:#b91c1c;{% else %}background:#e5e7eb;color:#374151;{% endif %}">
-            {{ cmp_summary.pct }}%
-          </span>
-          {% endif %}
-        </form>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+          <h3 style="margin:0;">Evolucao de Insercoes (Periodo selecionado)</h3>
+          <form method="get" id="dashCmpForm" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input type="date" id="dashCmpFrom" name="cmp_from" value="{{ cmp_from }}" style="padding:6px 8px;border:1px solid var(--border-color);border-radius:8px;font-size:12px;">
+            <span style="color:var(--text-secondary);font-size:12px;">a</span>
+            <input type="date" id="dashCmpTo" name="cmp_to" value="{{ cmp_to }}" style="padding:6px 8px;border:1px solid var(--border-color);border-radius:8px;font-size:12px;">
+            {% if selected_cliente_id %}<input type="hidden" name="cliente_id" value="{{ selected_cliente_id }}">{% endif %}
+            <button type="submit" class="btn-filter" style="padding:6px 10px;font-size:12px;border-radius:8px;">Aplicar</button>
+            <a href="{% if selected_cliente_id %}{% url 'web:dashboard' %}?cliente_id={{ selected_cliente_id }}{% else %}{% url 'web:dashboard' %}{% endif %}" class="btn-filter" style="padding:6px 10px;font-size:12px;border-radius:8px;background:#e5e7eb;color:#111827;">Limpar</a>
+            {% if cmp_summary %}
+            <span title="vs período anterior" style="padding:6px 10px;border-radius:999px; font-size:12px; font-weight:800; {% if cmp_summary.dir == 'up' %}background:rgba(34,197,94,.12);color:#166534;{% elif cmp_summary.dir == 'down' %}background:rgba(239,68,68,.12);color:#b91c1c;{% else %}background:#e5e7eb;color:#374151;{% endif %}">
+              {% if cmp_summary.dir == 'up' %}▲{% elif cmp_summary.dir == 'down' %}▼{% else %}■{% endif %}
+              {{ cmp_summary.pct }}%
+            </span>
+            {% endif %}
+          </form>
+        </div>
+        <!-- Date presets (write to cmp_from / cmp_to) -->
+        <div class="dash-date-presets" id="dashDatePresets">
+          <button type="button" class="dash-preset-btn" data-preset="today">Hoje</button>
+          <button type="button" class="dash-preset-btn" data-preset="7d">7 dias</button>
+          <button type="button" class="dash-preset-btn" data-preset="30d">30 dias</button>
+          <span class="dash-preset-sep"></span>
+          <button type="button" class="dash-preset-btn" data-preset="this_month">Este Mês</button>
+          <button type="button" class="dash-preset-btn" data-preset="last_month">Mês Passado</button>
+          <button type="button" class="dash-preset-btn" data-preset="quarter">Trimestre</button>
+        </div>
       </div>
       <div class="chart-canvas">
         <canvas id="insertionsChart"></canvas>
@@ -941,5 +954,89 @@ if (piecesLabels.length > 0) {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Dashboard date presets (cmp_from/cmp_to inputs) ── */
+.dash-date-presets {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.dash-preset-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  background: none;
+  color: var(--text-secondary, #64748b);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .15s;
+  font-family: inherit;
+}
+.dash-preset-btn:hover {
+  border-color: var(--brand-primary, #6366f1);
+  color: var(--brand-primary, #6366f1);
+  background: rgba(99,102,241,.04);
+}
+.dash-preset-btn.active {
+  border-color: var(--brand-primary, #6366f1);
+  background: var(--brand-primary, #6366f1);
+  color: #fff;
+}
+.dash-preset-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--border-color, #e2e8f0);
+  margin: 0 4px;
+}
 </style>
+
+<script>
+(function() {
+  var container = document.getElementById('dashDatePresets');
+  var fromInput = document.getElementById('dashCmpFrom');
+  var toInput = document.getElementById('dashCmpTo');
+  var form = document.getElementById('dashCmpForm');
+  if (!container || !fromInput || !toInput || !form) return;
+
+  function fmt(d) {
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  function getRange(key) {
+    var now = new Date();
+    var y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+    switch(key) {
+      case 'today':       return [fmt(now), fmt(now)];
+      case '7d':          return [fmt(new Date(y, m, d - 6)), fmt(now)];
+      case '30d':         return [fmt(new Date(y, m, d - 29)), fmt(now)];
+      case 'this_month':  return [fmt(new Date(y, m, 1)), fmt(now)];
+      case 'last_month':  return [fmt(new Date(y, m-1, 1)), fmt(new Date(y, m, 0))];
+      case 'quarter':     var qm = m - (m % 3); return [fmt(new Date(y, qm, 1)), fmt(now)];
+      default:            return null;
+    }
+  }
+  // Highlight active preset on load
+  function highlight() {
+    var fv = fromInput.value, tv = toInput.value;
+    container.querySelectorAll('.dash-preset-btn').forEach(function(btn) {
+      var range = getRange(btn.dataset.preset);
+      btn.classList.toggle('active', !!(range && range[0] === fv && range[1] === tv));
+    });
+  }
+  container.querySelectorAll('.dash-preset-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var range = getRange(this.dataset.preset);
+      if (!range) return;
+      fromInput.value = range[0];
+      toInput.value = range[1];
+      container.querySelectorAll('.dash-preset-btn').forEach(function(b) { b.classList.remove('active'); });
+      this.classList.add('active');
+      form.submit();
+    });
+  });
+  highlight();
+})();
+</script>
 {% endblock %}

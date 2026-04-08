@@ -140,7 +140,37 @@ backend/
 - Alocação percentual de orçamento por região com cores customizáveis.
 - Vinculação automática com peças criativas e linhas de veiculação.
 - Exclusão com confirmação e log de auditoria.
-- Visualização agrupada por cliente.
+- Visualização agrupada por cliente — filtrada para exibir apenas campanhas com status `ATIVA`.
+
+**Classificação automática de tipo de mídia (media_kind):**
+
+A plataforma calcula dinamicamente um indicador `media_kind` por campanha, derivado das linhas de veiculação reais (`PlacementLine`), independente do campo legado `Campaign.media_type`. Esse indicador alimenta os filtros e badges visuais da listagem de campanhas:
+
+| media_kind | Regra |
+|-----------|-------|
+| `online` | Apenas linhas com `media_type=online` ou nome iniciando com `Google Ads -` / `Meta Ads -` |
+| `offline` | Apenas linhas com `media_type=offline` |
+| `mixed` | Linhas online e offline coexistindo |
+| `none` | Sem linhas de veiculação |
+
+Cada card de campanha exibe:
+- **Borda colorida** semântica (verde online / vermelho offline / roxo misto / cinza sem dados)
+- **Badge** sobreposto (`ONLINE` / `OFFLINE` / `MISTO`)
+- **Contagem ON / OFF** colorida (verde para ON, vermelho para OFF)
+
+A barra de filtros permite ao usuário restringir por tipo (`Todas / Online / Offline / Misto`) e buscar por nome de campanha em tempo real, sem reload.
+
+**Comando administrativo de reconciliação:**
+
+`python manage.py fix_campaign_media_type [--dry-run] [--cliente-id=N]`
+
+Reconcilia inconsistências entre `Campaign.media_type`, `PlacementLine.media_type` e o `media_channel` real das linhas. Aplicado em três etapas:
+
+1. Força `media_type` das linhas com `media_channel` claramente offline (`radio`, `jornal`, `tv_aberta`) ou online (`google`, `meta`, `tiktok`, `linkedin`, `dv360*`, etc.).
+2. Para linhas com `media_channel='other'` (ambíguas), aplica uma **whitelist de broadcasters brasileiros** (rádios, emissoras de TV e jornais conhecidos) por padrões regex e nomes explícitos — pega casos como `GLOBONEWS`, `BAND NEWS`, `CNN BRASIL`, `SANTA CECILIA`, edições regionais (`SP1`, `CAMPINAS`, `RIBEIRÃO PRETO`).
+3. Recalcula `Campaign.media_type` por contagem majoritária das linhas corrigidas.
+
+O comando é **idempotente** e suporta `--dry-run` com transação rollback para inspeção segura antes de aplicar.
 
 **Modelos de dados:**
 - `Campaign` — cliente, nome, datas, timezone, orçamento, status, tipo de mídia, criado_por
@@ -247,9 +277,53 @@ se now > end_date    → ENDED
 - Relatórios por cliente e por campanha.
 - Relatório consolidado cross-campaign.
 - Analytics avançado com gráficos de séries temporais e indicadores de desempenho.
-- Painel "DashOn" — dashboard premium com métricas estendidas.
+- Painéis premium **DashON** e **Consolidated ON** — métricas estendidas por mídia digital.
 - Filtros por período, canal e campanha.
 - Timeline visual das campanhas com status em tempo real.
+
+**DashON — hierarquia visual e insights inteligentes:**
+
+O painel DashON foi redesenhado com hierarquia em três níveis para reduzir ruído cognitivo:
+
+1. **Insights Inteligentes no topo** — alertas determinísticos gerados a partir das métricas (CTR crítico, CPC elevado, recomendações de realocação de budget) com ícones semânticos (verde positivo, vermelho negativo, amarelo atenção, azul informativo).
+2. **KPIs primários** (4 cards grandes): Investimento, Impressões, Cliques, Conversões — cada um com variação % vs período anterior quando comparação está ativa.
+3. **KPIs secundários** (faixa compacta): CTR, CPC, CPM, Alcance, Campanhas, ROI Global.
+
+Outros componentes:
+- Comparativo lado a lado de plataformas (Google Ads / Meta Ads).
+- Gráficos separados em cards próprios (tendência de impressões, donut de investimento por plataforma, top 10 campanhas por investimento).
+- Tabela de campanhas simplificada com 6 colunas, badges coloridos por plataforma, barras visuais de performance, top 5 por padrão com botão "Mostrar todas".
+- Pills de filtro por plataforma e busca por nome.
+- Drill-down em cada campanha com modal de ad groups e séries temporais.
+
+**Consolidated ON — visão por veículo:**
+
+Painel consolidado por veículo de mídia digital (DV360 YouTube, Spotify, Eletromídia, Netflix, Globoplay, AdMooh, TikTok, LinkedIn, Google Ads, Meta Ads), com:
+- Hero com 7 KPIs totais.
+- Cards por veículo com investimento, impressões, cliques, CTR, CPC, ROI.
+- Gráficos de tendência por veículo, donut de investimento, comparativo de impressões.
+- Tabelas "Performance por Veículo" (top 6 por padrão) e "Top Campanhas" (top 5 por padrão), ambas com show-more, busca e filtros.
+
+**Tabelas ordenáveis (sortable):**
+
+Todos os headers das tabelas em DashON e Consolidated ON são clicáveis para ordenação asc/desc, com indicadores visuais (`▲ ▼ ⇅`). Numéricas começam em decrescente, textuais em crescente. O parser numérico lida corretamente com formatos brasileiros (`R$ 1.503,74`, `4,11%`). Ao ordenar uma tabela colapsada, ela expande automaticamente para refletir o real top da ordenação.
+
+**Sistema de visibilidade de módulos por cliente:**
+
+Administradores podem ocultar módulos específicos do DashON e do Consolidated ON para cada cliente individualmente, permitindo dashboards personalizados sem reescrever código (ex: cliente A não vê o módulo de "Insights por IA", cliente B esconde os "KPIs secundários").
+
+| Página | Módulos toggláveis |
+|--------|---------------------|
+| **DashON** | smart_insights, kpi_primary, kpi_secondary, platform_strip, live_status, projection, exec_summary, charts, channel_perf, campaigns_table, ai_insights |
+| **Consolidated ON** | hero_totals, vehicles_grid, trend_chart, donut_chart, bar_chart, vehicles_table, campaigns_table |
+
+Características:
+- Botão de olho (👁/👁‍🗨) ao lado do título de cada módulo, visível **apenas para admins**.
+- Click salva instantaneamente via AJAX (`POST /dashboard/toggle-module/`) e exibe toast de confirmação.
+- Para o cliente final, módulos ocultos simplesmente não aparecem.
+- Para o admin, módulos ocultos ficam dimmed com hachura sutil + badge "OCULTO P/ CLIENTE", permitindo reativar com 1 clique.
+- Persistência por cliente em campos JSONField separados: `Cliente.dashon_hidden_modules` e `Cliente.consolidated_hidden_modules`.
+- Whitelist de IDs no backend (`DASHBOARD_TOGGLEABLE_MODULES`) impede injeção de módulos arbitrários.
 
 ---
 

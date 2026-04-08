@@ -861,7 +861,7 @@ def campanhas_cliente(request: HttpRequest, cliente_id: int) -> HttpResponse:
         return redirect("web:grupo_campanhas")
 
     campaigns = (
-        Campaign.objects.filter(cliente_id=cliente_id)
+        Campaign.objects.filter(cliente_id=cliente_id, status=Campaign.Status.ACTIVE)
         .select_related("cliente")
         .order_by("-created_at")
     )
@@ -876,6 +876,22 @@ def campanhas_cliente(request: HttpRequest, cliente_id: int) -> HttpResponse:
         )
         on_count = PlacementLine.objects.filter(campaign=c, media_type="online").count()
         off_count = PlacementLine.objects.filter(campaign=c, media_type="offline").count()
+
+        # Google/Meta Ads campaigns come from API sync and may not have PlacementLine
+        # rows attached — they're inherently online, so force the classification.
+        is_google_meta = c.name.startswith("Google Ads - ") or c.name.startswith("Meta Ads - ")
+
+        # Classify campaign as ON / OFF / MIXED based on placement line counts
+        if is_google_meta:
+            media_kind = "on"
+        elif on_count > 0 and off_count == 0:
+            media_kind = "on"
+        elif off_count > 0 and on_count == 0:
+            media_kind = "off"
+        elif on_count > 0 and off_count > 0:
+            media_kind = "mixed"
+        else:
+            media_kind = "none"
 
         # Determine link: Google/Meta Ads campaigns → veiculação pages
         if c.name.startswith("Google Ads - "):
@@ -892,10 +908,19 @@ def campanhas_cliente(request: HttpRequest, cliente_id: int) -> HttpResponse:
             "insertions": totals.get("insertions") or 0,
             "on_count": on_count,
             "off_count": off_count,
+            "media_kind": media_kind,
             "start": totals.get("min_date") or c.start_date,
             "end": totals.get("max_date") or c.end_date,
             "link_url": link_url,
         })
+
+    # Counts per media kind for the filter pills
+    media_counts = {
+        "all": len(campaigns_with_stats),
+        "on": sum(1 for c in campaigns_with_stats if c["media_kind"] == "on"),
+        "off": sum(1 for c in campaigns_with_stats if c["media_kind"] == "off"),
+        "mixed": sum(1 for c in campaigns_with_stats if c["media_kind"] == "mixed"),
+    }
 
     return render(
         request,
@@ -905,6 +930,7 @@ def campanhas_cliente(request: HttpRequest, cliente_id: int) -> HttpResponse:
             "page_title": f"Campanhas - {cliente.nome}",
             "cliente": cliente,
             "campaigns_with_stats": campaigns_with_stats,
+            "media_counts": media_counts,
             "show_back": role != "cliente",
         },
     )
@@ -976,6 +1002,23 @@ def pecas_campanhas(request: HttpRequest, cliente_id: int) -> HttpResponse:
         pieces_with_media = c.pieces.filter(assets__isnull=False).distinct().count()
         pct = round((pieces_with_media / total_pieces * 100) if total_pieces > 0 else 0)
 
+        # Classify campaign as ON / OFF / MIXED based on placement line counts.
+        # Google/Meta Ads campaigns come from API sync without PlacementLine rows
+        # attached, so force them to "on".
+        on_count = PlacementLine.objects.filter(campaign=c, media_type="online").count()
+        off_count = PlacementLine.objects.filter(campaign=c, media_type="offline").count()
+        is_google_meta = c.name.startswith("Google Ads - ") or c.name.startswith("Meta Ads - ")
+        if is_google_meta:
+            media_kind = "on"
+        elif on_count > 0 and off_count == 0:
+            media_kind = "on"
+        elif off_count > 0 and on_count == 0:
+            media_kind = "off"
+        elif on_count > 0 and off_count > 0:
+            media_kind = "mixed"
+        else:
+            media_kind = "none"
+
         campaigns_with_stats.append({
             "campaign": c,
             "total_pieces": total_pieces,
@@ -983,7 +1026,15 @@ def pecas_campanhas(request: HttpRequest, cliente_id: int) -> HttpResponse:
             "pct": pct,
             "start": c.start_date,
             "end": c.end_date,
+            "media_kind": media_kind,
         })
+
+    media_counts = {
+        "all": len(campaigns_with_stats),
+        "on": sum(1 for c in campaigns_with_stats if c["media_kind"] == "on"),
+        "off": sum(1 for c in campaigns_with_stats if c["media_kind"] == "off"),
+        "mixed": sum(1 for c in campaigns_with_stats if c["media_kind"] == "mixed"),
+    }
 
     return render(
         request,
@@ -993,6 +1044,7 @@ def pecas_campanhas(request: HttpRequest, cliente_id: int) -> HttpResponse:
             "page_title": f"Peças & Criativos - {cliente.nome}",
             "cliente": cliente,
             "campaigns_with_stats": campaigns_with_stats,
+            "media_counts": media_counts,
             "show_back": role != "cliente",
         },
     )
@@ -1244,6 +1296,12 @@ def dashon(request: HttpRequest) -> HttpResponse:
         gads_qs = gads_qs.filter(cliente_id=cliente_id)
         mads_qs = mads_qs.filter(cliente_id=cliente_id)
     has_accounts = gads_qs.exists() or mads_qs.exists()
+
+    # Per-client module visibility
+    from accounts.models import Cliente as _Cliente
+    _cliente_obj = _Cliente.objects.filter(id=cliente_id).only("id", "dashon_hidden_modules").first()
+    hidden_modules = list(_cliente_obj.dashon_hidden_modules or []) if _cliente_obj else []
+    can_manage_modules = is_admin(request.user)
 
     # Digital channels
     google_channels = ["google", "youtube", "display", "search"]
@@ -1695,8 +1753,76 @@ def dashon(request: HttpRequest) -> HttpResponse:
             "total_roas": round(total_clicks * 0.05 / total_cost, 2) if total_cost > 0 else 0,  # estimated
             "cost_per_lead": round(total_cost / max(total_clicks * 0.03, 1), 2),  # est 3% conv rate
             "days_in_period": days_in_period,
+            # Per-client module visibility
+            "hidden_modules": hidden_modules,
+            "can_manage_modules": can_manage_modules,
+            "current_cliente_id": cliente_id,
         },
     )
+
+
+# Allowed module IDs per page. Keep in sync with {% if 'X' in hidden_modules %} checks in templates.
+DASHBOARD_TOGGLEABLE_MODULES = {
+    "dashon": {
+        "smart_insights", "kpi_primary", "kpi_secondary", "platform_strip",
+        "live_status", "projection", "exec_summary",
+        "charts", "channel_perf", "campaigns_table", "ai_insights",
+    },
+    "consolidated_on": {
+        "filters", "hero_totals", "vehicles_grid", "trend_chart", "donut_chart",
+        "bar_chart", "vehicles_table", "campaigns_table",
+    },
+}
+
+# Maps page name -> (Cliente field name)
+DASHBOARD_PAGE_FIELD = {
+    "dashon": "dashon_hidden_modules",
+    "consolidated_on": "consolidated_hidden_modules",
+}
+
+
+@login_required
+def dashboard_toggle_module(request: HttpRequest) -> HttpResponse:
+    """Admin-only: toggle visibility of a dashboard module for a specific cliente.
+
+    Accepts POST: cliente_id, module_id, page (dashon|consolidated_on), hidden (0|1).
+    """
+    from django.http import JsonResponse
+    from accounts.models import Cliente as _Cliente
+
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "method"}, status=405)
+    if not is_admin(request.user):
+        return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
+
+    try:
+        cliente_id = int(request.POST.get("cliente_id") or 0)
+    except (TypeError, ValueError):
+        return JsonResponse({"ok": False, "error": "cliente_id"}, status=400)
+
+    page = (request.POST.get("page") or "dashon").strip()
+    module_id = (request.POST.get("module_id") or "").strip()
+    hidden = (request.POST.get("hidden") or "").lower() in ("1", "true", "on", "yes")
+
+    if page not in DASHBOARD_PAGE_FIELD:
+        return JsonResponse({"ok": False, "error": "page"}, status=400)
+    if module_id not in DASHBOARD_TOGGLEABLE_MODULES[page]:
+        return JsonResponse({"ok": False, "error": "module_id"}, status=400)
+
+    cliente = _Cliente.objects.filter(id=cliente_id).first()
+    if not cliente:
+        return JsonResponse({"ok": False, "error": "cliente"}, status=404)
+
+    field_name = DASHBOARD_PAGE_FIELD[page]
+    current = list(getattr(cliente, field_name) or [])
+    if hidden and module_id not in current:
+        current.append(module_id)
+    elif not hidden and module_id in current:
+        current = [m for m in current if m != module_id]
+    setattr(cliente, field_name, current)
+    cliente.save(update_fields=[field_name, "atualizado_em"])
+
+    return JsonResponse({"ok": True, "page": page, "hidden": hidden, "module_id": module_id, "hidden_modules": current})
 
 
 @login_required
@@ -1715,6 +1841,12 @@ def consolidated_on(request: HttpRequest) -> HttpResponse:
             "page_title": "Consolidated ON",
             "require_cliente": True,
         })
+
+    # Per-client module visibility
+    from accounts.models import Cliente as _Cliente
+    _cliente_obj = _Cliente.objects.filter(id=cliente_id).only("id", "consolidated_hidden_modules").first()
+    hidden_modules = list(_cliente_obj.consolidated_hidden_modules or []) if _cliente_obj else []
+    can_manage_modules = is_admin(request.user)
 
     # All digital channels
     all_channels = [
@@ -1748,6 +1880,11 @@ def consolidated_on(request: HttpRequest) -> HttpResponse:
     date_from = request.GET.get("date_from", "")
     date_to = request.GET.get("date_to", "")
 
+    # Compare toggle (same UX as DashON)
+    compare_on = request.GET.get("compare", "") == "on"
+    compare_from = request.GET.get("compare_from", "")
+    compare_to = request.GET.get("compare_to", "")
+
     days_qs = PlacementDay.objects.filter(placement_line_id__in=line_ids)
     if date_from:
         days_qs = days_qs.filter(date__gte=date_from)
@@ -1767,6 +1904,73 @@ def consolidated_on(request: HttpRequest) -> HttpResponse:
     cpc = round((total_cost / total_clicks), 2) if total_clicks > 0 else 0
     cpm = round((total_cost / total_impressions * 1000), 2) if total_impressions > 0 else 0
     total_roi = round(total_clicks / total_cost, 2) if total_cost > 0 else 0
+
+    # ── Period comparison (same logic as DashON) ──────────────────────
+    consolidated_comparison = None
+    prev_qs = None
+    prev_start = None
+    prev_end = None
+
+    def _pct(curr, prev):
+        return round(((curr - prev) / prev) * 100, 1) if prev else None
+
+    if compare_on:
+        try:
+            if compare_from and compare_to:
+                prev_start = datetime.strptime(compare_from, "%Y-%m-%d").date()
+                prev_end = datetime.strptime(compare_to, "%Y-%m-%d").date()
+            elif date_from and date_to:
+                p_start = datetime.strptime(date_from, "%Y-%m-%d").date()
+                p_end = datetime.strptime(date_to, "%Y-%m-%d").date()
+                p_len = (p_end - p_start).days + 1
+                prev_end = p_start - timedelta(days=1)
+                prev_start = prev_end - timedelta(days=p_len - 1)
+            else:
+                from datetime import date as _d
+                p_end = _d.today()
+                p_start = p_end - timedelta(days=29)
+                prev_end = p_start - timedelta(days=1)
+                prev_start = prev_end - timedelta(days=29)
+
+            prev_qs = PlacementDay.objects.filter(
+                placement_line_id__in=line_ids,
+                date__gte=prev_start,
+                date__lte=prev_end,
+            )
+            prev_stats = prev_qs.aggregate(
+                imp=Sum("impressions"), clk=Sum("clicks"), cst=Sum("cost"),
+            )
+            prev_imp = prev_stats["imp"] or 0
+            prev_clk = prev_stats["clk"] or 0
+            prev_cost = float(prev_stats["cst"] or 0)
+            prev_ctr = round((prev_clk / prev_imp * 100), 2) if prev_imp > 0 else 0
+            prev_cpc = round((prev_cost / prev_clk), 2) if prev_clk > 0 else 0
+            prev_cpm = round((prev_cost / prev_imp * 1000), 2) if prev_imp > 0 else 0
+            prev_roi = round((prev_clk / prev_cost), 2) if prev_cost > 0 else 0
+
+            consolidated_comparison = {
+                "imp_change": _pct(total_impressions, prev_imp),
+                "clk_change": _pct(total_clicks, prev_clk),
+                "ctr_change": _pct(ctr, prev_ctr),
+                "cost_change": _pct(total_cost, prev_cost),
+                "cpc_change": _pct(cpc, prev_cpc),
+                "cpm_change": _pct(cpm, prev_cpm),
+                "roi_change": _pct(total_roi, prev_roi),
+                "prev_start": prev_start.strftime("%d/%m"),
+                "prev_end": prev_end.strftime("%d/%m"),
+                "period_label": f"{prev_start.strftime('%d/%m')} - {prev_end.strftime('%d/%m')}",
+                "prev_start_iso": prev_start.strftime("%Y-%m-%d"),
+                "prev_end_iso": prev_end.strftime("%Y-%m-%d"),
+                "prev_impressions": prev_imp,
+                "prev_clicks": prev_clk,
+                "prev_cost": round(prev_cost, 2),
+                "prev_ctr": prev_ctr,
+                "prev_cpc": prev_cpc,
+                "prev_cpm": prev_cpm,
+                "prev_roi": prev_roi,
+            }
+        except (ValueError, TypeError, ZeroDivisionError):
+            pass
 
     # ── Per-channel group stats ──
     vehicles_data = []
@@ -1878,6 +2082,25 @@ def consolidated_on(request: HttpRequest) -> HttpResponse:
             "data": [v_daily.get(d, 0) for d in trend_labels],
         }
 
+    # ── Previous-period totals series for trend chart overlay ──
+    # We aggregate the previous period day-by-day so the chart can render a
+    # dotted "Período anterior" line aligned to the current series length.
+    trend_prev_total = []
+    if compare_on and prev_qs is not None and len(trend_labels) > 0:
+        prev_daily = {
+            str(row["date"]): int(row["imp"] or 0)
+            for row in prev_qs.values("date").annotate(imp=Sum("impressions")).order_by("date")
+        }
+        # Align previous series by index (not by absolute date) so the curves
+        # overlap visually
+        prev_dates_sorted = sorted(prev_daily.keys())
+        # Pad / truncate to match current length
+        n = len(trend_labels)
+        if len(prev_dates_sorted) >= n:
+            trend_prev_total = [prev_daily[d] for d in prev_dates_sorted[:n]]
+        else:
+            trend_prev_total = [prev_daily.get(d, 0) for d in prev_dates_sorted] + [0] * (n - len(prev_dates_sorted))
+
     # ── Top campaigns across all vehicles ──
     campaigns_data = []
     for line in lines_qs.select_related("campaign", "campaign__cliente"):
@@ -1907,6 +2130,15 @@ def consolidated_on(request: HttpRequest) -> HttpResponse:
         })
     campaigns_data.sort(key=lambda c: c["cost"], reverse=True)
 
+    # Unique vehicle labels for filter pills (preserving cost order)
+    _seen_vehicles: set[str] = set()
+    vehicles_in_campaigns: list[str] = []
+    for c in campaigns_data:
+        v = c.get("vehicle") or ""
+        if v and v not in _seen_vehicles:
+            _seen_vehicles.add(v)
+            vehicles_in_campaigns.append(v)
+
     has_data = bool(vehicles_data)
 
     return render(
@@ -1918,6 +2150,12 @@ def consolidated_on(request: HttpRequest) -> HttpResponse:
             "has_data": has_data,
             "date_from": date_from,
             "date_to": date_to,
+            # Period comparison
+            "compare_on": compare_on,
+            "compare_from": compare_from,
+            "compare_to": compare_to,
+            "comparison": consolidated_comparison,
+            "trend_prev_json": json.dumps(trend_prev_total),
             # Totals
             "total_impressions": total_impressions,
             "total_clicks": total_clicks,
@@ -1945,6 +2183,11 @@ def consolidated_on(request: HttpRequest) -> HttpResponse:
             "vehicle_trends_json": json.dumps(vehicle_trends),
             # Campaigns table
             "campaigns_data": campaigns_data,
+            "vehicles_in_campaigns": vehicles_in_campaigns,
+            # Per-client module visibility
+            "hidden_modules": hidden_modules,
+            "can_manage_modules": can_manage_modules,
+            "current_cliente_id": cliente_id,
         },
     )
 
@@ -3389,9 +3632,21 @@ def cliente_delete(request: HttpRequest, cliente_id: int) -> HttpResponse:
 @require_admin
 def cliente_campaigns(request: HttpRequest, cliente_id: int) -> HttpResponse:
     from django.core.paginator import Paginator
+    from django.db.models import Exists, OuterRef, Q
 
     cliente = Cliente.objects.get(id=cliente_id)
-    campaigns_qs = Campaign.objects.filter(cliente_id=cliente.id).order_by("-created_at")
+    campaigns_qs = Campaign.objects.filter(cliente_id=cliente.id)
+
+    # Annotate placement-line presence so we can compute media_kind consistently
+    # with /campanhas/<id>/ — the Campaign.media_type field is unreliable, so we
+    # rely on PlacementLine.media_type counts + Google/Meta name heuristic.
+    has_online = PlacementLine.objects.filter(campaign=OuterRef("pk"), media_type="online")
+    has_offline = PlacementLine.objects.filter(campaign=OuterRef("pk"), media_type="offline")
+    google_meta_q = Q(name__startswith="Google Ads - ") | Q(name__startswith="Meta Ads - ")
+    campaigns_qs = campaigns_qs.annotate(
+        _has_on=Exists(has_online),
+        _has_off=Exists(has_offline),
+    ).order_by("-created_at")
 
     # Search filter
     q = request.GET.get("q", "").strip()
@@ -3403,14 +3658,32 @@ def cliente_campaigns(request: HttpRequest, cliente_id: int) -> HttpResponse:
     if status_filter:
         campaigns_qs = campaigns_qs.filter(status=status_filter)
 
-    # Meio filter
+    # Meio filter (uses computed media_kind, not the stale Campaign.media_type field)
     meio_filter = request.GET.get("meio", "")
-    if meio_filter:
-        campaigns_qs = campaigns_qs.filter(media_type=meio_filter)
+    if meio_filter == "online":
+        campaigns_qs = campaigns_qs.filter(google_meta_q | Q(_has_on=True, _has_off=False))
+    elif meio_filter == "offline":
+        campaigns_qs = campaigns_qs.filter(_has_off=True, _has_on=False).exclude(google_meta_q)
+    elif meio_filter == "mixed":
+        campaigns_qs = campaigns_qs.filter(_has_on=True, _has_off=True).exclude(google_meta_q)
 
     paginator = Paginator(campaigns_qs, 10)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
+
+    # Compute media_kind for each campaign on the current page
+    for c in page_obj.object_list:
+        is_google_meta = c.name.startswith("Google Ads - ") or c.name.startswith("Meta Ads - ")
+        if is_google_meta:
+            c.media_kind = "online"
+        elif c._has_on and not c._has_off:
+            c.media_kind = "online"
+        elif c._has_off and not c._has_on:
+            c.media_kind = "offline"
+        elif c._has_on and c._has_off:
+            c.media_kind = "mixed"
+        else:
+            c.media_kind = "none"
 
     return render(
         request,

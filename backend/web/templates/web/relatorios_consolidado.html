@@ -466,7 +466,21 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
+    max-height: 100vh;
+    overflow-y: auto;
+    padding-right: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
   }
+  .timeline-body::-webkit-scrollbar { width: 10px; }
+  .timeline-body::-webkit-scrollbar-track { background: transparent; }
+  .timeline-body::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 5px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  .timeline-body::-webkit-scrollbar-thumb:hover { background: #94a3b8; background-clip: padding-box; border: 2px solid transparent; }
 
   .timeline-row {
     display: grid;
