@@ -135,3 +135,6 @@ staticfiles/
 venv/
 env/
 ENV/
+
+# Claude Code local settings (per-machine permissions)
+.claude/settings.local.json
