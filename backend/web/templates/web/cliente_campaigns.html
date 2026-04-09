@@ -378,15 +378,25 @@
   <!-- Pagination -->
   {% if page_obj.paginator.num_pages > 1 %}
   <div class="pagination-bar">
-    <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if meio_filter %}&meio={{ meio_filter }}{% endif %}"
-       class="{% if not page_obj.has_previous %}disabled{% endif %}">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if meio_filter %}&meio={{ meio_filter }}{% endif %}">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
     </a>
+    {% else %}
+    <span class="disabled">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
+    </span>
+    {% endif %}
     <span>{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
-    <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if meio_filter %}&meio={{ meio_filter }}{% endif %}"
-       class="{% if not page_obj.has_next %}disabled{% endif %}">
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if meio_filter %}&meio={{ meio_filter }}{% endif %}">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
     </a>
+    {% else %}
+    <span class="disabled">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+    </span>
+    {% endif %}
   </div>
   {% endif %}
 </section>

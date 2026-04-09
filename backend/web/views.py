@@ -3668,7 +3668,14 @@ def cliente_campaigns(request: HttpRequest, cliente_id: int) -> HttpResponse:
         campaigns_qs = campaigns_qs.filter(_has_on=True, _has_off=True).exclude(google_meta_q)
 
     paginator = Paginator(campaigns_qs, 10)
-    page_number = request.GET.get("page", 1)
+    # Sanitize page param: clamp to >= 1 and fall back to 1 on garbage input.
+    # Django's get_page() should handle this but in 4.2.7 some edge cases
+    # (empty string, redirect from upload with stale ?page=) propagate an
+    # EmptyPage all the way up. Guarding here is harmless and bulletproof.
+    try:
+        page_number = max(1, int(request.GET.get("page") or 1))
+    except (TypeError, ValueError):
+        page_number = 1
     page_obj = paginator.get_page(page_number)
 
     # Compute media_kind for each campaign on the current page
@@ -6435,37 +6442,44 @@ def campaign_financial_upload(request: HttpRequest, campaign_id: int) -> HttpRes
                 region_rows = parsed.get("region_investments") or []
                 resumo = parsed.get("resumo_meios") or {}
 
-                # Build per-sheet detail for selection UI
-                sheet_details = {}
-                for s in sheets_found:
-                    sheet_details[s] = {"name": s, "rows": 0, "type": ""}
-
-                # Count eff rows per channel and map to sheet names
-                eff_by_ch: dict[str, int] = {}
-                for row in eff_rows:
-                    ch = row.get("channel_type", "other")
-                    eff_by_ch[ch] = eff_by_ch.get(ch, 0) + 1
-
-                # Map channel types to known sheet patterns
+                # Build per-sheet detail for selection UI.
+                # Only RESUMO DE MEIOS * and CUSTO GERAÇÃO * are financial tabs.
+                # Everything else (COVER, TV ABERTA, RÁDIO, JORNAL, DIGITAL, etc.)
+                # belongs to the media plan upload and must come locked here.
                 from campaigns.financial_xlsx_worker import _norm
-                CH_LABELS = {
-                    "tv_aberta": "TV Aberta", "paytv": "Pay TV", "radio": "Rádio",
-                    "jornal": "Jornal", "digital": "Digital", "geracao": "Geração",
-                }
+                sheet_details = {}
+
+                resumo_sheets = [s for s in sheets_found if "resumo" in _norm(s) and "meios" in _norm(s)]
+                geracao_sheets = [s for s in sheets_found if "custo" in _norm(s) and "geracao" in _norm(s)]
+                geracao_total = len(parsed.get("custo_geracao") or [])
+
+                # Distribute eff_rows count evenly across resumo sheets (parser merges them).
+                eff_per_resumo = (len(eff_rows) // len(resumo_sheets)) if resumo_sheets else 0
+                # Distribute geração count similarly.
+                ger_per_sheet = (geracao_total // len(geracao_sheets)) if geracao_sheets else 0
+
                 for s in sheets_found:
-                    sn = _norm(s)
-                    if "resumo" in sn and "meios" in sn:
-                        total_eff = len(eff_rows)
-                        sheet_details[s] = {"name": s, "rows": total_eff, "type": "eficiência"}
-                    elif "custo" in sn and "geracao" in sn:
-                        sheet_details[s] = {"name": s, "rows": len(parsed.get("custo_geracao") or []), "type": "geração"}
-                    elif "cover" in sn:
-                        sheet_details[s] = {"name": s, "rows": 0, "type": "capa"}
+                    if s in resumo_sheets:
+                        sheet_details[s] = {
+                            "name": s,
+                            "rows": eff_per_resumo,
+                            "type": "Resumo de Meios",
+                            "is_financial": True,
+                        }
+                    elif s in geracao_sheets:
+                        sheet_details[s] = {
+                            "name": s,
+                            "rows": ger_per_sheet,
+                            "type": "Custo Geração",
+                            "is_financial": True,
+                        }
                     else:
-                        for ch_key, ch_label in CH_LABELS.items():
-                            if ch_key.replace("_", " ") in sn or ch_label.lower().replace("á", "a").replace("ã", "a") in sn:
-                                sheet_details[s] = {"name": s, "rows": eff_by_ch.get(ch_key, 0), "type": ch_label}
-                                break
+                        sheet_details[s] = {
+                            "name": s,
+                            "rows": 0,
+                            "type": "",
+                            "is_financial": False,
+                        }
 
                 upload.summary = {
                     "ok": bool(parsed.get("ok")),

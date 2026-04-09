@@ -178,10 +178,10 @@ class PlacementLine(models.Model):
 class PlacementDay(models.Model):
     placement_line = models.ForeignKey(PlacementLine, on_delete=models.CASCADE, related_name="days")
     date = models.DateField()
-    insertions = models.PositiveIntegerField(default=0)
+    insertions = models.PositiveBigIntegerField(default=0)
     cost = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
-    impressions = models.PositiveIntegerField(null=True, blank=True)
-    clicks = models.PositiveIntegerField(null=True, blank=True)
+    impressions = models.PositiveBigIntegerField(null=True, blank=True)
+    clicks = models.PositiveBigIntegerField(null=True, blank=True)
 
     class Meta:
         verbose_name = "Dia de veiculação"
@@ -225,8 +225,8 @@ class AdGroupDay(models.Model):
     """Métricas diárias por grupo de anúncios."""
     ad_group = models.ForeignKey(AdGroup, on_delete=models.CASCADE, related_name="days")
     date = models.DateField()
-    impressions = models.PositiveIntegerField(default=0)
-    clicks = models.PositiveIntegerField(default=0)
+    impressions = models.PositiveBigIntegerField(default=0)
+    clicks = models.PositiveBigIntegerField(default=0)
     cost = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
     class Meta:
@@ -280,8 +280,8 @@ class AdDay(models.Model):
     """Métricas diárias por anúncio."""
     ad = models.ForeignKey(Ad, on_delete=models.CASCADE, related_name="days")
     date = models.DateField()
-    impressions = models.PositiveIntegerField(default=0)
-    clicks = models.PositiveIntegerField(default=0)
+    impressions = models.PositiveBigIntegerField(default=0)
+    clicks = models.PositiveBigIntegerField(default=0)
     cost = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
     class Meta:
@@ -408,11 +408,11 @@ class MediaEfficiency(models.Model):
     cpp = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
     custo_tabela = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
     custo_negociado = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
-    impactos = models.PositiveIntegerField(null=True, blank=True)
+    impactos = models.PositiveBigIntegerField(null=True, blank=True)
     cpm = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
     ia_pct = models.DecimalField(max_digits=7, decimal_places=4, null=True, blank=True)
     formato = models.CharField(max_length=100, blank=True, default="")
-    circulacao = models.PositiveIntegerField(null=True, blank=True)
+    circulacao = models.PositiveBigIntegerField(null=True, blank=True)
     valor = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
 
     class Meta:

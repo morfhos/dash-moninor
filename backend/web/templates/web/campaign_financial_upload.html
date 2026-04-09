@@ -14,7 +14,17 @@
   }
   .sheet-card:hover { border-color: var(--accent, #6366f1); }
   .sheet-card.checked { border-color: var(--accent, #6366f1); background: rgba(99,102,241,.06); }
+  .sheet-card.locked {
+    cursor: not-allowed;
+    background: #fafafa;
+    border-color: #f1f5f9;
+    opacity: .7;
+  }
+  .sheet-card.locked:hover { border-color: #f1f5f9; }
+  .sheet-card.locked .sheet-name { color: #94a3b8; }
+  .sheet-card.locked .sheet-meta { color: #cbd5e1; }
   .sheet-card input[type="checkbox"] { accent-color: var(--accent, #6366f1); width: 16px; height: 16px; cursor: pointer; }
+  .sheet-card input[type="checkbox"]:disabled { cursor: not-allowed; }
   .sheet-card .sheet-info { flex: 1; min-width: 0; }
   .sheet-card .sheet-name { font-size: 13px; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sheet-card .sheet-meta { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
@@ -123,26 +133,31 @@
       <!-- Sheet cards -->
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;max-height:340px;overflow-y:auto;" id="sheets-list">
         {% for sheet_name, detail in result.sheet_details.items %}
+        {% if detail.is_financial %}
         <label class="sheet-card checked">
           <input type="checkbox" value="{{ sheet_name }}" checked onchange="toggleCard(this)">
           <div class="sheet-info">
             <div class="sheet-name">{{ sheet_name }}</div>
             <div class="sheet-meta">
-              {% if detail.rows > 0 %}{{ detail.rows }} linhas{% else %}metadados{% endif %}
+              {% if detail.rows > 0 %}{{ detail.rows }} linha{{ detail.rows|pluralize }}{% else %}dados financeiros{% endif %}
             </div>
           </div>
-          {% if detail.type %}
           <span class="sheet-badge
-            {% if detail.type == 'eficiência' %}badge-eficiencia
-            {% elif 'TV' in detail.type %}badge-tv
-            {% elif detail.type == 'Rádio' %}badge-radio
-            {% elif detail.type == 'Jornal' %}badge-jornal
-            {% elif detail.type == 'Digital' %}badge-digital
-            {% elif detail.type == 'geração' or detail.type == 'Geração' %}badge-geracao
-            {% elif detail.type == 'capa' %}badge-capa
-            {% else %}badge-default{% endif %}">{{ detail.type }}</span>
-          {% endif %}
+            {% if detail.type == 'Custo Geração' %}badge-geracao
+            {% else %}badge-eficiencia{% endif %}">{{ detail.type }}</span>
         </label>
+        {% else %}
+        <label class="sheet-card locked" title="Aba não financeira — disponível apenas no upload de mídia">
+          <input type="checkbox" value="{{ sheet_name }}" disabled>
+          <div class="sheet-info">
+            <div class="sheet-name">{{ sheet_name }}</div>
+            <div class="sheet-meta">
+              <span style="color:#f87171;">&#9888; Não é aba financeira</span>
+            </div>
+          </div>
+          <span class="sheet-badge badge-default">bloqueada</span>
+        </label>
+        {% endif %}
         {% endfor %}
       </div>
 
@@ -214,16 +229,16 @@ function toggleCard(cb) {
 }
 
 function updateCount() {
-  const all = document.querySelectorAll('#sheets-list input[type="checkbox"]');
-  const checked = document.querySelectorAll('#sheets-list input[type="checkbox"]:checked');
+  const all = document.querySelectorAll('#sheets-list input[type="checkbox"]:not(:disabled)');
+  const checked = document.querySelectorAll('#sheets-list input[type="checkbox"]:not(:disabled):checked');
   const el = document.getElementById('selected-count');
-  if (el) el.textContent = checked.length + ' de ' + all.length + ' abas selecionadas';
+  if (el) el.textContent = checked.length + ' de ' + all.length + ' abas financeiras selecionadas';
   const btn = document.getElementById('import-btn');
   if (btn) btn.disabled = checked.length === 0;
 }
 
 function selectAll() {
-  document.querySelectorAll('#sheets-list input[type="checkbox"]').forEach(cb => {
+  document.querySelectorAll('#sheets-list input[type="checkbox"]:not(:disabled)').forEach(cb => {
     cb.checked = true;
     cb.closest('.sheet-card').classList.add('checked');
   });
@@ -231,7 +246,7 @@ function selectAll() {
 }
 
 function clearAll() {
-  document.querySelectorAll('#sheets-list input[type="checkbox"]').forEach(cb => {
+  document.querySelectorAll('#sheets-list input[type="checkbox"]:not(:disabled)').forEach(cb => {
     cb.checked = false;
     cb.closest('.sheet-card').classList.remove('checked');
   });
@@ -242,8 +257,8 @@ function injectSheets(e) {
   const form = document.getElementById('import-form');
   // Remove old hidden inputs
   form.querySelectorAll('input[name="selected_sheets"]').forEach(el => el.remove());
-  // Add checked sheets
-  document.querySelectorAll('#sheets-list input[type="checkbox"]:checked').forEach(cb => {
+  // Add checked sheets (disabled checkboxes are skipped)
+  document.querySelectorAll('#sheets-list input[type="checkbox"]:not(:disabled):checked').forEach(cb => {
     const hi = document.createElement('input');
     hi.type = 'hidden';
     hi.name = 'selected_sheets';
