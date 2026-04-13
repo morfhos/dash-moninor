@@ -376,6 +376,8 @@ def main() -> int:
                 col_by_key["end_date"] = idx
             elif h in {"peca", "peça", "criativo", "creative"}:
                 col_by_key["piece_codes"] = idx
+            elif "circulacao" in h or "tiragem" in h or ("impressoes" in h and "circulacao" in h):
+                col_by_key["circulation"] = idx
             else:
                 maybe_date = _try_parse_date(header_values[idx - 1])
                 if maybe_date is not None:
@@ -479,6 +481,8 @@ def main() -> int:
 
             duration_raw = row_values[col_by_key["duration_sec"] - 1] if "duration_sec" in col_by_key else None
             data["duration_sec"] = _parse_int(duration_raw)
+            circ_raw = row_values[col_by_key["circulation"] - 1] if "circulation" in col_by_key else None
+            data["circulation"] = _parse_int(circ_raw)
             data["external_ref"] = (
                 (row_values[col_by_key["external_ref"] - 1] if "external_ref" in col_by_key else "") or ""
             )

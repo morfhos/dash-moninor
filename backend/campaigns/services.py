@@ -364,6 +364,14 @@ def import_media_plan_xlsx(*, campaign: Campaign, uploaded_file: UploadedFile, r
                         created_pieces += 1
 
         for row in parsed_rows:
+            # Para impressos (jornal/revista/impresso), inclui tiragem no property_text
+            prop_text = str(row.data.get("property_text") or "")[:250]
+            circulation = row.data.get("circulation")
+            if circulation and row.media_channel in ("jornal", "revista", "impresso", "magazine"):
+                circ_str = f"{circulation:,}".replace(",", ".")
+                prop_text = f"Tiragem: {circ_str}" if not prop_text else f"{prop_text} | Tiragem: {circ_str}"
+                prop_text = prop_text[:250]
+
             line = PlacementLine.objects.create(
                 campaign=campaign,
                 media_type=row.media_type,
@@ -371,7 +379,7 @@ def import_media_plan_xlsx(*, campaign: Campaign, uploaded_file: UploadedFile, r
                 market=str(row.data.get("market") or "")[:100],
                 channel=str(row.data.get("channel") or "")[:100],
                 program=str(row.data.get("program") or "")[:150],
-                property_text=str(row.data.get("property_text") or "")[:250],
+                property_text=prop_text,
                 format_text=str(row.data.get("format_text") or "")[:250],
                 duration_sec=row.data.get("duration_sec") or None,
                 external_ref=str(row.data.get("external_ref") or "")[:120],

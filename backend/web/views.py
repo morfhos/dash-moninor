@@ -3961,6 +3961,23 @@ def contract_wizard_step2(request: HttpRequest, campaign_id: int) -> HttpRespons
     )
 
 
+def _build_media_tabs(unique_media_channels: set) -> list:
+    """Build 4 fixed media type tabs: TV, Rádio, Impressa, Todas."""
+    # Agrupamentos: cada tab filtra um ou mais media_channels
+    TV_CHANNELS = {"tv_aberta", "paytv"}
+    RADIO_CHANNELS = {"radio"}
+    PRINT_CHANNELS = {"jornal", "revista", "magazine", "impresso"}
+
+    tabs = []
+    if unique_media_channels & TV_CHANNELS:
+        tabs.append({"key": "tv", "label": "TV", "channels": ",".join(sorted(TV_CHANNELS & unique_media_channels))})
+    if unique_media_channels & RADIO_CHANNELS:
+        tabs.append({"key": "radio", "label": "Rádio", "channels": ",".join(sorted(RADIO_CHANNELS & unique_media_channels))})
+    if unique_media_channels & PRINT_CHANNELS:
+        tabs.append({"key": "impressa", "label": "Impressa", "channels": ",".join(sorted(PRINT_CHANNELS & unique_media_channels))})
+    return tabs
+
+
 @login_required
 def contract_done(request: HttpRequest, campaign_id: int) -> HttpResponse:
     campaign = Campaign.objects.filter(id=campaign_id).select_related("cliente").first()
@@ -4071,6 +4088,7 @@ def contract_done(request: HttpRequest, campaign_id: int) -> HttpResponse:
     unique_piece_titles: set = set()
     unique_channels: set = set()
     unique_markets: set = set()
+    unique_media_channels: set = set()  # para tabs de tipo de mídia
 
     # Mídia impressa: para esses canais a planilha geralmente não traz código de
     # peça nos cabeçalhos, então renderizamos um card sintético "Veiculação <Tipo>"
@@ -4106,11 +4124,16 @@ def contract_done(request: HttpRequest, campaign_id: int) -> HttpResponse:
         if market:
             unique_markets.add(market)
 
+        # Coletar media_channel para tabs de tipo
+        media_ch_norm = (line.media_channel or "").strip().lower()
+        if media_ch_norm:
+            unique_media_channels.add(media_ch_norm)
+
         # Buscar peças vinculadas a esta linha
         linked_pieces = list(line.placement_creatives.select_related("piece").all())
 
-        media_ch_norm = (line.media_channel or "").strip().lower()
         is_print = media_ch_norm in PRINT_CHANNELS
+        prop_text = (line.property_text or "").strip()
 
         if linked_pieces:
             for pc in linked_pieces:
@@ -4130,6 +4153,8 @@ def contract_done(request: HttpRequest, campaign_id: int) -> HttpResponse:
                     "end": line.max_day,
                     "insertions": line.total_insertions or 0,
                     "color": get_piece_color(piece.code),
+                    "property_text": prop_text,
+                    "format_text": (line.format_text or "").strip(),
                 })
         elif is_print:
             type_label = PRINT_TYPE_LABELS.get(media_ch_norm, "Impresso")
@@ -4147,6 +4172,8 @@ def contract_done(request: HttpRequest, campaign_id: int) -> HttpResponse:
                 "end": line.max_day,
                 "insertions": line.total_insertions or 0,
                 "color": PRINT_COLORS.get(media_ch_norm, "#fcd34d"),
+                "property_text": prop_text,
+                "format_text": (line.format_text or "").strip(),
             })
         # Demais linhas sem peças vinculadas não entram na timeline
 
@@ -4273,6 +4300,7 @@ def contract_done(request: HttpRequest, campaign_id: int) -> HttpResponse:
             "filter_pieces": sorted(unique_piece_titles),
             "filter_channels": sorted(unique_channels),
             "filter_markets": sorted(unique_markets),
+            "media_type_tabs": _build_media_tabs(unique_media_channels),
             "role": role,
             "has_financial": campaign.financial_uploads.exists(),
         },

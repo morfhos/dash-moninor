@@ -116,6 +116,16 @@
 
         <!-- Timeline Calendar -->
         <div class="timeline-calendar">
+          <!-- Media type tabs -->
+          {% if media_type_tabs %}
+          <div class="calendar-header media-tabs">
+            {% for tab in media_type_tabs %}
+              <button class="media-tab-btn{% if forloop.first %} active{% endif %}" data-media="{{ tab.key }}" data-channels="{{ tab.channels }}">{{ tab.label }}</button>
+            {% endfor %}
+            <button class="media-tab-btn" data-media="all">Todas</button>
+          </div>
+          {% endif %}
+
           <div class="calendar-header">
             <button class="month-btn active" data-month="all">Todos</button>
             {% for m in months_list %}
@@ -130,7 +140,7 @@
           <!-- Timeline Rows -->
           <div class="timeline-body" id="timelineBody">
             {% for group in timeline_data %}
-              <div class="timeline-row" data-channel="{{ group.channel }}">
+              <div class="timeline-row" data-channel="{{ group.channel }}" data-media-channel="{{ group.media_channel }}">
                 <div class="row-label">
                   <strong>{{ group.channel }}</strong>
                   {% if group.media_channel %}
@@ -147,20 +157,25 @@
                          data-end="{{ item.end|date:'Y-m' }}"
                          data-piece="{{ item.title }}"
                          data-channel="{{ item.channel_name }}"
-                         data-market="{{ item.market }}">
+                         data-market="{{ item.market }}"
+                         data-media-channel="{{ item.channel }}">
                       <span class="bar-title">{{ item.title|truncatechars:25 }}</span>
                       <span class="bar-dates">{{ item.start_str }} a {{ item.end_str }}</span>
                     </a>
                     {% else %}
                     <div class="timeline-bar timeline-bar--print"
                          style="background: {{ item.color }};cursor:default;"
-                         title="{{ item.title }} - {{ item.market }} - {{ item.start_str }} a {{ item.end_str }}"
+                         title="{{ item.title }}{% if item.property_text %} - {{ item.property_text }}{% endif %} - {{ item.market }} - {{ item.start_str }} a {{ item.end_str }}"
                          data-start="{{ item.start|date:'Y-m' }}"
                          data-end="{{ item.end|date:'Y-m' }}"
                          data-piece="{{ item.title }}"
                          data-channel="{{ item.channel_name }}"
-                         data-market="{{ item.market }}">
+                         data-market="{{ item.market }}"
+                         data-media-channel="{{ item.channel }}">
                       <span class="bar-title">{{ item.title|truncatechars:25 }}</span>
+                      {% if item.property_text %}
+                        <span class="bar-circulation">{{ item.property_text }}</span>
+                      {% endif %}
                       <span class="bar-dates">{{ item.start_str }} a {{ item.end_str }}</span>
                     </div>
                     {% endif %}
@@ -446,6 +461,44 @@
     background: var(--brand-primary);
     border-color: var(--brand-primary);
     color: white;
+  }
+
+  /* Media type tabs */
+  .media-tabs {
+    margin-bottom: 4px;
+    gap: 6px;
+  }
+
+  .media-tab-btn {
+    padding: 6px 14px;
+    border: 1px solid var(--border-color);
+    background: white;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--text-secondary);
+  }
+
+  .media-tab-btn:hover {
+    border-color: #f59e0b;
+    color: #f59e0b;
+  }
+
+  .media-tab-btn.active {
+    background: #f59e0b;
+    border-color: #f59e0b;
+    color: white;
+  }
+
+  .bar-circulation {
+    font-size: 9px;
+    opacity: 0.85;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .month-name {
@@ -794,6 +847,8 @@ document.addEventListener('DOMContentLoaded', function() {
   const filterChannel = document.getElementById('filterChannel');
   const filterPraca = document.getElementById('filterPraca');
 
+  const mediaTabBtns = document.querySelectorAll('.media-tab-btn');
+
   // Estado dos filtros
   let selectedMonth = 'all';
   let selectedPiece = '';
@@ -801,18 +856,97 @@ document.addEventListener('DOMContentLoaded', function() {
   let selectedPraca = '';
   let searchText = '';
 
+  // Inicializar tab ativa (primeira tab, ex: TV)
+  var activeMediaTab = document.querySelector('.media-tab-btn.active');
+  var selectedMediaChannels = [];
+  if (activeMediaTab && activeMediaTab.dataset.media !== 'all') {
+    selectedMediaChannels = (activeMediaTab.dataset.channels || '').split(',').filter(Boolean);
+  }
+
+  // Atualiza as opções dos dropdowns com base na tab de mídia selecionada
+  function updateDropdownOptions() {
+    var hasMediaFilter = selectedMediaChannels.length > 0;
+    var relevantBars = [];
+    timelineBars.forEach(function(bar) {
+      if (!hasMediaFilter || selectedMediaChannels.indexOf(bar.dataset.mediaChannel || '') !== -1) {
+        relevantBars.push(bar);
+      }
+    });
+
+    // Coletar valores únicos das barras relevantes
+    var pracas = new Set();
+    var channels = new Set();
+    var pieces = new Set();
+    relevantBars.forEach(function(bar) {
+      if (bar.dataset.market) pracas.add(bar.dataset.market);
+      if (bar.dataset.channel) channels.add(bar.dataset.channel);
+      if (bar.dataset.piece) pieces.add(bar.dataset.piece);
+    });
+
+    // Rebuild Praças
+    var prevPraca = filterPraca.value;
+    filterPraca.innerHTML = '<option value="">Todas Praças</option>';
+    Array.from(pracas).sort().forEach(function(v) {
+      var opt = document.createElement('option');
+      opt.value = v; opt.textContent = v;
+      filterPraca.appendChild(opt);
+    });
+    filterPraca.value = pracas.has(prevPraca) ? prevPraca : '';
+    selectedPraca = filterPraca.value;
+
+    // Rebuild Canais
+    var prevCh = filterChannel.value;
+    filterChannel.innerHTML = '<option value="">Todos Canais</option>';
+    Array.from(channels).sort().forEach(function(v) {
+      var opt = document.createElement('option');
+      opt.value = v; opt.textContent = v;
+      filterChannel.appendChild(opt);
+    });
+    filterChannel.value = channels.has(prevCh) ? prevCh : '';
+    selectedChannel = filterChannel.value;
+
+    // Rebuild Peças
+    var prevPiece = filterPiece.value;
+    filterPiece.innerHTML = '<option value="">Todas Peças</option>';
+    Array.from(pieces).sort().forEach(function(v) {
+      var opt = document.createElement('option');
+      opt.value = v; opt.textContent = v;
+      filterPiece.appendChild(opt);
+    });
+    filterPiece.value = pieces.has(prevPiece) ? prevPiece : '';
+    selectedPiece = filterPiece.value;
+  }
+
   function applyFilters() {
+    var hasMediaFilter = selectedMediaChannels.length > 0;
+
+    // Primeiro: filtro por tipo de mídia nas ROWS (nível grupo)
+    timelineRows.forEach(row => {
+      if (hasMediaFilter) {
+        var rowMedia = row.dataset.mediaChannel || '';
+        row.classList.toggle('hidden', selectedMediaChannels.indexOf(rowMedia) === -1);
+      } else {
+        row.classList.remove('hidden');
+      }
+    });
+
     timelineBars.forEach(bar => {
       const startMonth = bar.dataset.start;
       const endMonth = bar.dataset.end;
       const piece = bar.dataset.piece || '';
       const channel = bar.dataset.channel || '';
       const market = bar.dataset.market || '';
+      const mediaChannel = bar.dataset.mediaChannel || '';
 
       let visible = true;
 
+      // Filtro de tipo de mídia (tabs)
+      if (hasMediaFilter) {
+        visible = selectedMediaChannels.indexOf(mediaChannel) !== -1;
+      }
+
       // Filtro de mês
-      if (selectedMonth !== 'all') {
+      if (visible && selectedMonth !== 'all') {
         if (startMonth && endMonth) {
           visible = selectedMonth >= startMonth && selectedMonth <= endMonth;
         } else if (startMonth) {
@@ -847,10 +981,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Esconder linhas que não têm barras visíveis
     timelineRows.forEach(row => {
+      if (row.classList.contains('hidden')) return;  // já oculta pelo media filter
       const visibleBars = row.querySelectorAll('.timeline-bar:not(.hidden)');
       row.classList.toggle('hidden', visibleBars.length === 0);
     });
   }
+
+  // Event listeners para tabs de tipo de mídia
+  mediaTabBtns.forEach(btn => {
+    btn.addEventListener('click', function() {
+      mediaTabBtns.forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      if (this.dataset.media === 'all') {
+        selectedMediaChannels = [];
+      } else {
+        selectedMediaChannels = (this.dataset.channels || '').split(',').filter(Boolean);
+      }
+      updateDropdownOptions();
+      applyFilters();
+    });
+  });
 
   // Event listeners para botões de mês
   monthButtons.forEach(btn => {
@@ -902,9 +1052,21 @@ document.addEventListener('DOMContentLoaded', function() {
     monthButtons.forEach(b => b.classList.remove('active'));
     document.querySelector('.month-btn[data-month="all"]').classList.add('active');
 
+    // Resetar tabs de tipo de mídia
+    selectedMediaChannels = [];
+    mediaTabBtns.forEach(b => b.classList.remove('active'));
+    var allMediaBtn = document.querySelector('.media-tab-btn[data-media="all"]');
+    if (allMediaBtn) allMediaBtn.classList.add('active');
+
     // Aplicar filtros (mostra tudo)
     applyFilters();
   });
+
+  // Aplicar filtro inicial (primeira tab ativa)
+  if (selectedMediaChannels.length > 0) {
+    updateDropdownOptions();
+    applyFilters();
+  }
 
   // Botão Imprimir
   const btnPrint = document.getElementById('btnPrint');

@@ -172,17 +172,38 @@ def parse_resumo_meios(wb) -> tuple[dict, dict, list[dict]]:
 
             label_norm = _norm(praca_str)
 
-            # Check if this is a TT (total) row
-            if label_norm.startswith("tt ") or "total geral" in label_norm:
+            # Check if this is a TT (total) row — two patterns:
+            #   Pattern A: label starts with "TT " (ex: "TT TV ABERTA", "TT RÁDIO")
+            #   Pattern B: praça/meio/veículo all empty but has totals and part≈100%
+            #              (subtotal row inferred from previous carry_meio)
+            #   Pattern C: "TOTAL GERAL" or "TOTAL MIDIA" in label
+            is_tt_row = label_norm.startswith("tt ")
+            is_total_row = "total geral" in label_norm or "total midia" in label_norm
+            is_blank_subtotal = (
+                not praca_str and not meio_str and not veiculo_str
+                and (total_bruto is not None or desembolso is not None)
+                and part_pct is not None and part_pct >= 0.99
+            )
+
+            if is_tt_row or is_total_row or is_blank_subtotal:
                 channel_key = None
-                for alias, key in CHANNEL_ALIASES.items():
-                    if alias in label_norm:
-                        channel_key = key
-                        break
+
+                if is_tt_row:
+                    # Match from the label (ex: "TT TV ABERTA")
+                    for alias, key in CHANNEL_ALIASES.items():
+                        if alias in label_norm:
+                            channel_key = key
+                            break
+                elif is_blank_subtotal and carry_meio:
+                    # Infer channel from the last MEIO seen above this row
+                    channel_key = _resolve_channel(carry_meio)
+                    if channel_key == "other":
+                        channel_key = None
 
                 if "total geral" in label_norm:
-                    # Overall total
                     channel_key = "_total"
+                elif "total midia" in label_norm:
+                    channel_key = "_total_midia"
 
                 if channel_key and (total_bruto is not None or desembolso is not None):
                     existing = channel_totals.get(channel_key, {})
@@ -192,10 +213,10 @@ def parse_resumo_meios(wb) -> tuple[dict, dict, list[dict]]:
                         existing["part_pct"] = part_pct
                     channel_totals[channel_key] = existing
 
-                    # Accumulate monthly values from TT rows for timeline
+                    # Accumulate monthly values from TT/subtotal rows for timeline
                     for col, month_num in month_cols:
                         v = _safe_float(ws.cell(row=r, column=col).value)
-                        if v and v > 0 and channel_key != "_total":
+                        if v and v > 0 and channel_key not in ("_total", "_total_midia"):
                             mk = f"2026-{month_num:02d}"
                             monthly[mk] = monthly.get(mk, 0) + v
 
@@ -350,9 +371,17 @@ def main(path: str) -> dict:
 
     # Derive financial summary from channel totals
     total_row = channel_totals.pop("_total", {})
+    total_midia_row = channel_totals.pop("_total_midia", {})
     summary: dict[str, Any] = {}
-    summary["total_valor_tabela"] = total_row.get("valor_bruto")
-    summary["total_desembolso"] = total_row.get("valor_liquido")
+    # TOTAL GERAL bruto pode estar vazio em algumas planilhas; fallback para TOTAL MIDIA
+    summary["total_valor_tabela"] = (
+        total_row.get("valor_bruto")
+        or total_midia_row.get("valor_bruto")
+    )
+    summary["total_desembolso"] = (
+        total_row.get("valor_liquido")
+        or total_midia_row.get("valor_liquido")
+    )
     if summary.get("total_valor_tabela") and summary.get("total_desembolso"):
         vt = summary["total_valor_tabela"]
         vd = summary["total_desembolso"]
