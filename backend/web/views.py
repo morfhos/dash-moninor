@@ -862,7 +862,7 @@ def campanhas_cliente(request: HttpRequest, cliente_id: int) -> HttpResponse:
 
     campaigns = (
         Campaign.objects.filter(cliente_id=cliente_id, status=Campaign.Status.ACTIVE)
-        .select_related("cliente")
+        .select_related("cliente", "financial_summary")
         .order_by("-created_at")
     )
 
@@ -874,6 +874,13 @@ def campanhas_cliente(request: HttpRequest, cliente_id: int) -> HttpResponse:
             min_date=Min("date"),
             max_date=Max("date"),
         )
+        # Fallback de Investimento: budget cadastrado → custo de placement days →
+        # total da planilha financeira (FinancialSummary.total_valor_tabela)
+        investment_value = c.total_budget or totals.get("cost") or 0
+        if not investment_value:
+            fin_summary = getattr(c, "financial_summary", None)
+            if fin_summary and fin_summary.total_valor_tabela:
+                investment_value = fin_summary.total_valor_tabela
         on_count = PlacementLine.objects.filter(campaign=c, media_type="online").count()
         off_count = PlacementLine.objects.filter(campaign=c, media_type="offline").count()
 
@@ -904,7 +911,7 @@ def campanhas_cliente(request: HttpRequest, cliente_id: int) -> HttpResponse:
         campaigns_with_stats.append({
             "campaign": c,
             "cliente": c.cliente,
-            "investment": c.total_budget or totals.get("cost") or 0,
+            "investment": investment_value,
             "insertions": totals.get("insertions") or 0,
             "on_count": on_count,
             "off_count": off_count,
@@ -4065,6 +4072,23 @@ def contract_done(request: HttpRequest, campaign_id: int) -> HttpResponse:
     unique_channels: set = set()
     unique_markets: set = set()
 
+    # Mídia impressa: para esses canais a planilha geralmente não traz código de
+    # peça nos cabeçalhos, então renderizamos um card sintético "Veiculação <Tipo>"
+    # mesmo sem peça vinculada.
+    PRINT_CHANNELS = {"jornal", "revista", "magazine", "impresso"}
+    PRINT_TYPE_LABELS = {
+        "jornal": "Jornal",
+        "revista": "Revista",
+        "magazine": "Revista",
+        "impresso": "Impresso",
+    }
+    PRINT_COLORS = {
+        "jornal": "#fdba74",   # laranja claro
+        "revista": "#f9a8d4",  # rosa
+        "magazine": "#f9a8d4",
+        "impresso": "#a3e635", # lima
+    }
+
     grouped_by_channel: dict = {}
     for line in lines_with_pieces:
         channel = (line.channel or line.program or line.media_channel or "Outros").strip()
@@ -4085,7 +4109,9 @@ def contract_done(request: HttpRequest, campaign_id: int) -> HttpResponse:
         # Buscar peças vinculadas a esta linha
         linked_pieces = list(line.placement_creatives.select_related("piece").all())
 
-        # Apenas exibir itens que têm peças vinculadas
+        media_ch_norm = (line.media_channel or "").strip().lower()
+        is_print = media_ch_norm in PRINT_CHANNELS
+
         if linked_pieces:
             for pc in linked_pieces:
                 piece = pc.piece
@@ -4105,7 +4131,24 @@ def contract_done(request: HttpRequest, campaign_id: int) -> HttpResponse:
                     "insertions": line.total_insertions or 0,
                     "color": get_piece_color(piece.code),
                 })
-        # Linhas sem peças vinculadas não são exibidas na timeline
+        elif is_print:
+            type_label = PRINT_TYPE_LABELS.get(media_ch_norm, "Impresso")
+            title = f"Veiculação {type_label}"
+            unique_piece_titles.add(title)
+            grouped_by_channel[channel]["items"].append({
+                "title": title,
+                "piece_id": None,
+                "piece_code": "",
+                "channel": line.media_channel,
+                "channel_name": channel,
+                "market": market,
+                "program": line.channel or line.program or "",
+                "start": line.min_day,
+                "end": line.max_day,
+                "insertions": line.total_insertions or 0,
+                "color": PRINT_COLORS.get(media_ch_norm, "#fcd34d"),
+            })
+        # Demais linhas sem peças vinculadas não entram na timeline
 
     for channel_name, data in grouped_by_channel.items():
         # Só adicionar se tiver itens (peças vinculadas)
@@ -4193,6 +4236,14 @@ def contract_done(request: HttpRequest, campaign_id: int) -> HttpResponse:
             y, m = current.year, current.month
             current = date(y + 1, 1, 1) if m == 12 else date(y, m + 1, 1)
 
+    # Fallback de Investimento Total: se não há budget cadastrado nem custo
+    # importado de placement days, usa o total da planilha financeira (FinancialSummary).
+    investment_value = campaign.total_budget or totals.get("cost") or 0
+    if not investment_value:
+        fin_summary = getattr(campaign, "financial_summary", None)
+        if fin_summary and fin_summary.total_valor_tabela:
+            investment_value = fin_summary.total_valor_tabela
+
     return render(
         request,
         "web/contract_done.html",
@@ -4203,7 +4254,7 @@ def contract_done(request: HttpRequest, campaign_id: int) -> HttpResponse:
             "cliente": campaign.cliente,
             "last_upload": last_upload,
             "totals": {
-                "investment": campaign.total_budget or totals.get("cost") or 0,
+                "investment": investment_value,
                 "insertions": totals.get("insertions") or 0,
                 "impressions": totals.get("impressions") or 0,
                 "cost": totals.get("cost") or 0,

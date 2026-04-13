@@ -139,6 +139,7 @@
                 </div>
                 <div class="row-bars">
                   {% for item in group.items %}
+                    {% if item.piece_id %}
                     <a href="{% url 'web:peca_detalhe' item.piece_id %}" class="timeline-bar"
                          style="background: {{ item.color }};"
                          title="{{ item.title }} - {{ item.start_str }} a {{ item.end_str }}"
@@ -150,6 +151,19 @@
                       <span class="bar-title">{{ item.title|truncatechars:25 }}</span>
                       <span class="bar-dates">{{ item.start_str }} a {{ item.end_str }}</span>
                     </a>
+                    {% else %}
+                    <div class="timeline-bar timeline-bar--print"
+                         style="background: {{ item.color }};cursor:default;"
+                         title="{{ item.title }} - {{ item.market }} - {{ item.start_str }} a {{ item.end_str }}"
+                         data-start="{{ item.start|date:'Y-m' }}"
+                         data-end="{{ item.end|date:'Y-m' }}"
+                         data-piece="{{ item.title }}"
+                         data-channel="{{ item.channel_name }}"
+                         data-market="{{ item.market }}">
+                      <span class="bar-title">{{ item.title|truncatechars:25 }}</span>
+                      <span class="bar-dates">{{ item.start_str }} a {{ item.end_str }}</span>
+                    </div>
+                    {% endif %}
                   {% endfor %}
                 </div>
               </div>

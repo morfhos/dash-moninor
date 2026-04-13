@@ -100,12 +100,16 @@ def detect_media_from_sheet(sheet_name: str) -> tuple[str, str]:
     n = _norm(sheet_name)
     if "open tv" in n or "tv aberta" in n:
         return ("offline", "tv_aberta")
-    if "paytv" in n or "pay tv" in n:
+    if "paytv" in n or "pay tv" in n or "tv paga" in n or "tv fechada" in n:
         return ("offline", "paytv")
     if "radio" in n:
         return ("offline", "radio")
+    if "revista" in n or "magazine" in n:
+        return ("offline", "revista")
     if "jornal" in n:
         return ("offline", "jornal")
+    if "impresso" in n:
+        return ("offline", "impresso")
     if "ooh" in n:
         return ("offline", "ooh")
     if "meta" in n:
@@ -461,7 +465,7 @@ def main() -> int:
             market_norm = _norm(market_val)
             is_section_header = any(
                 pattern in market_norm
-                for pattern in ("pay tv", "paytv", "open tv", "tv aberta", "radio", "jornal", "ooh", "digital", "meta", "google", "youtube")
+                for pattern in ("pay tv", "paytv", "tv paga", "open tv", "tv aberta", "radio", "jornal", "revista", "magazine", "impresso", "ooh", "digital", "meta", "google", "youtube")
             )
             if is_section_header:
                 data["market"] = ""  # Não usar como market
