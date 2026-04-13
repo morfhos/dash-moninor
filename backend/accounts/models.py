@@ -89,6 +89,14 @@ class AuditLog(models.Model):
         CONTRACT_UPLOADED = "contract_uploaded", "Contrato Enviado"
         PASSWORD_RESET_REQUESTED = "password_reset_requested", "Recuperacao de Senha Solicitada"
         PASSWORD_RESET_COMPLETED = "password_reset_completed", "Senha Redefinida"
+        FINANCIAL_UPDATED = "financial_updated", "Dados Financeiros Atualizados"
+        FINANCIAL_DELETED = "financial_deleted", "Dados Financeiros Deletados"
+        VISIBILITY_CHANGED = "visibility_changed", "Visibilidade Alterada"
+        EFFICIENCY_UPDATED = "efficiency_updated", "Eficiencia Atualizada"
+        EFFICIENCY_DELETED = "efficiency_deleted", "Eficiencia Deletada"
+        REGION_UPDATED = "region_updated", "Regioes Atualizadas"
+        CAMPAIGN_STATUS = "campaign_status", "Status Campanha Alterado"
+        SETTINGS_UPDATED = "settings_updated", "Configuracoes Atualizadas"
 
     event_type = models.CharField(max_length=30, choices=EventType.choices, db_index=True)
     user = models.ForeignKey(

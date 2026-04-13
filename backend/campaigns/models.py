@@ -382,6 +382,11 @@ class FinancialSummary(models.Model):
     cobertura_pct = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
     frequencia_eficaz = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
+    # Controle de visibilidade para clientes
+    client_visible = models.BooleanField(default=False, help_text="Se True, cliente pode ver a página financeira")
+    # Dict com campos ocultos: {"total_valor_tabela": false, "desconto_pct": false, ...}
+    # True = visível ao cliente, False/ausente = oculto ao cliente
+    visibility = models.JSONField(blank=True, default=dict, help_text="Campos visíveis ao cliente")
 
     class Meta:
         verbose_name = "Resumo Financeiro"

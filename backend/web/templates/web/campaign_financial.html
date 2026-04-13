@@ -275,6 +275,99 @@
   .region-row .rbar-fill { height: 100%; border-radius: 5px; }
   .region-row .rpct { width: 50px; font-size: 13px; text-align: right; color: var(--text-secondary); }
   .region-row .rval { width: 110px; font-size: 13px; text-align: right; font-weight: 600; }
+
+  /* ── Edit metrics button ── */
+  .btn-edit-metrics {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: white;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .btn-edit-metrics:hover {
+    border-color: #6366f1;
+    color: #6366f1;
+  }
+
+  /* ── Visibility eye toggle ── */
+  .metric-card { position: relative; }
+  .vis-eye {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    opacity: 0.4;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all .15s;
+  }
+  .vis-eye:hover {
+    opacity: 1;
+    background: rgba(0,0,0,.05);
+  }
+  .vis-eye.active {
+    opacity: 1;
+    color: #16a34a;
+  }
+  .vis-section[data-vis-hidden="true"] {
+    opacity: 0.4;
+  }
+
+  /* ── Mobile ──────────────────────────────────────────── */
+  @media (max-width: 768px) {
+    .metric-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .metric-card {
+      padding: 14px 12px;
+    }
+    .metric-card .value {
+      font-size: 17px;
+    }
+    .charts-row {
+      grid-template-columns: 1fr;
+    }
+    .table-section {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .fin-table {
+      min-width: 600px;
+    }
+    .table-toolbar {
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .table-toolbar .search-box,
+    .table-toolbar select {
+      flex: 1;
+      min-width: 120px;
+    }
+    .region-row .rname { width: 80px; font-size: 11px; }
+    .region-row .rval { width: 80px; font-size: 11px; }
+    .region-row .rpct { width: 40px; font-size: 11px; }
+    .fin-header { flex-wrap: wrap; gap: 8px; }
+  }
+
+  @media (max-width: 480px) {
+    .metric-grid {
+      grid-template-columns: 1fr;
+    }
+    .metric-card .value {
+      font-size: 15px;
+    }
+  }
 </style>
 
 {% csrf_token %}
@@ -290,7 +383,19 @@
     <p class="subtitle">{{ campaign.name }} · {{ cliente.nome }}</p>
   </div>
   <div style="display:flex;gap:10px;align-items:center;">
-    {% if fs %}
+    {% if fs and role != "cliente" %}
+    <!-- Toggle visibilidade para o cliente -->
+    <button type="button" id="btn-client-visible" onclick="toggleClientVisible()" title="{% if client_visible %}Visível ao cliente — clique para ocultar{% else %}Oculto ao cliente — clique para liberar{% endif %}" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;border:1px solid {% if client_visible %}#16a34a{% else %}var(--border){% endif %};background:{% if client_visible %}rgba(22,163,106,.08){% else %}none{% endif %};color:{% if client_visible %}#16a34a{% else %}var(--text-secondary){% endif %};cursor:pointer;font-size:12px;font-weight:600;transition:all .15s;">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        {% if client_visible %}
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+        {% else %}
+        <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>
+        {% endif %}
+      </svg>
+      {% if client_visible %}Visível ao cliente{% else %}Oculto ao cliente{% endif %}
+    </button>
+
     <button type="button" onclick="confirmDelete()" title="Deletar dados financeiros" style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:none;color:var(--text-secondary);cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='#ef4444';this.style.color='#ef4444'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">
       <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"/></svg>
     </button>
@@ -310,41 +415,57 @@
       <path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
     </svg>
     <p class="big">Nenhum dado financeiro importado</p>
-    <p>Importe a planilha financeira para visualizar o dashboard</p>
-    <a class="btn-upload" href="{% url 'web:campaign_financial_upload' campaign.id %}" style="margin-top:20px;display:inline-flex;">Importar planilha</a>
+    <p>Importe uma planilha ou cadastre os valores manualmente</p>
+    <div style="display:flex;gap:12px;margin-top:20px;flex-wrap:wrap;justify-content:center;">
+      <a class="btn-upload" href="{% url 'web:campaign_financial_upload' campaign.id %}">Importar planilha</a>
+      {% if role != "cliente" %}
+      <button type="button" class="btn-upload" style="background:#16a34a;" onclick="openEditSummary()">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
+        Cadastrar manualmente
+      </button>
+      {% endif %}
+    </div>
   </div>
 </div>
 {% else %}
 
 <!-- ── 1. Metric Cards (full width, 4 cols) ────────────────────────────────── -->
 <div class="metric-grid">
-  <div class="metric-card">
+  {% with vis=visibility %}
+  <div class="metric-card vis-section" data-vis-key="valor_total" {% if role == "cliente" and not vis.valor_total %}style="display:none"{% endif %}>
+    {% if role != "cliente" %}<button class="vis-eye" onclick="toggleVis('valor_total', this)" title="Toggle visibilidade cliente"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">{% if vis.valor_total %}<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>{% else %}<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>{% endif %}</svg></button>{% endif %}
     <p class="label">Valor Total</p>
     <p class="value">{% if fs.total_valor_tabela %}R$ {{ fs.total_valor_tabela|floatformat:0 }}{% else %}—{% endif %}</p>
     <p class="sub">Valor Tabela</p>
   </div>
-  <div class="metric-card">
+  <div class="metric-card vis-section" data-vis-key="valor_negociado" {% if role == "cliente" and not vis.valor_negociado %}style="display:none"{% endif %}>
+    {% if role != "cliente" %}<button class="vis-eye" onclick="toggleVis('valor_negociado', this)" title="Toggle visibilidade cliente"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">{% if vis.valor_negociado %}<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>{% else %}<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>{% endif %}</svg></button>{% endif %}
     <p class="label">Valor Pendente</p>
-    <p class="value" style="color:#6366f1;">
-      {% if fs.total_valor_negociado %}R$ {{ fs.total_valor_negociado|floatformat:0 }}{% else %}—{% endif %}
-    </p>
+    <p class="value" style="color:#6366f1;">{% if fs.total_valor_negociado %}R$ {{ fs.total_valor_negociado|floatformat:0 }}{% else %}—{% endif %}</p>
     <p class="sub">Valor Negociado</p>
   </div>
-  <div class="metric-card">
+  <div class="metric-card vis-section" data-vis-key="desembolso" {% if role == "cliente" and not vis.desembolso %}style="display:none"{% endif %}>
+    {% if role != "cliente" %}<button class="vis-eye" onclick="toggleVis('desembolso', this)" title="Toggle visibilidade cliente"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">{% if vis.desembolso %}<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>{% else %}<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>{% endif %}</svg></button>{% endif %}
     <p class="label">Valor Pago</p>
-    <p class="value" style="color:#16a34a;">
-      {% if fs.total_desembolso %}R$ {{ fs.total_desembolso|floatformat:0 }}{% else %}—{% endif %}
-    </p>
+    <p class="value" style="color:#16a34a;">{% if fs.total_desembolso %}R$ {{ fs.total_desembolso|floatformat:0 }}{% else %}—{% endif %}</p>
     <p class="sub">Desembolso</p>
   </div>
-  <div class="metric-card">
+  <div class="metric-card vis-section" data-vis-key="desconto" {% if role == "cliente" and not vis.desconto %}style="display:none"{% endif %}>
+    {% if role != "cliente" %}<button class="vis-eye" onclick="toggleVis('desconto', this)" title="Toggle visibilidade cliente"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">{% if vis.desconto %}<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>{% else %}<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>{% endif %}</svg></button>{% endif %}
     <p class="label">Desconto</p>
-    <p class="value" style="color:#d97706;">
-      {% if fs.desconto_pct %}{{ fs.desconto_pct|floatformat:1 }}%{% else %}—{% endif %}
-    </p>
+    <p class="value" style="color:#d97706;">{% if fs.desconto_pct %}{{ fs.desconto_pct|floatformat:1 }}%{% else %}—{% endif %}</p>
     <p class="sub">Desconto Negociado</p>
   </div>
+  {% endwith %}
 </div>
+{% if role != "cliente" %}
+<div style="display:flex;gap:8px;margin:-20px 0 24px;">
+  <button type="button" class="btn-edit-metrics" onclick="openEditSummary()" title="Editar valores financeiros">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+    Editar valores
+  </button>
+</div>
+{% endif %}
 
 {% if fs.grp_pct or fs.cobertura_pct or fs.frequencia_eficaz %}
 <div style="display:flex;gap:16px;margin-bottom:28px;">
@@ -808,6 +929,152 @@ async function deleteEff(id, el) {
   if (res.ok) {
     const tr = el.closest('tr');
     if (tr) tr.remove();
+  }
+}
+
+// ── Edit Financial Summary ─────────────────────────────
+const SUMMARY_FIELDS = [
+  {key: 'total_valor_tabela',  label: 'Valor Total (Tabela)', prefix: 'R$ '},
+  {key: 'total_valor_negociado', label: 'Valor Negociado', prefix: 'R$ '},
+  {key: 'total_desembolso',    label: 'Valor Pago (Desembolso)', prefix: 'R$ '},
+  {key: 'desconto_pct',        label: 'Desconto %'},
+  {key: 'grp_pct',             label: 'GRP'},
+  {key: 'cobertura_pct',       label: 'Cobertura %'},
+  {key: 'frequencia_eficaz',   label: 'Freq. Eficaz'},
+];
+
+async function openEditSummary() {
+  const res = await fetch('/api/financial-summary/{{ campaign.id }}/');
+  const d = res.ok ? await res.json() : {};
+  let html = '';
+  for (let i = 0; i < SUMMARY_FIELDS.length; i += 2) {
+    html += '<div class="lb-row">';
+    for (let j = i; j < Math.min(i + 2, SUMMARY_FIELDS.length); j++) {
+      const f = SUMMARY_FIELDS[j];
+      const val = d[f.key] ?? '';
+      html += '<div class="lb-field"><label>' + f.label + '</label>';
+      html += '<input type="number" step="any" id="fs-' + f.key + '" value="' + val + '" placeholder="' + (f.prefix || '') + '">';
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+  // Monthly investment editor
+  html += '<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border,#e2e8f0);">';
+  html += '<label style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;">Investimento Mensal (Timeline)</label>';
+  html += '<div id="fs-monthly-rows" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">';
+  const monthly = d.monthly_investment || [];
+  if (monthly.length > 0) {
+    monthly.forEach(function(m, idx) {
+      html += monthlyRow(m.month || '', m.valor || '', idx);
+    });
+  } else {
+    html += monthlyRow('', '', 0);
+  }
+  html += '</div>';
+  html += '<button type="button" onclick="addMonthlyRow()" style="margin-top:8px;background:none;border:1px dashed var(--border,#e2e8f0);border-radius:6px;padding:6px 12px;font-size:11px;color:var(--text-secondary);cursor:pointer;width:100%;">+ Adicionar mês</button>';
+  html += '</div>';
+
+  document.getElementById('lb-edit-body').innerHTML = html;
+  document.getElementById('lb-save-btn').setAttribute('onclick', 'saveSummary()');
+  document.querySelector('#lb-edit .lb-header h3').textContent = 'Editar Dados Financeiros';
+  openLB('lb-edit');
+}
+
+function monthlyRow(month, valor, idx) {
+  return '<div class="lb-row" style="gap:8px;align-items:center;">' +
+    '<div class="lb-field" style="flex:1;"><input type="month" class="fs-m-month" value="' + month + '" placeholder="YYYY-MM"></div>' +
+    '<div class="lb-field" style="flex:1;"><input type="number" step="any" class="fs-m-valor" value="' + valor + '" placeholder="R$ valor"></div>' +
+    '<button type="button" onclick="this.closest(\'.lb-row\').remove()" style="background:none;border:none;color:#ef4444;cursor:pointer;padding:4px;" title="Remover">' +
+    '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></button>' +
+    '</div>';
+}
+
+function addMonthlyRow() {
+  var container = document.getElementById('fs-monthly-rows');
+  var div = document.createElement('div');
+  div.innerHTML = monthlyRow('', '', container.children.length);
+  container.appendChild(div.firstChild);
+}
+
+// ── Visibility toggles (admin only) ─────────────────────
+var _visState = {{ visibility_json|safe }};
+
+async function toggleVis(key, btn) {
+  var current = !!_visState[key];
+  var newVal = !current;
+  _visState[key] = newVal;
+
+  var res = await fetch('/api/financial-visibility/{{ campaign.id }}/', {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''},
+    body: JSON.stringify({visibility: {[key]: newVal}}),
+  });
+  if (res.ok) {
+    // Update eye icon
+    var eyeOpen = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+    var eyeClosed = '<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
+    btn.querySelector('svg').innerHTML = newVal ? eyeOpen : eyeClosed;
+    btn.classList.toggle('active', newVal);
+    // Dim the card if hidden
+    var card = btn.closest('.vis-section');
+    if (card) card.setAttribute('data-vis-hidden', !newVal);
+  }
+}
+
+async function toggleClientVisible() {
+  var btn = document.getElementById('btn-client-visible');
+  var current = btn.dataset.visible === 'true';
+  var newVal = !current;
+
+  var res = await fetch('/api/financial-visibility/{{ campaign.id }}/', {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''},
+    body: JSON.stringify({client_visible: newVal}),
+  });
+  if (res.ok) {
+    location.reload();
+  }
+}
+
+// Initialize eye button states
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.vis-eye').forEach(function(btn) {
+    var key = btn.closest('.vis-section')?.dataset.visKey;
+    if (key && _visState[key]) {
+      btn.classList.add('active');
+    } else if (key) {
+      btn.closest('.vis-section')?.setAttribute('data-vis-hidden', 'true');
+    }
+  });
+  var cvBtn = document.getElementById('btn-client-visible');
+  if (cvBtn) cvBtn.dataset.visible = '{{ client_visible|yesno:"true,false" }}';
+});
+
+async function saveSummary() {
+  var data = {};
+  SUMMARY_FIELDS.forEach(function(f) {
+    var el = document.getElementById('fs-' + f.key);
+    if (!el) return;
+    data[f.key] = el.value === '' ? null : Number(el.value);
+  });
+
+  // Collect monthly investment
+  var months = [];
+  document.querySelectorAll('#fs-monthly-rows .lb-row').forEach(function(row) {
+    var m = row.querySelector('.fs-m-month')?.value || '';
+    var v = row.querySelector('.fs-m-valor')?.value || '';
+    if (m && v) months.push({month: m, valor: Number(v)});
+  });
+  data.monthly_investment = months;
+
+  var res = await fetch('/api/financial-summary/{{ campaign.id }}/', {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''},
+    body: JSON.stringify(data),
+  });
+  if (res.ok) {
+    closeLB('lb-edit');
+    location.reload();
   }
 }
 </script>

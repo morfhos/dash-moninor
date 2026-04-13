@@ -36,6 +36,7 @@
 body {
   background-color: var(--bg-main);
   color: var(--text-primary);
+  overflow-x: hidden;
 }
 
 .full-gradient {
@@ -204,6 +205,8 @@ body {
 .layout {
   display: flex;
   min-height: 100vh;
+  overflow-x: hidden;
+  width: 100%;
 }
 
 .sidebar {
@@ -220,6 +223,7 @@ body {
   flex-grow: 1;
   padding: 24px 32px;
   overflow-y: auto;
+  min-width: 0;    /* prevent flex children from overflowing */
 }
 
 .topbar {
@@ -549,62 +553,243 @@ body {
   opacity: 0.8;
 }
 
+/* ── Responsive: Tablet ─────────────────────────────────── */
 @media (max-width: 1100px) {
   .grid {
     grid-template-columns: 1fr;
   }
 }
 
-@media (max-width: 900px) {
-  .layout {
-    flex-direction: column;
+/* ── Responsive: Mobile (≤768px) ───────────────────────── */
+@media (max-width: 768px) {
+  /* Sidebar: off-screen by default, overlay on toggle */
+  .sidebar {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px !important;
+    z-index: 1000;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    overflow-y: auto;
+    padding: 24px 16px !important;
+  }
+  html.sidebar-mobile-open .sidebar {
+    transform: translateX(0);
+  }
+  /* Override ALL desktop collapsed rules on mobile */
+  html.sidebar-is-collapsed .sidebar {
+    width: 280px !important;
+    padding: 24px 16px !important;
+    transform: translateX(-100%);
+  }
+  html.sidebar-mobile-open.sidebar-is-collapsed .sidebar {
+    transform: translateX(0);
+  }
+  html.sidebar-is-collapsed .sidebar .sidebar-client-selector,
+  html.sidebar-is-collapsed .sidebar .nav-group-toggle .nav-group-label,
+  html.sidebar-is-collapsed .sidebar .nav-group-toggle .nav-chevron,
+  html.sidebar-is-collapsed .sidebar .menu-item .item-content span:not(.icon),
+  html.sidebar-is-collapsed .sidebar .logout-btn span:not(.icon),
+  html.sidebar-is-collapsed .sidebar .version-badge { display: revert !important; }
+  html.sidebar-is-collapsed .sidebar .menu-item .item-content,
+  html.sidebar-is-collapsed .sidebar .logout-btn,
+  html.sidebar-is-collapsed .sidebar .nav-group-toggle { justify-content: flex-start !important; }
+  /* Sidebar desktop toggle hidden */
+  .sidebar-toggle { display: none !important; }
+
+  /* Overlay behind sidebar */
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 999;
+  }
+  html.sidebar-mobile-open .sidebar-overlay {
+    display: block;
   }
 
-  .sidebar {
+  /* Hamburger button visible */
+  .mobile-hamburger {
+    display: flex !important;
+  }
+
+  /* Content fills full width */
+  .content {
+    padding: 12px 14px;
     width: 100%;
   }
 
-  .content {
-    padding: 16px;
-  }
-}
-
-@media (max-width: 640px) {
-  .grid {
-    gap: 16px;
-  }
-
   .topbar h1 {
-    font-size: 20px;
+    font-size: 18px;
   }
 
-  .month-selector {
+  .topbar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Top userbar: hamburger left, icons right, single row */
+  .top-userbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+  .top-userbar-left {
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+  .top-userbar-right {
+    flex: 1;
+    justify-content: flex-end;
+    gap: 6px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  /* Hide non-essential icons on mobile */
+  .top-userbar-right .divider-vertical {
+    display: none;
+  }
+  /* Hide profile name on mobile */
+  .profile-name {
+    display: none;
+  }
+  .profile-caret {
+    display: none;
+  }
+  .icon-btn {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+  }
+
+  /* Stat cards: 2 per row */
+  .cards {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .metric {
+    padding: 12px;
+    gap: 8px;
+  }
+  .metric .value {
+    font-size: 16px;
+  }
+  .metric .label {
+    font-size: 10px;
+  }
+  .metric .icon-box {
+    width: 28px;
+    height: 28px;
+  }
+
+  /* Grid: single column */
+  .grid {
+    grid-template-columns: 1fr;
     gap: 16px;
-    padding: 10px 12px;
-    justify-content: flex-start;
   }
 
+  /* Tables: horizontal scroll */
+  .table-responsive,
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Form grid: single column */
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Month selector / calendar header */
+  .month-selector,
+  .calendar-header {
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  /* Timeline: allow horizontal scroll */
   .timeline-grid {
     min-width: 720px;
   }
-
-  .timeline-row {
-    grid-template-columns: 150px 1fr;
+  .timeline-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
-  .top-userbar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
+  /* Search */
   .search {
     max-width: 100%;
   }
 
-  .top-userbar-right {
-    width: 100%;
-    justify-content: space-between;
+  /* Filter dropdowns stack */
+  .filter-select {
+    font-size: 12px;
+    padding: 6px 8px;
+    min-width: 0;
+    width: auto;
+    flex: 1;
+    max-width: 140px;
   }
+
+  /* Breadcrumbs: smaller */
+  .breadcrumbs {
+    font-size: 11px;
+  }
+  .bc-current {
+    max-width: 180px;
+  }
+}
+
+/* ── Responsive: Small phone (≤480px) ──────────────────── */
+@media (max-width: 480px) {
+  .content {
+    padding: 10px;
+  }
+
+  /* Stat cards: stack */
+  .cards {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .metric .value {
+    font-size: 14px;
+  }
+
+  .top-userbar-right .icon-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .divider-vertical {
+    display: none;
+  }
+}
+
+/* ── Hamburger button (hidden on desktop) ──────────────── */
+.mobile-hamburger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 10px;
+  background: var(--brand-primary);
+  color: white;
+  cursor: pointer;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+/* ── Sidebar overlay (hidden on desktop) ───────────────── */
+.sidebar-overlay {
+  display: none;
 }
 
 

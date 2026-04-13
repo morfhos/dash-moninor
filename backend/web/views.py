@@ -4302,7 +4302,8 @@ def contract_done(request: HttpRequest, campaign_id: int) -> HttpResponse:
             "filter_markets": sorted(unique_markets),
             "media_type_tabs": _build_media_tabs(unique_media_channels),
             "role": role,
-            "has_financial": campaign.financial_uploads.exists(),
+            "has_financial": campaign.financial_uploads.exists() or hasattr(campaign, "financial_summary"),
+            "financial_client_visible": getattr(getattr(campaign, "financial_summary", None), "client_visible", False),
         },
     )
 
@@ -5823,11 +5824,9 @@ def api_piece_create(request: HttpRequest, campaign_id: int) -> HttpResponse:
     )
 
     AuditLog.log(
-        user=request.user,
-        action="piece_created",
-        details=f"Peca '{code}' criada na campanha '{campaign.name}'",
-        model_name="Piece",
-        object_id=piece.id,
+        AuditLog.EventType.PIECE_CREATED,
+        request=request,
+        details={"piece_id": piece.id, "code": code, "campaign": campaign.name},
     )
 
     return JsonResponse({
@@ -6400,7 +6399,6 @@ def api_veiculacao_data(request: HttpRequest) -> JsonResponse:
 # ── Financial integration views ───────────────────────────────────────────────
 
 @login_required
-@require_admin
 def campaign_financeiro(request: HttpRequest, campaign_id: int) -> HttpResponse:
     """Exibe o dashboard financeiro da campanha (6 módulos)."""
     from django.db.models import Sum
@@ -6409,10 +6407,16 @@ def campaign_financeiro(request: HttpRequest, campaign_id: int) -> HttpResponse:
     if campaign is None:
         return redirect("web:campanhas")
 
+    role = effective_role(request)
+
     try:
         fs = campaign.financial_summary
     except Exception:
         fs = None
+
+    # Cliente só acessa se client_visible estiver habilitado
+    if role == "cliente" and (not fs or not fs.client_visible):
+        return redirect("web:contract_done", campaign_id=campaign.id)
 
     efficiencies = list(campaign.media_efficiencies.order_by("channel_type", "veiculo"))
     pi_controls = list(campaign.pi_controls.order_by("vencimento"))
@@ -6468,6 +6472,10 @@ def campaign_financeiro(request: HttpRequest, campaign_id: int) -> HttpResponse:
         "pi_due_soon": pi_due_soon,
         "meio_options": meio_options,
         "veiculo_options": veiculo_options,
+        "role": role,
+        "visibility": (fs.visibility if fs else {}) or {},
+        "visibility_json": _json.dumps((fs.visibility if fs else {}) or {}),
+        "client_visible": fs.client_visible if fs else False,
     })
 
 
@@ -6677,6 +6685,114 @@ def api_efficiency_detail(request: HttpRequest, eff_id: int) -> JsonResponse:
                 setattr(eff, field, _dec(data[field]))
         eff.save()
         return JsonResponse({"ok": True, "id": eff.id})
+
+    return JsonResponse({"error": "Method not allowed"}, status=405)
+
+
+@login_required
+@require_admin
+def api_financial_summary(request: HttpRequest, campaign_id: int) -> JsonResponse:
+    """GET/PATCH FinancialSummary for a campaign. Creates if not exists on PATCH."""
+    from campaigns.models import FinancialSummary
+    from decimal import Decimal, InvalidOperation
+    import json as _json
+
+    campaign = Campaign.objects.filter(id=campaign_id).first()
+    if campaign is None:
+        return JsonResponse({"error": "Campaign not found"}, status=404)
+
+    DECIMAL_FIELDS = (
+        "total_valor_tabela", "total_valor_negociado", "total_desembolso",
+        "desconto_pct", "grp_pct", "cobertura_pct", "frequencia_eficaz",
+    )
+    JSON_FIELDS = ("data_by_channel", "monthly_investment")
+
+    if request.method == "GET":
+        fs = getattr(campaign, "financial_summary", None)
+        if fs is None:
+            return JsonResponse({"exists": False})
+        data = {"exists": True}
+        for f in DECIMAL_FIELDS:
+            v = getattr(fs, f, None)
+            data[f] = float(v) if v is not None else None
+        for f in JSON_FIELDS:
+            data[f] = getattr(fs, f, None)
+        return JsonResponse(data)
+
+    if request.method in ("PUT", "PATCH"):
+        try:
+            body = _json.loads(request.body)
+        except _json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+        fs, created = FinancialSummary.objects.get_or_create(campaign=campaign)
+
+        def _dec(v):
+            if v is None or v == "":
+                return None
+            try:
+                return Decimal(str(v))
+            except InvalidOperation:
+                return None
+
+        for f in DECIMAL_FIELDS:
+            if f in body:
+                setattr(fs, f, _dec(body[f]))
+        for f in JSON_FIELDS:
+            if f in body:
+                setattr(fs, f, body[f])
+
+        # Auto-calculate desconto if both tabela and desembolso present
+        if fs.total_valor_tabela and fs.total_desembolso and fs.total_valor_tabela > 0:
+            if "desconto_pct" not in body or body.get("desconto_pct") is None:
+                fs.desconto_pct = Decimal(str(
+                    round((1 - float(fs.total_desembolso) / float(fs.total_valor_tabela)) * 100, 2)
+                ))
+
+        fs.save()
+        return JsonResponse({"ok": True, "created": created})
+
+    return JsonResponse({"error": "Method not allowed"}, status=405)
+
+
+@login_required
+@require_admin
+def api_financial_visibility(request: HttpRequest, campaign_id: int) -> JsonResponse:
+    """Toggle visibility of financial fields/sections for client view."""
+    from campaigns.models import FinancialSummary
+    import json as _json
+
+    campaign = Campaign.objects.filter(id=campaign_id).first()
+    if campaign is None:
+        return JsonResponse({"error": "Not found"}, status=404)
+
+    fs, _ = FinancialSummary.objects.get_or_create(campaign=campaign)
+
+    if request.method == "GET":
+        return JsonResponse({
+            "client_visible": fs.client_visible,
+            "visibility": fs.visibility or {},
+        })
+
+    if request.method in ("PUT", "PATCH"):
+        try:
+            data = _json.loads(request.body)
+        except _json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+        if "client_visible" in data:
+            fs.client_visible = bool(data["client_visible"])
+        if "visibility" in data:
+            current = fs.visibility or {}
+            current.update(data["visibility"])
+            fs.visibility = current
+        fs.save(update_fields=["client_visible", "visibility"])
+        AuditLog.log(
+            AuditLog.EventType.VISIBILITY_CHANGED,
+            request=request,
+            details={"campaign_id": campaign_id, "client_visible": fs.client_visible, "changes": data},
+        )
+        return JsonResponse({"ok": True, "client_visible": fs.client_visible, "visibility": fs.visibility})
 
     return JsonResponse({"error": "Method not allowed"}, status=405)
 

@@ -945,12 +945,38 @@ if (piecesLabels.length > 0) {
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .stats-cards {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .stat-card {
+    padding: 10px;
+    gap: 8px;
+  }
+  .stat-icon {
+    width: 32px;
+    height: 32px;
+  }
+  .stat-value {
+    font-size: 15px;
+  }
+  .stat-label {
+    font-size: 10px;
+  }
+  .modules-grid {
     grid-template-columns: 1fr;
   }
+  .topbar h1 {
+    font-size: 18px;
+  }
+  .chart-card {
+    min-height: auto;
+  }
+}
 
-  .modules-grid {
+@media (max-width: 380px) {
+  .stats-cards {
     grid-template-columns: 1fr;
   }
 }

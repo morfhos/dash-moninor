@@ -289,9 +289,17 @@
     color: var(--text-secondary);
   }
 
-  @media (max-width: 640px) {
+  @media (max-width: 768px) {
     .campaigns-grid {
       grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    .media-filter-bar {
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .campaign-card {
+      border-radius: 12px;
     }
   }
 
